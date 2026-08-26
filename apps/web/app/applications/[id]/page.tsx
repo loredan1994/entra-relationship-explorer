@@ -33,7 +33,7 @@ export default async function ApplicationDetailPage({ params }: { params: Promis
     <AppShell>
       <div className="page-container">
         <PageHeading
-          eyebrow={`Application detail · ${snapshot.mode === "fixture" ? "synthetic record" : "tenant snapshot"}`}
+          eyebrow={`Application detail · ${snapshot.mode === "fixture" ? "sample record" : "your tenant snapshot"}`}
           title={selected.label}
           description="The reusable blueprint and its tenant-local identity are separate Entra objects joined by application ID."
           actions={<Link className="button button-secondary" href="/map">Back to map</Link>}
@@ -62,6 +62,16 @@ export default async function ApplicationDetailPage({ params }: { params: Promis
   );
 }
 
+function describeCredential(credential: { status: "healthy" | "expiring" | "expired" | "none"; expiresAt: string | null } | undefined): string {
+  if (!credential || credential.status === "none") return "No credential metadata recorded";
+  const expiry = credential.expiresAt
+    ? new Intl.DateTimeFormat("en", { dateStyle: "medium", timeZone: "UTC" }).format(new Date(credential.expiresAt))
+    : null;
+  if (credential.status === "healthy") return expiry ? `Healthy — next expiry ${expiry}` : "Healthy";
+  if (credential.status === "expiring") return expiry ? `Expiring soon — ${expiry}` : "Expiring soon";
+  return expiry ? `Expired on ${expiry}` : "Expired";
+}
+
 function EntityCard({
   title,
   microsoftTerm,
@@ -83,6 +93,7 @@ function EntityCard({
         <div><dt>Application ID</dt><dd><code>{node.appId}</code></dd></div>
         <div><dt>Publisher</dt><dd>{node.publisher}</dd></div>
         <div><dt>Owners</dt><dd>{node.ownerIds.length || "None recorded"}</dd></div>
+        <div><dt>Credentials</dt><dd>{describeCredential(node.credential)}</dd></div>
       </dl>
       <p className="rule-reason"><strong>Review reason:</strong> {node.risk.reason}</p>
     </section>
