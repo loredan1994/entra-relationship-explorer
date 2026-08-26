@@ -1,0 +1,14 @@
+.DS_Store
+.env
+.env.*
+!.env.example
+node_modules/
+.next/
+dist/
+coverage/
+*.tfstate
+*.tfstate.*
+.terraform/
+.gstack/
+
+.gstack/

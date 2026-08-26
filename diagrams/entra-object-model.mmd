@@ -1,0 +1,20 @@
+flowchart LR
+  AR["App registration<br/>BLUEPRINT<br/>Defines roles: Api.Read, Api.Write"]
+  RSP["Enterprise application<br/>RESOURCE service principal<br/>Tenant-local API identity"]
+  CAR["App registration<br/>BLUEPRINT<br/>Orchestrator settings"]
+  CSP["Enterprise application<br/>CLIENT service principal<br/>Orchestrator identity"]
+  USER(("User"))
+  GROUP{{"Group"}}
+
+  AR -. "same appId creates local identity" .-> RSP
+  CAR -. "same appId creates local identity" .-> CSP
+  CSP == "CAN CALL<br/>Api.Read + Api.Write" ==> RSP
+  USER -. "assigned to use" .-> RSP
+  GROUP -. "assigned to use" .-> RSP
+
+  classDef blueprint fill:#EAF0FF,stroke:#2F6FED,color:#172033,stroke-width:2px;
+  classDef identity fill:#DDF8F8,stroke:#16B8C4,color:#172033,stroke-width:2px;
+  classDef person fill:#F5F7FA,stroke:#667085,color:#172033;
+  class AR,CAR blueprint;
+  class RSP,CSP identity;
+  class USER,GROUP person;

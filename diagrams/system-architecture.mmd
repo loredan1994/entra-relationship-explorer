@@ -1,0 +1,23 @@
+flowchart LR
+  ADMIN["Entra administrator<br/>Signs in and starts scan"]
+  WEB["Explorer web app<br/>Map, table, evidence"]
+  SCAN["Read-only scanner<br/>Pagination + retry"]
+  GRAPH["Microsoft Graph<br/>Tenant authority"]
+  STORE[("Snapshot store<br/>Tenant-isolated metadata")]
+
+  ADMIN -->|"Authorization code + PKCE"| WEB
+  WEB -->|"Start/read scan"| SCAN
+  SCAN -->|"Read-only permissions"| GRAPH
+  GRAPH -->|"Apps, identities, grants, owners"| SCAN
+  SCAN -->|"Normalized nodes, edges, evidence"| STORE
+  STORE -->|"Bounded queries"| WEB
+
+  NOTE["No write permissions<br/>No secrets or token values stored"]
+  NOTE -. "security boundary" .-> SCAN
+
+  classDef core fill:#EAF0FF,stroke:#2F6FED,color:#172033,stroke-width:2px;
+  classDef data fill:#DDF8F8,stroke:#16B8C4,color:#172033,stroke-width:2px;
+  classDef guard fill:#FFF4DC,stroke:#D97706,color:#172033;
+  class WEB,SCAN core;
+  class GRAPH,STORE data;
+  class NOTE guard;
