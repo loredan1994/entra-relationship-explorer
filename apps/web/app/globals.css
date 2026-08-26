@@ -21,7 +21,10 @@
 
 * { box-sizing: border-box; }
 html { min-width: 320px; background: var(--surface-app); color: var(--ink-strong); }
-body { margin: 0; font-family: var(--font-ui); font-size: 14px; line-height: 1.45; background: var(--surface-app); }
+/* Tenant object names are attacker/user-controlled and can be arbitrarily long
+   unbroken tokens; break them anywhere rather than letting any name push
+   layout past the viewport. Only applies when a word cannot otherwise fit. */
+body { margin: 0; font-family: var(--font-ui); font-size: 14px; line-height: 1.45; background: var(--surface-app); overflow-wrap: anywhere; }
 a { color: inherit; }
 button, input { font: inherit; }
 button, a, input { -webkit-tap-highlight-color: transparent; }
