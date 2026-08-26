@@ -62,21 +62,48 @@ test("mobile layout does not overflow the page", async ({ page }, testInfo) => {
   expect(metrics.body).toBeLessThanOrEqual(metrics.viewport + 1);
 });
 
-test("the security page reports tenant exposure from configured access only", async ({ page }) => {
+test("the threat workspace explains transitive paths and keeps evidence classes separate", async ({ page }) => {
   await page.goto("/security");
-  await expect(page.getByRole("heading", { name: "Where this tenant is exposed.", level: 1 })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Attack paths and threat workspace", level: 1 })).toBeVisible();
+  await page.getByRole("button", { name: /Maya Chen can reach Clean Project API/ }).click();
+  await expect(page.getByRole("heading", { name: "Multi-stage attack flow" })).toBeVisible();
+  await expect(page.getByText("3 configured steps")).toBeVisible();
+  await expect(page.getByText("0 observed")).toBeVisible();
+  await expect(page.getByText(/not evidence that exploitation occurred/)).toBeVisible();
+  await page.getByRole("button", { name: "Edit a review copy" }).click();
+  await expect(page.getByText("3 review steps")).toBeVisible();
+  await page.getByRole("button", { name: "Add analyst step" }).click();
+  await expect(page.getByText("4 review steps")).toBeVisible();
+  await page.getByLabel("Owner").fill("IAM team");
+  await page.getByLabel("Status").selectOption("mitigating");
+  await page.reload();
+  await expect(page.getByLabel("Owner")).toHaveValue("IAM team");
+  await expect(page.getByLabel("Status")).toHaveValue("mitigating");
+});
 
-  // The fixture grants Api.Read plus Api.Write as an application permission.
-  const powerful = page.getByRole("article").filter({ hasText: "Clean Project Orchestrator" }).first();
-  await expect(powerful).toContainText("Application permission");
-  await expect(powerful).toContainText("Api.Write");
+test("standalone report and MITRE Attack Flow exports are sanitized and interoperable", async ({ request }) => {
+  const report = await request.get("/api/export/report.html");
+  expect(report.ok()).toBeTruthy();
+  expect(report.headers()["content-disposition"]).toContain("attachment");
+  expect(report.headers()["content-security-policy"]).toContain("frame-ancestors 'none'");
+  const reportBody = await report.text();
+  expect(reportBody).toContain("default-src 'none'");
+  expect(reportBody).not.toContain("accessToken");
+  const flow = await request.get("/api/export/attack-flow.json");
+  expect(flow.ok()).toBeTruthy();
+  const bundle = await flow.json() as { type: string; objects: Array<{ type: string; spec_version?: string }> };
+  expect(bundle.type).toBe("bundle");
+  expect(bundle.objects.some((item) => item.type === "attack-flow" && item.spec_version === "2.1")).toBeTruthy();
+});
 
-  // Configured access must never be presented as observed use.
-  await expect(page.getByText("Configured, not observed.")).toBeVisible();
-  await expect(page.getByRole("main")).not.toContainText("last used");
-
-  // Unowned identities are named, and link to their evidence.
-  await expect(page.getByRole("table").filter({ hasText: "Expense Reporter" })).toBeVisible();
+test("fixture findings export is sanitized and evidence-labelled", async ({ request }) => {
+  const response = await request.get("/api/export/findings.csv");
+  expect(response.ok()).toBeTruthy();
+  expect(response.headers()["content-type"]).toContain("text/csv");
+  const body = await response.text();
+  expect(body).toContain('"evidenceClass"');
+  expect(body).toContain('"inferred"');
+  expect(body).not.toContain("accessToken");
 });
 
 test("live access is disabled by default and responses are hardened", async ({ request }) => {

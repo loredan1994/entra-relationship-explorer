@@ -12,7 +12,8 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@entra-explorer/domain": "workspace:*"
+    "@entra-explorer/domain": "workspace:*",
+    "@microsoft/microsoft-graph-client": "3.0.7"
   },
   "devDependencies": {
     "typescript": "5.9.2",

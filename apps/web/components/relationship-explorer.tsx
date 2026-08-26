@@ -18,8 +18,13 @@ import { RiskBadge } from "./risk-badge";
 const kindLabels: Record<NodeKind, { plain: string; microsoft: string }> = {
   application: { plain: "Blueprint", microsoft: "App registration" },
   servicePrincipal: { plain: "Tenant identity", microsoft: "Enterprise application" },
+  managedIdentity: { plain: "Managed identity", microsoft: "Service principal" },
   user: { plain: "Person", microsoft: "User" },
   group: { plain: "Group", microsoft: "Group" },
+  appRole: { plain: "Application role", microsoft: "App role" },
+  directoryRole: { plain: "Administrative role", microsoft: "Directory role" },
+  policy: { plain: "Access policy", microsoft: "Conditional Access policy" },
+  externalTenant: { plain: "External tenant", microsoft: "Partner tenant" },
 };
 
 const relationshipLabels: Record<RelationshipType, string> = {
@@ -27,6 +32,13 @@ const relationshipLabels: Record<RelationshipType, string> = {
   CAN_CALL_AS_APP: "Can call as an app",
   CAN_CALL_DELEGATED: "Can call with a signed-in person",
   ASSIGNED_TO: "Assigned to use",
+  EXPOSES_APP_ROLE: "Exposes app role",
+  GRANTED_APP_ROLE: "Granted app role",
+  MEMBER_OF: "Member of",
+  ACTIVE_IN_ROLE: "Active in role",
+  ELIGIBLE_FOR_ROLE: "Eligible for role",
+  GOVERNED_BY: "Governed by",
+  CROSS_TENANT_ACCESS: "Cross-tenant setting",
   OWNS: "Owns",
   OBSERVED_CALL: "Called recently",
 };

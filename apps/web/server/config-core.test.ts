@@ -41,4 +41,13 @@ describe("Phase 1 configuration boundary", () => {
     expect(config.enabled).toBe(true);
     expect(() => parseEntraConfig({ ...validEnvironment, NODE_ENV: "production", ENTRA_ALLOW_LOCAL_CLIENT_SECRET: "true", ENTRA_REDIRECT_URI: "https://example.com/api/auth/callback" })).toThrow(/must not use a client secret/i);
   });
+
+  it("adds only explicitly requested optional read-only evidence scopes", () => {
+    const config = parseEntraConfig({ ...validEnvironment, ENTRA_OPTIONAL_GRAPH_SCOPES: "RoleManagement.Read.Directory Policy.Read.All AuditLog.Read.All" });
+    if (!config.enabled) throw new Error("Expected live config");
+    expect(config.graphScopes).toContain("https://graph.microsoft.com/RoleManagement.Read.Directory");
+    expect(config.graphScopes).toContain("https://graph.microsoft.com/Policy.Read.All");
+    expect(config.graphScopes).toContain("https://graph.microsoft.com/AuditLog.Read.All");
+    expect(() => parseEntraConfig({ ...validEnvironment, ENTRA_OPTIONAL_GRAPH_SCOPES: "Sites.Read.All" })).toThrow(/optional|approved/i);
+  });
 });

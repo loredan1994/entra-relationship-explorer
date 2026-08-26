@@ -4,8 +4,13 @@ export const CORE_GRAPH_SCOPES = [
 ] as const;
 
 export const IDENTITY_SCOPES = ["openid", "profile", "offline_access"] as const;
+export const OPTIONAL_GRAPH_SCOPES = [
+  "https://graph.microsoft.com/RoleManagement.Read.Directory",
+  "https://graph.microsoft.com/Policy.Read.All",
+  "https://graph.microsoft.com/AuditLog.Read.All",
+] as const;
 
-const ALLOWED_SCOPES = new Set<string>([...CORE_GRAPH_SCOPES, ...IDENTITY_SCOPES]);
+const ALLOWED_SCOPES = new Set<string>([...CORE_GRAPH_SCOPES, ...OPTIONAL_GRAPH_SCOPES, ...IDENTITY_SCOPES]);
 
 export function assertReadOnlyScopes(scopes: readonly string[]): void {
   if (scopes.length === 0) throw new Error("At least one scope is required.");

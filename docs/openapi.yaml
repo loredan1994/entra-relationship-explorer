@@ -41,6 +41,27 @@ paths:
         "200": { description: Scan job }
         "401": { description: Authentication required }
         "404": { description: Job absent from this tenant }
+    delete:
+      summary: Safely cancel a queued or running read-only scan
+      responses:
+        "200": { description: Cancellation accepted or completed }
+        "401": { description: Authentication required }
+        "403": { description: Same-origin check failed }
+        "404": { description: Active job absent from this tenant }
+  /threat-reviews/{id}:
+    get:
+      summary: Read one encrypted tenant-scoped finding decision
+      responses:
+        "200": { description: Review or null }
+        "401": { description: Authentication required }
+        "404": { description: Finding absent from the latest tenant snapshot }
+    put:
+      summary: Save a decision and optional analyst-edited attack-flow copy
+      responses:
+        "200": { description: Encrypted review saved }
+        "400": { description: Invalid decision or accepted-risk fields }
+        "401": { description: Authentication required }
+        "403": { description: Same-origin check failed }
   /exports/relationships.csv:
     get:
       summary: Export the latest tenant snapshot as CSV

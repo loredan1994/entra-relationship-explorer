@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-08-26",
+  "product": "Entra Relationship Explorer",
+  "components": [
+    { "name": "@microsoft/microsoft-graph-client", "version": "3.0.7", "license": "MIT", "copyright": "Microsoft Corporation", "scope": "runtime", "modified": false },
+    { "name": "cytoscape", "version": "3.34.1", "license": "MIT", "copyright": "Cytoscape.js contributors", "scope": "runtime", "modified": false },
+    { "name": "next", "version": "16.3.3", "license": "MIT", "copyright": "Vercel, Inc.", "scope": "runtime", "modified": false },
+    { "name": "react", "version": "19.2.7", "license": "MIT", "copyright": "Meta Platforms, Inc. and affiliates", "scope": "runtime", "modified": false },
+    { "name": "react-dom", "version": "19.2.7", "license": "MIT", "copyright": "Meta Platforms, Inc. and affiliates", "scope": "runtime", "modified": false },
+    { "name": "@azure/msal-node", "version": "5.4.3", "license": "MIT", "copyright": "Microsoft Corporation", "scope": "runtime", "modified": false },
+    { "name": "pg", "version": "8.23.0", "license": "MIT", "copyright": "node-postgres contributors", "scope": "runtime", "modified": false },
+    { "name": "server-only", "version": "0.0.1", "license": "MIT", "copyright": "Meta Platforms, Inc. and affiliates", "scope": "runtime", "modified": false },
+    { "name": "tsx", "version": "4.23.12", "license": "MIT", "copyright": "Hiroki Osame", "scope": "runtime", "modified": false },
+    { "name": "postgres", "version": "17-alpine", "license": "PostgreSQL", "copyright": "PostgreSQL Global Development Group", "scope": "infrastructure", "modified": false },
+    { "name": "typescript", "version": "5.9.2", "license": "Apache-2.0", "copyright": "Microsoft Corporation", "scope": "development", "modified": false },
+    { "name": "@playwright/test", "version": "1.62.1", "license": "Apache-2.0", "copyright": "Microsoft Corporation", "scope": "development", "modified": false },
+    { "name": "vitest", "version": "3.2.6", "license": "MIT", "copyright": "Vitest contributors", "scope": "development", "modified": false },
+    { "name": "@axe-core/playwright", "version": "4.13.0", "license": "MPL-2.0", "copyright": "Deque Systems, Inc.", "scope": "development", "modified": false },
+    { "name": "eslint", "version": "10.9.1", "license": "MIT", "copyright": "OpenJS Foundation and ESLint contributors", "scope": "development", "modified": false },
+    { "name": "@eslint/js", "version": "10.0.1", "license": "MIT", "copyright": "OpenJS Foundation and ESLint contributors", "scope": "development", "modified": false },
+    { "name": "typescript-eslint", "version": "8.68.0", "license": "MIT", "copyright": "typescript-eslint contributors", "scope": "development", "modified": false },
+    { "name": "MITRE Attack Flow specification", "version": "2.0.0", "license": "Apache-2.0", "copyright": "The MITRE Corporation", "scope": "interoperability", "modified": false }
+  ],
+  "dataAttribution": [
+    { "name": "MITRE ATT&CK", "use": "Technique identifiers and names", "terms": "https://attack.mitre.org/resources/terms-of-use/", "endorsement": false },
+    { "name": "MITRE Attack Flow", "use": "STIX 2.1 extension format", "terms": "https://github.com/center-for-threat-informed-defense/attack-flow/blob/main/LICENSE", "endorsement": false }
+  ],
+  "excludedCopyleftFoundations": ["BloodHound", "AzureHound"]
+}

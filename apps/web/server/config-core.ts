@@ -1,4 +1,4 @@
-import { assertReadOnlyScopes, CORE_GRAPH_SCOPES, IDENTITY_SCOPES } from "@entra-explorer/graph";
+import { assertReadOnlyScopes, CORE_GRAPH_SCOPES, IDENTITY_SCOPES, OPTIONAL_GRAPH_SCOPES } from "@entra-explorer/graph";
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -52,7 +52,11 @@ export function parseEntraConfig(environment: NodeJS.ProcessEnv): EntraConfig {
   const dataEncryptionKey = Uint8Array.from(Buffer.from(encodedKey, "base64"));
   if (dataEncryptionKey.byteLength !== 32) throw new Error("ENTRA_DATA_ENCRYPTION_KEY must be a base64-encoded 32-byte key.");
 
-  const scopes = [...IDENTITY_SCOPES, ...CORE_GRAPH_SCOPES];
+  const requestedOptional = (environment.ENTRA_OPTIONAL_GRAPH_SCOPES ?? "").split(/[\s,]+/).filter(Boolean).map((scope) => scope.startsWith("https://") ? scope : `https://graph.microsoft.com/${scope}`);
+  const approvedOptional = new Set<string>(OPTIONAL_GRAPH_SCOPES);
+  for (const scope of requestedOptional) if (!approvedOptional.has(scope)) throw new Error(`Optional Graph scope is not approved by the product: ${scope}`);
+  const graphScopes = [...CORE_GRAPH_SCOPES, ...requestedOptional];
+  const scopes = [...IDENTITY_SCOPES, ...graphScopes];
   assertReadOnlyScopes(scopes);
   return {
     enabled: true,
@@ -62,7 +66,7 @@ export function parseEntraConfig(environment: NodeJS.ProcessEnv): EntraConfig {
     redirectUri: redirect.toString(),
     authority: `https://login.microsoftonline.com/${tenantId}`,
     scopes,
-    graphScopes: [...CORE_GRAPH_SCOPES],
+    graphScopes,
     databaseUrl,
     dataEncryptionKey,
     sessionMaxAgeSeconds: 60 * 60,

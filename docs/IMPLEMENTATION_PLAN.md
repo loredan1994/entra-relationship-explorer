@@ -28,7 +28,7 @@ Status: implemented for local use. The project scanner passed a representative G
 
 - Application detail, saved filters, one-hop expansion, unresolved-edge warnings.
 - Snapshot comparison and change feed.
-- Accessibility audit, large-tenant performance test, privacy review, threat model.
+- Accessibility audit, large-tenant performance test, and privacy review.
 
 Exit: production pilot with representative tenant scale.
 
@@ -40,25 +40,24 @@ Exit: production pilot with representative tenant scale.
 - Versioned `/api/v1` health, session, scan, and export endpoints.
 - Docker Compose stack with loopback exposure, health checks, persistent volume, and Key Vault-sourced secrets.
 
-## Phase 3 — optional modules
+## IAM intelligence and threat workspace — implemented for the current relationship scope
+
+- Bounded transitive path discovery over evidence-bearing configured relationships.
+- Prioritized findings for powerful privilege paths, delegated OAuth consent, missing ownership, and missing scan evidence.
+- Multi-stage flows with prerequisites, per-step provenance, MITRE ATT&CK® mappings, confidence, mitigation, and uncertainty.
+- Browser-local decision records for status, owner, expiry, and assumptions, plus sanitized CSV finding exports.
+- Strict configured / observed / inferred / missing evidence separation, including an optional 30-day observed sign-in overlay.
+
+## Next product modules
 
 - Sign-in activity overlay behind separate `AuditLog.Read.All` consent.
-- Rule-based review findings with transparent explanations.
+- Live collection for directory roles, group membership, PIM eligibility, Conditional Access, managed identities, and cross-tenant policy where least-privilege permissions permit it.
+- PostgreSQL-synchronized finding decisions and collaborative report generation.
 - Scheduled scans using managed identity or certificate authentication.
-
-## Initial backlog
-
-1. Scaffold Next.js/TypeScript workspace and tests.
-2. Convert `DESIGN.md` tokens into CSS variables.
-3. Define `ApplicationNode`, `ServicePrincipalNode`, and `RelationshipEdge` schemas.
-4. Load synthetic fixtures for the Clean Project example.
-5. Build map, search, filter, inspector, and table fallback.
-6. Add Microsoft login and Graph permission display.
-7. Implement scanner endpoint by endpoint with fixture-driven contract tests.
 
 ## Decisions requiring explicit approval later
 
 - Tenant hosting model: local-only, single-tenant Azure deployment, or multi-tenant service.
-- Whether optional sign-in logs are worth the extra permission.
+- Which deployments should enable optional role, policy, cross-tenant, or sign-in evidence scopes.
 - Retention duration and whether user-identifying fields may be stored.
 - Any future write/remediation capability; this must be a separate security design.

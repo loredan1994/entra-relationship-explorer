@@ -89,6 +89,6 @@ describe("permission boundary", () => {
 
   it("rejects any write-capable or unknown scope", () => {
     expect(() => assertReadOnlyScopes(["https://graph.microsoft.com/Application.ReadWrite.All"])).toThrow(/outside|write/i);
-    expect(() => assertReadOnlyScopes(["https://graph.microsoft.com/AuditLog.Read.All"])).toThrow(/outside/i);
+    expect(() => assertReadOnlyScopes(["https://graph.microsoft.com/Sites.Read.All"])).toThrow(/outside/i);
   });
 });

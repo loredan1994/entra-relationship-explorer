@@ -1,10 +1,17 @@
-export type NodeKind = "application" | "servicePrincipal" | "user" | "group";
+export type NodeKind = "application" | "servicePrincipal" | "managedIdentity" | "user" | "group" | "appRole" | "directoryRole" | "policy" | "externalTenant";
 
 export type RelationshipType =
   | "INSTANTIATES_AS"
   | "CAN_CALL_AS_APP"
   | "CAN_CALL_DELEGATED"
   | "ASSIGNED_TO"
+  | "EXPOSES_APP_ROLE"
+  | "GRANTED_APP_ROLE"
+  | "MEMBER_OF"
+  | "ACTIVE_IN_ROLE"
+  | "ELIGIBLE_FOR_ROLE"
+  | "GOVERNED_BY"
+  | "CROSS_TENANT_ACCESS"
   | "OWNS"
   | "OBSERVED_CALL";
 
@@ -23,6 +30,8 @@ export interface DirectoryNode {
   description: string;
   appId?: string;
   publisher?: string;
+  isExternal?: boolean;
+  metadata?: Record<string, string | boolean | number | null>;
   ownerIds: string[];
   credential?: {
     status: "healthy" | "expiring" | "expired" | "none";

@@ -1,7 +1,8 @@
 import { hostname } from "node:os";
 import { randomUUID } from "node:crypto";
 import { PostgresBackend, type DurableSession, type ScanJob, type ScanJobStage } from "@entra-explorer/backend";
-import { normalizeTenantScan, ReadOnlyGraphClient, scanTenant } from "@entra-explorer/graph";
+import { normalizeTenantScan, ReadOnlyGraphClient, scanTenant, ScanCancelledError } from "@entra-explorer/graph";
+import type { RawTenantScan } from "@entra-explorer/graph";
 import type { AccountInfo } from "@azure/msal-node";
 import { parseEntraConfig } from "./server/config-core";
 import { acquireSilent } from "./server/auth/msal";
@@ -49,14 +50,21 @@ async function run(job: ScanJob): Promise<void> {
       onRetry: ({ status, attempt, delayMs }) => progress(currentStage, currentCollected, `${status === 429 ? "Microsoft Graph throttled the scan" : "A transient read failed"}; retry ${attempt} in ${Math.ceil(delayMs / 1_000)} seconds`),
     });
     await progressWrites;
+    const checkpoint = await backend.getScanCheckpoint(job.id, job.tenantId);
+    if (checkpoint) progress(currentStage, currentCollected, `Resuming encrypted checkpoint from attempt ${Math.max(1, job.attempt - 1)}`);
     const raw = await scanTenant(client, job.tenantId, {
       concurrency: 4,
       onProgress: (event) => progress(event.stage, event.collected, event.detail),
+      shouldCancel: () => backend.isScanCancellationRequested(job.id, workerId),
+      enabledScopes: liveConfig.graphScopes,
+      resumeFrom: checkpoint?.payload as RawTenantScan | undefined,
+      onCheckpoint: (payload) => backend.saveScanCheckpoint({ jobId: job.id, tenantId: job.tenantId, payload, updatedAt: new Date().toISOString() }, workerId),
     });
     await backend.updateJobProgress(job.id, workerId, "normalizing", job.collected, "Normalizing source records into explainable relationships");
     const snapshot = normalizeTenantScan(raw);
     await backend.completeJob(job.id, workerId, snapshot, new Date(Date.now() - 30 * 24 * 60 * 60 * 1_000));
-  } catch {
+  } catch (error) {
+    if (error instanceof ScanCancelledError || await backend.isScanCancellationRequested(job.id, workerId)) { await backend.cancelJob(job.id, workerId); return; }
     await backend.failJob(job.id, workerId, "Scan failed. Review worker diagnostics; tokens and response bodies are not included.");
   }
 }

@@ -19,6 +19,8 @@ Microsoft Entra stores application identity across several related object types 
 - Identify unowned apps, broad permissions, and expiring credentials.
 - Show the source evidence for each conclusion.
 - Compare two scans without changing the tenant.
+- Find transitive paths to powerful application and directory access.
+- Review IAM threats with evidence, remediation, ownership, assumptions, and expiry.
 
 ## MVP
 
@@ -29,9 +31,11 @@ The MVP signs an administrator in, requests read-only consent, scans one tenant,
 - Delegated OAuth permission grants
 - Users, groups, and service principals assigned to enterprise applications
 - Owners and credential metadata (never credential values)
-- Search, filters, graph view, table view, evidence inspector, JSON/CSV export
+- Search, filters, Cytoscape-assisted graph layout, table view, evidence inspector, and CSV export
+- Evidence-backed IAM findings and multi-stage attack flows
+- A threat workspace with encrypted tenant decision records, editable analyst flow copies, and sanitized CSV, HTML, and Attack Flow exports
 
-Optional after MVP: activity overlay from sign-in logs and snapshot-to-snapshot change alerts.
+Optional evidence is implemented behind separately approved read-only scopes: sign-in activity, active and PIM-eligible roles, Conditional Access, and partner cross-tenant settings. Maester is not embedded: an isolated posture worker remains appropriate only after a concrete, license-verified test pack produces evidence that the native Graph collector does not already provide.
 
 ## Non-goals for v1
 
@@ -40,7 +44,7 @@ Optional after MVP: activity overlay from sign-in logs and snapshot-to-snapshot 
 - Rotating or storing credentials
 - Replacing Microsoft Entra admin center
 - Claiming that configured access proves actual usage
-- Automated remediation or attack-path scoring
+- Automated remediation or claims that an inferred path was exploited
 
 ## Success measures
 
@@ -66,5 +70,5 @@ The evidence panel then shows both service-principal object IDs, the resource ap
 | `/applications/[id]` | One application and all connected objects |
 | `/permissions` | Searchable access inventory |
 | `/changes` | Snapshot comparison |
+| `/security` | IAM findings, attack paths, and threat workspace |
 | `/settings` | Connection, permissions, scan scope, retention |
-

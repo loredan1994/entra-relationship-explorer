@@ -27,7 +27,7 @@ export function getMsalClient(config: LiveEntraConfig): ConfidentialClientApplic
   });
 }
 
-export async function createAuthorizationRequest(config: LiveEntraConfig) {
+export async function createAuthorizationRequest(_config: LiveEntraConfig) {
   const { verifier, challenge } = await cryptoProvider.generatePkceCodes();
   return { verifier, challenge };
 }

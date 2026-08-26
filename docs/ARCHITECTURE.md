@@ -4,7 +4,7 @@
 
 A TypeScript monorepo with a Next.js web application, a background scanner, and a small relational store. The graph is a presentation/query model; Microsoft Graph remains the authority.
 
-- **Web:** Next.js, React, accessible component primitives, Cytoscape.js or React Flow.
+- **Web:** Next.js, React, accessible HTML controls, and Cytoscape.js for headless relationship layout. The graph always has a table equivalent.
 - **API/scanner:** TypeScript, a narrow GET-only Microsoft Graph transport, a thin versioned API, and a separate restart-safe worker.
 - **Storage:** PostgreSQL stores encrypted OAuth sessions and snapshot payloads plus a durable scan queue and access events. Every retrieval is tenant-keyed.
 - **Authentication:** Microsoft identity platform authorization-code flow with PKCE.
@@ -36,7 +36,11 @@ A TypeScript monorepo with a Next.js web application, a background scanner, and 
 | ServicePrincipal | `CAN_CALL_AS_APP` | ServicePrincipal | app-role assignment |
 | ServicePrincipal | `CAN_CALL_DELEGATED` | ServicePrincipal | OAuth2 permission grant |
 | User/Group | `ASSIGNED_TO` | ServicePrincipal | app-role assignment |
+| User/ServicePrincipal | `MEMBER_OF` | Group | direct group members |
+| Principal | `ACTIVE_IN_ROLE` / `ELIGIBLE_FOR_ROLE` | DirectoryRole | role management schedules, optional |
 | User | `OWNS` | Application/ServicePrincipal | owners relationship |
+| Object | `GOVERNED_BY` | Policy | Conditional Access, optional |
+| ExternalTenant | `CROSS_TENANT_ACCESS` | Policy | partner cross-tenant settings, optional |
 | ServicePrincipal | `OBSERVED_CALL` | Resource | sign-in logs, optional |
 
 ## Microsoft Graph reads
@@ -45,14 +49,21 @@ The current implementation reads:
 
 - `/applications`
 - `/servicePrincipals`
+- `/users`
+- `/groups`
+- `/groups/{id}/members`
 - `/servicePrincipals/{id}/appRoleAssignedTo`
 - `/oauth2PermissionGrants`
 - `/applications/{id}/owners`
 - `/servicePrincipals/{id}/owners`
+- optional `/roleManagement/directory/roleDefinitions`, `/roleAssignments`, and `/roleEligibilitySchedules`
+- optional `/identity/conditionalAccess/policies`
+- optional `/policies/crossTenantAccessPolicy/partners`
+- optional `/auditLogs/signIns` with a 30-day filter
 
 Every request, including a continuation link, is HTTPS GET-only to the exact `graph.microsoft.com` origin and `/v1.0/` path. The transport honors server throttling guidance with bounded retries and also caps pages, items, request time, and scanner concurrency. Failed endpoints are recorded as an explicit partial result. Do not infer a complete edge when source objects are incomplete; mark it unresolved.
 
-`AuditLog.Read.All` and sign-in activity are not requested or collected. Any observed-activity overlay is a separate future feature and permission review.
+The default consent excludes optional evidence. `RoleManagement.Read.Directory`, `Policy.Read.All`, and `AuditLog.Read.All` are separately allowlisted and collected only when explicitly configured. Activity reads include a server-enforced 30-day timestamp filter; cross-tenant partner settings use `Policy.Read.All`, the documented least-privileged read permission.
 
 ## API shape
 
@@ -79,21 +90,12 @@ The internal API should return stable, UI-oriented records:
 
 Do not render an entire large tenant at once. Start with an overview, cluster by publisher/project, fetch one-hop neighbors on selection, cap visible nodes, and always offer the equivalent table.
 
-## Security-model alignment
+## IAM intelligence model
 
-Stable model identifiers and trust boundaries are maintained in both `security/threat-dragon/entra-relationship-explorer.json` and `security/threagile/threagile.yaml`. The canonical flow IDs are:
+The domain package discovers bounded directed paths over evidence-bearing normalized relationships. Each step retains its object IDs, relationship type, Graph endpoint, collection time, and completeness. Findings classify conclusions as configured access, observed activity, inferred possibility, or missing evidence. Dormancy is evaluated only when the optional activity endpoint was actually collected and is always phrased as a bounded-window inference.
 
-- `df-01` browser/OAuth and local UI request.
-- `df-02` web to Microsoft identity token exchange.
-- `df-03` Docker host startup retrieval from Azure Key Vault.
-- `df-04` web to PostgreSQL.
-- `df-05` worker to PostgreSQL.
-- `df-06` worker delegated-token refresh.
-- `df-07` worker to Microsoft Graph: strictly GET-only/read-only.
-- `df-08` migration to local PostgreSQL schema.
-- `df-09` PostgreSQL to Docker volume.
-- `df-10` tenant-scoped UI/API response.
-- `df-11` explicit CSV export boundary.
-- `df-12` local browser/operator control of the Docker host.
+MITRE ATT&CK® technique identifiers are classification references, not embedded product logic or an endorsement. Attack paths include prerequisites, confidence, mitigations, and residual uncertainty. Standards-oriented exports use STIX 2.1 with the MITRE Attack Flow 2.0 extension. Review decisions and editable analyst flow copies are encrypted and shared within the authenticated tenant and snapshot boundary.
 
-The Compose bridge is private. Web and PostgreSQL publish loopback ports only; worker and migration have no host port. All services use `no-new-privileges`; the application runtime is non-root and contains neither the workspace lockfile nor development dependency declarations. Sensitive PostgreSQL payloads use tenant-bound authenticated encryption, while scheduling/index metadata remains plaintext by design and is tracked in the risk register.
+The worker checkpoints sanitized collection state after each completed stage. A recovered job resumes at the next stage rather than re-reading completed stages. Checkpoints use tenant-bound authenticated encryption and are deleted after completion or cancellation.
+
+The Compose bridge is private. Web and PostgreSQL publish loopback ports only; worker and migration have no host port. All services use `no-new-privileges`; the application runtime is non-root. Sensitive PostgreSQL payloads use tenant-bound authenticated encryption, while scheduling/index metadata remains plaintext by design.

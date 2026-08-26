@@ -145,7 +145,7 @@ function daysUntil(value: string | null, now: number): number | null {
 }
 
 function isAccountable(node: DirectoryNode): boolean {
-  return node.kind === "application" || node.kind === "servicePrincipal";
+  return node.kind === "application" || (node.kind === "servicePrincipal" && node.metadata?.ownershipExpected === true);
 }
 
 export function analyzeTenantSecurity(snapshot: TenantSnapshot, now = Date.now()): TenantSecurityView {

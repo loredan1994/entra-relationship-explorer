@@ -62,4 +62,23 @@ describe("Backend contract", () => {
     const snapshot = { ...cleanProjectFixture, id: randomUUID(), tenant: { ...cleanProjectFixture.tenant, tenantId: randomUUID() }, scannedAt: new Date().toISOString() };
     await expect(backend.completeJob(queued.id, "worker-1", snapshot, new Date(0))).rejects.toThrow(/tenant boundaries/i);
   });
+
+  it("tenant-binds resumable checkpoints and clears them on completion", async () => {
+    const backend = new MemoryBackend(); const valid = session(); await backend.createSession(valid);
+    const queued = await backend.enqueueScan(tenantId, valid.id); await backend.claimNextJob("worker-1");
+    await backend.saveScanCheckpoint({ jobId: queued.id, tenantId, payload: { completedStages: ["applications"] }, updatedAt: new Date().toISOString() }, "worker-1");
+    expect(await backend.getScanCheckpoint(queued.id, randomUUID())).toBeNull();
+    expect(await backend.getScanCheckpoint(queued.id, tenantId)).toMatchObject({ payload: { completedStages: ["applications"] } });
+    const snapshot = { ...cleanProjectFixture, id: randomUUID(), tenant: { ...cleanProjectFixture.tenant, tenantId }, scannedAt: new Date().toISOString() };
+    await backend.completeJob(queued.id, "worker-1", snapshot, new Date(0));
+    expect(await backend.getScanCheckpoint(queued.id, tenantId)).toBeNull();
+  });
+
+  it("persists tenant-isolated finding decisions and editable attack-flow copies", async () => {
+    const backend = new MemoryBackend();
+    const review = { findingId: "finding-1", snapshotId: randomUUID(), tenantId, disposition: "mitigating" as const, owner: "IAM", expiresAt: null, assumption: "Control remains effective", flowDraft: [{ id: "step-1", title: "Review configured path", evidenceEdgeId: "edge-1" }], updatedAt: new Date().toISOString() };
+    await backend.upsertThreatReview(review, null);
+    expect(await backend.getThreatReview(tenantId, review.snapshotId, review.findingId)).toMatchObject({ owner: "IAM", flowDraft: review.flowDraft });
+    expect(await backend.getThreatReview(randomUUID(), review.snapshotId, review.findingId)).toBeNull();
+  });
 });

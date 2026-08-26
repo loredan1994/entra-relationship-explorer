@@ -1,7 +1,7 @@
 import type { TenantSnapshot } from "@entra-explorer/domain";
 
-export type ScanJobStatus = "queued" | "running" | "complete" | "failed";
-export type ScanJobStage = "applications" | "servicePrincipals" | "appRoleAssignments" | "delegatedPermissionGrants" | "owners" | "normalizing" | "complete";
+export type ScanJobStatus = "queued" | "running" | "complete" | "failed" | "cancel_requested" | "cancelled";
+export type ScanJobStage = "applications" | "servicePrincipals" | "usersAndGroups" | "groupMemberships" | "appRoleAssignments" | "delegatedPermissionGrants" | "owners" | "roles" | "conditionalAccess" | "crossTenantAccess" | "activity" | "normalizing" | "complete";
 
 export interface DurableSession {
   id: string;
@@ -54,6 +54,25 @@ export interface AccessEvent {
   createdAt: string;
 }
 
+export interface ThreatReview {
+  findingId: string;
+  snapshotId: string;
+  tenantId: string;
+  disposition: "open" | "mitigating" | "accepted" | "resolved";
+  owner: string;
+  expiresAt: string | null;
+  assumption: string;
+  flowDraft?: Array<{ id: string; title: string; evidenceEdgeId: string | null }>;
+  updatedAt: string;
+}
+
+export interface ScanCheckpoint {
+  jobId: string;
+  tenantId: string;
+  payload: unknown;
+  updatedAt: string;
+}
+
 export interface Backend {
   migrate(): Promise<void>;
   health(): Promise<BackendHealth>;
@@ -71,8 +90,15 @@ export interface Backend {
   updateJobProgress(id: string, workerId: string, stage: ScanJobStage, collected: number, detail: string): Promise<void>;
   completeJob(id: string, workerId: string, snapshot: TenantSnapshot, retainAfter: Date): Promise<void>;
   failJob(id: string, workerId: string, error: string): Promise<void>;
+  requestScanCancellation(id: string, tenantId: string): Promise<ScanJob | null>;
+  isScanCancellationRequested(id: string, workerId: string): Promise<boolean>;
+  cancelJob(id: string, workerId: string): Promise<void>;
+  getScanCheckpoint(id: string, tenantId: string): Promise<ScanCheckpoint | null>;
+  saveScanCheckpoint(checkpoint: ScanCheckpoint, workerId: string): Promise<void>;
   recentSnapshots(tenantId: string, limit?: number): Promise<TenantSnapshot[]>;
   recordAccess(tenantId: string, sessionId: string | null, action: string, resourceType: string, resourceId?: string): Promise<void>;
   recentAccessEvents(tenantId: string, limit?: number): Promise<AccessEvent[]>;
+  getThreatReview(tenantId: string, snapshotId: string, findingId: string): Promise<ThreatReview | null>;
+  upsertThreatReview(review: ThreatReview, sessionId: string | null): Promise<ThreatReview>;
   close(): Promise<void>;
 }

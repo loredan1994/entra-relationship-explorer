@@ -1,4 +1,5 @@
 import type { DirectoryNode, RelationshipType, RelationshipView } from "@entra-explorer/domain";
+import cytoscape from "cytoscape";
 
 export const NODE_WIDTH = 190;
 export const NODE_HEIGHT = 96;
@@ -19,6 +20,13 @@ const shortRelationshipLabel: Record<RelationshipType, string> = {
   CAN_CALL_AS_APP: "can call as app",
   CAN_CALL_DELEGATED: "delegated",
   ASSIGNED_TO: "assigned",
+  EXPOSES_APP_ROLE: "exposes role",
+  GRANTED_APP_ROLE: "granted role",
+  MEMBER_OF: "member of",
+  ACTIVE_IN_ROLE: "active role",
+  ELIGIBLE_FOR_ROLE: "eligible role",
+  GOVERNED_BY: "governed by",
+  CROSS_TENANT_ACCESS: "partner setting",
   OWNS: "owns",
   OBSERVED_CALL: "called recently",
 };
@@ -168,29 +176,31 @@ export function layoutGraph(nodes: DirectoryNode[], views: RelationshipView[]): 
 
   const present = new Set(nodes.map((node) => node.id));
   const internal = views.filter(({ source, target }) => present.has(source.id) && present.has(target.id));
+  const cy = cytoscape({
+    headless: true,
+    styleEnabled: false,
+    elements: [
+      ...nodes.map((node) => ({ data: { id: node.id } })),
+      ...internal.map((view) => ({ data: { id: view.edge.id, source: view.source.id, target: view.target.id } })),
+    ],
+  });
+  const componentRank = new Map<string, number>();
+  cy.elements().components().forEach((component, rank) => component.nodes().forEach((node) => { componentRank.set(node.id(), rank); }));
+  cy.destroy();
 
   const layerOf = assignLayers(nodes.map((node) => node.id), internal);
   const columnCount = Math.max(...nodes.map((node) => layerOf.get(node.id) ?? 0)) + 1;
   const columns: string[][] = Array.from({ length: columnCount }, () => []);
   for (const node of nodes) columns[layerOf.get(node.id) ?? 0]!.push(node.id);
-
+  for (const column of columns) column.sort((a, b) => (componentRank.get(a) ?? 0) - (componentRank.get(b) ?? 0));
   const ordered = orderLayers(columns, internal);
-  const columnHeights = ordered.map((column) =>
-    column.length ? column.length * NODE_HEIGHT + (column.length - 1) * ROW_GAP : 0,
-  );
+  const columnHeights = ordered.map((column) => column.length ? column.length * NODE_HEIGHT + (column.length - 1) * ROW_GAP : 0);
   const tallest = Math.max(NODE_HEIGHT, ...columnHeights);
-
   const topLeft = new Map<string, Point>();
   ordered.forEach((column, columnIndex) => {
     const offset = (tallest - columnHeights[columnIndex]!) / 2;
-    column.forEach((id, row) => {
-      topLeft.set(id, {
-        x: PADDING + columnIndex * (NODE_WIDTH + COLUMN_GAP),
-        y: PADDING + offset + row * (NODE_HEIGHT + ROW_GAP),
-      });
-    });
+    column.forEach((id, row) => topLeft.set(id, { x: PADDING + columnIndex * (NODE_WIDTH + COLUMN_GAP), y: PADDING + offset + row * (NODE_HEIGHT + ROW_GAP) }));
   });
-
   const width = PADDING * 2 + columnCount * NODE_WIDTH + (columnCount - 1) * COLUMN_GAP;
   const height = PADDING * 2 + tallest;
 

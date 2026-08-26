@@ -61,7 +61,17 @@ export interface GraphDirectoryObject {
   "@odata.type"?: string;
   id: string;
   displayName?: string | null;
+  userType?: string | null;
 }
+
+export interface GraphGroup extends GraphDirectoryObject { securityEnabled?: boolean | null; }
+export interface GraphUser extends GraphDirectoryObject { userType?: string | null; externalUserState?: string | null; }
+export interface GraphGroupMembership extends Sourced<GraphDirectoryObject> { groupId: string; }
+export interface GraphRoleDefinition { id: string; displayName: string; templateId?: string | null; isBuiltIn?: boolean | null; }
+export interface GraphRoleSchedule { id: string; principalId: string; roleDefinitionId: string; directoryScopeId?: string | null; }
+export interface GraphConditionalAccessPolicy { id: string; displayName: string; state: string; conditions?: { users?: { includeUsers?: string[]; includeGroups?: string[] }; applications?: { includeApplications?: string[] } }; grantControls?: { builtInControls?: string[]; operator?: string | null } | null; }
+export interface GraphSignIn { id: string; createdDateTime: string; servicePrincipalId?: string | null; resourceServicePrincipalId?: string | null; appDisplayName?: string | null; resourceDisplayName?: string | null; status?: { errorCode?: number | null } | null; }
+export interface GraphCrossTenantPartner { tenantId: string; inboundTrust?: { isMfaAccepted?: boolean | null; isCompliantDeviceAccepted?: boolean | null; isHybridAzureADJoinedDeviceAccepted?: boolean | null } | null; isInMultiTenantOrganization?: boolean | null; }
 
 export interface Sourced<T> {
   endpoint: string;
@@ -77,9 +87,19 @@ export interface RawTenantScan {
   oauth2PermissionGrants: Sourced<GraphOAuth2PermissionGrant>[];
   applicationOwners: Array<Sourced<GraphDirectoryObject> & { targetId: string }>;
   servicePrincipalOwners: Array<Sourced<GraphDirectoryObject> & { targetId: string }>;
+  users?: Sourced<GraphUser>[];
+  groups?: Sourced<GraphGroup>[];
+  groupMemberships?: GraphGroupMembership[];
+  roleDefinitions?: Sourced<GraphRoleDefinition>[];
+  roleAssignments?: Sourced<GraphRoleSchedule>[];
+  roleEligibilities?: Sourced<GraphRoleSchedule>[];
+  conditionalAccessPolicies?: Sourced<GraphConditionalAccessPolicy>[];
+  signIns?: Sourced<GraphSignIn>[];
+  crossTenantPartners?: Sourced<GraphCrossTenantPartner>[];
   collectedEndpoints: string[];
   skippedEndpoints: string[];
   errors: Array<{ endpoint: string; code: string; message: string }>;
+  completedStages?: ScanStage[];
 }
 
 export type ScanStage =
@@ -88,6 +108,12 @@ export type ScanStage =
   | "appRoleAssignments"
   | "delegatedPermissionGrants"
   | "owners"
+  | "usersAndGroups"
+  | "groupMemberships"
+  | "roles"
+  | "conditionalAccess"
+  | "crossTenantAccess"
+  | "activity"
   | "normalizing"
   | "complete";
 

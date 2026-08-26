@@ -21,7 +21,3 @@ exports/
 snapshots/
 tenant-data/
 **/.data/
-
-# Security scanner output can include file paths, snippets, and response metadata.
-security/generated/*
-!security/generated/.gitkeep

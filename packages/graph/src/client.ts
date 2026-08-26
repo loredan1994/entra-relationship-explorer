@@ -41,6 +41,7 @@ export class ReadOnlyGraphClient {
   private readonly requestTimeoutMs: number;
   private readonly random: () => number;
   private readonly onRetry?: ReadOnlyGraphClientOptions["onRetry"];
+  private readonly sdkClient: Client;
 
   constructor(
     private readonly accessToken: AccessTokenProvider,
@@ -56,6 +57,23 @@ export class ReadOnlyGraphClient {
     this.requestTimeoutMs = options.requestTimeoutMs ?? 30_000;
     this.random = options.random ?? Math.random;
     this.onRetry = options.onRetry;
+    const getOnlyMiddleware: Middleware = {
+      execute: async (context: Context) => {
+        const method = context.options?.method ?? "GET";
+        if (method !== "GET") throw new GraphRequestError(0, "write_method_rejected", new URL(String(context.request)).pathname);
+        const token = typeof this.accessToken === "string" ? this.accessToken : await this.accessToken();
+        if (!token.trim()) throw new Error("token_unavailable");
+        context.response = await this.fetchImpl(context.request, {
+          ...context.options,
+          method: "GET",
+          headers: { ...context.options?.headers, Accept: "application/json", Authorization: `Bearer ${token}` },
+          cache: "no-store",
+          redirect: "error",
+          signal: AbortSignal.timeout(this.requestTimeoutMs),
+        });
+      },
+    };
+    this.sdkClient = Client.initWithMiddleware({ baseUrl: GRAPH_ORIGIN, defaultVersion: "v1.0", middleware: getOnlyMiddleware });
   }
 
   async getAll<T>(endpoint: string, onPage?: (totalItems: number) => void): Promise<T[]> {
@@ -82,15 +100,7 @@ export class ReadOnlyGraphClient {
     for (let attempt = 0; attempt <= this.maxRetries; attempt++) {
       let response: Response;
       try {
-        const token = typeof this.accessToken === "string" ? this.accessToken : await this.accessToken();
-        if (!token.trim()) throw new Error("token_unavailable");
-        response = await this.fetchImpl(safeUrl, {
-          method: "GET",
-          headers: { Accept: "application/json", Authorization: `Bearer ${token}` },
-          cache: "no-store",
-          redirect: "error",
-          signal: AbortSignal.timeout(this.requestTimeoutMs),
-        });
+        response = await this.sdkClient.api(safeUrl).responseType(ResponseType.RAW).get() as Response;
       } catch {
         if (attempt >= this.maxRetries) throw new GraphRequestError(0, "network_error", new URL(safeUrl).pathname);
         await this.waitBeforeRetry(safeUrl, 0, attempt, null);
@@ -148,3 +158,4 @@ async function safeErrorCode(response: Response): Promise<string> {
     return "request_failed";
   }
 }
+import { Client, ResponseType, type Context, type Middleware } from "@microsoft/microsoft-graph-client";

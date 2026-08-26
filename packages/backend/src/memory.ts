@@ -1,6 +1,6 @@
 import { randomUUID, timingSafeEqual } from "node:crypto";
 import type { TenantSnapshot } from "@entra-explorer/domain";
-import type { AccessEvent, Backend, BackendHealth, DurableAuthFlow, DurableSession, ScanJob, ScanJobStage } from "./types";
+import type { AccessEvent, Backend, BackendHealth, DurableAuthFlow, DurableSession, ScanCheckpoint, ScanJob, ScanJobStage, ThreatReview } from "./types";
 
 function copy<T>(value: T): T {
   return structuredClone(value);
@@ -18,6 +18,8 @@ export class MemoryBackend implements Backend {
   private readonly jobs = new Map<string, ScanJob>();
   private readonly snapshots = new Map<string, TenantSnapshot[]>();
   private readonly accessEvents: AccessEvent[] = [];
+  private readonly threatReviews = new Map<string, ThreatReview>();
+  private readonly scanCheckpoints = new Map<string, ScanCheckpoint>();
 
   async migrate(): Promise<void> {}
   async health(): Promise<BackendHealth> { return { ok: true, database: "memory" }; }
@@ -53,7 +55,7 @@ export class MemoryBackend implements Backend {
   async enqueueScan(tenantId: string, sessionId: string): Promise<ScanJob> {
     const session = await this.getSession(sessionId, tenantId);
     if (!session) throw new Error("A valid tenant session is required.");
-    const active = [...this.jobs.values()].find((job) => job.tenantId === tenantId && (job.status === "queued" || job.status === "running"));
+    const active = [...this.jobs.values()].find((job) => job.tenantId === tenantId && (job.status === "queued" || job.status === "running" || job.status === "cancel_requested"));
     if (active) return copy(active);
     const now = new Date().toISOString();
     const job: ScanJob = { id: randomUUID(), tenantId, sessionId, status: "queued", stage: "applications", collected: 0, detail: "Waiting to begin the read-only scan", createdAt: now, updatedAt: now, finishedAt: null, snapshotId: null, completion: null, error: null, attempt: 0, workerId: null };
@@ -74,7 +76,15 @@ export class MemoryBackend implements Backend {
   async recoverStaleJobs(staleBefore: Date): Promise<number> {
     let recovered = 0;
     for (const job of this.jobs.values()) {
-      if (job.status === "running" && new Date(job.updatedAt) < staleBefore) {
+      if (job.status === "cancel_requested" && new Date(job.updatedAt) < staleBefore) {
+        job.status = "cancelled";
+        job.workerId = null;
+        job.finishedAt = new Date().toISOString();
+        job.detail = "Cancellation completed after the previous worker stopped";
+        job.updatedAt = job.finishedAt;
+        this.scanCheckpoints.delete(job.id);
+        recovered += 1;
+      } else if (job.status === "running" && new Date(job.updatedAt) < staleBefore) {
         job.status = "queued";
         job.workerId = null;
         job.detail = "Recovered after the previous worker stopped";
@@ -119,6 +129,7 @@ export class MemoryBackend implements Backend {
     job.finishedAt = new Date().toISOString();
     job.updatedAt = job.finishedAt;
     job.workerId = null;
+    this.scanCheckpoints.delete(id);
   }
 
   async failJob(id: string, workerId: string, error: string): Promise<void> {
@@ -130,6 +141,20 @@ export class MemoryBackend implements Backend {
     job.updatedAt = job.finishedAt;
     job.workerId = null;
   }
+
+  async requestScanCancellation(id: string, tenantId: string): Promise<ScanJob | null> {
+    const job = this.jobs.get(id);
+    if (!job || job.tenantId !== tenantId || !["queued", "running", "cancel_requested"].includes(job.status)) return null;
+    if (job.status === "queued") { job.status = "cancelled"; job.finishedAt = new Date().toISOString(); job.detail = "Cancelled before Microsoft Graph collection began"; }
+    else { job.status = "cancel_requested"; job.detail = "Cancellation requested; finishing the current read safely"; }
+    job.updatedAt = new Date().toISOString();
+    return copy(job);
+  }
+
+  async isScanCancellationRequested(id: string, workerId: string): Promise<boolean> { const job = this.jobs.get(id); return job?.workerId === workerId && job.status === "cancel_requested"; }
+  async cancelJob(id: string, workerId: string): Promise<void> { const job = this.jobs.get(id); if (!job || job.workerId !== workerId || job.status !== "cancel_requested") throw new Error("The scan job is not cancellable by this worker."); job.status = "cancelled"; job.detail = "Scan cancelled safely; no partial snapshot was published"; job.finishedAt = new Date().toISOString(); job.updatedAt = job.finishedAt; job.workerId = null; this.scanCheckpoints.delete(id); }
+  async getScanCheckpoint(id: string, tenantId: string): Promise<ScanCheckpoint | null> { const value = this.scanCheckpoints.get(id); return value?.tenantId === tenantId ? copy(value) : null; }
+  async saveScanCheckpoint(checkpoint: ScanCheckpoint, workerId: string): Promise<void> { this.ownedRunningJob(checkpoint.jobId, workerId); this.scanCheckpoints.set(checkpoint.jobId, { ...copy(checkpoint), updatedAt: new Date().toISOString() }); }
 
   async recentSnapshots(tenantId: string, limit = 20): Promise<TenantSnapshot[]> {
     return copy((this.snapshots.get(tenantId) ?? []).slice(0, Math.max(1, Math.min(limit, 100))));
@@ -143,6 +168,8 @@ export class MemoryBackend implements Backend {
     const bounded = Math.max(1, Math.min(limit, 100));
     return copy(this.accessEvents.filter((event) => event.tenantId === tenantId).sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, bounded));
   }
+  async getThreatReview(tenantId: string, snapshotId: string, findingId: string): Promise<ThreatReview | null> { const value = this.threatReviews.get(`${tenantId}:${snapshotId}:${findingId}`); return value ? copy(value) : null; }
+  async upsertThreatReview(review: ThreatReview, sessionId: string | null): Promise<ThreatReview> { const value = { ...copy(review), updatedAt: new Date().toISOString() }; this.threatReviews.set(`${value.tenantId}:${value.snapshotId}:${value.findingId}`, value); await this.recordAccess(value.tenantId, sessionId, "update", "threat_review", value.findingId); return copy(value); }
   async close(): Promise<void> {}
 
   private ownedRunningJob(id: string, workerId: string): ScanJob {
