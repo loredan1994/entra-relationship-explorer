@@ -49,6 +49,8 @@ pnpm install --frozen-lockfile
 pnpm dev
 ```
 
+Quality gates beyond `pnpm run verify`: `pnpm quality:crap` runs unit coverage and writes a CRAP (Change Risk Anti-Patterns) report to `quality-reports/crap-report.md`, ranking every function by complexity² × (1 − coverage)³ + complexity; `pnpm test:mutation` runs StrykerJS mutation testing per package and writes HTML reports to each package's `reports/mutation/`.
+
 Open `http://localhost:3000/overview`. The `/security` section prioritizes transitive identity paths, distinguishes configured facts from observed activity, inferred possibilities, and missing evidence, maps relevant scenarios to MITRE ATT&CK®, and provides a synchronized review workspace. Run `pnpm run verify`; it validates Compose isolation, lints and type-checks the workspace, runs domain, scanner, storage, authentication, accessibility, and browser tests, and builds every product route.
 
 The product remains in fixture mode by default. For the approved live local stack, start Docker Desktop and run `pnpm dev:live`. It retrieves the app credential, encryption key, and database password from `your-key-vault`, builds the containers, applies idempotent migrations, and starts PostgreSQL, web, and worker services on loopback interfaces. No secret is written into the repository.
