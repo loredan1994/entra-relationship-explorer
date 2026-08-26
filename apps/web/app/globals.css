@@ -188,10 +188,10 @@ button, a, input { -webkit-tap-highlight-color: transparent; }
 .zoom-control > span { min-width: 42px; color: #aebbd0; font-family: var(--font-mono); font-size: 11px; text-align: center; }
 .configured-key { display: flex; align-items: center; gap: 8px; font-size: 11px; }
 .configured-key > span { width: 8px; height: 8px; border-radius: 50%; background: var(--action); }
-.relationship-canvas { flex: 1; display: flex; overflow: auto; background-color: var(--canvas-deep); background-image: radial-gradient(rgba(137, 160, 189, 0.18) 0.7px, transparent 0.7px); background-size: 20px 20px; cursor: grab; }
+.relationship-canvas { position: relative; flex: 1; overflow: hidden; background-color: var(--canvas-deep); background-image: radial-gradient(rgba(137, 160, 189, 0.18) 0.7px, transparent 0.7px); background-size: 20px 20px; cursor: grab; touch-action: none; }
 .relationship-canvas.panning { cursor: grabbing; user-select: none; }
 .map-hint { color: #7c8ea6; font-size: 11px; white-space: nowrap; }
-.canvas-scaler { position: relative; flex: none; margin: auto; }
+.canvas-scaler { position: absolute; left: 0; top: 0; }
 .canvas-inner { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
 .edge-lines { position: absolute; left: 0; top: 0; overflow: visible; }
 .edge-lines marker.arrow-default path { fill: #6681a0; }

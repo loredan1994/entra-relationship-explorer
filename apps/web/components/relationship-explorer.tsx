@@ -11,8 +11,10 @@ import {
 } from "@entra-explorer/domain";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
 import { layoutGraph, NODE_HEIGHT, NODE_WIDTH } from "./graph-layout";
+import { PermissionPills } from "./permission-pills";
+import { permissionPhrase } from "./permission-utils";
 import { RiskBadge } from "./risk-badge";
 
 const kindLabels: Record<NodeKind, { plain: string; microsoft: string }> = {
@@ -44,7 +46,7 @@ const relationshipLabels: Record<RelationshipType, string> = {
 };
 
 const MAP_NODE_LIMIT = 15;
-const MIN_ZOOM = 0.4;
+const MIN_ZOOM = 0.3;
 const MAX_ZOOM = 1.6;
 
 interface SavedFilter {
@@ -63,10 +65,10 @@ function arrowVariant(type: RelationshipType): "default" | "app" | "delegated" {
 function explanation(view: RelationshipView) {
   const { edge, source, target } = view;
   if (edge.type === "CAN_CALL_AS_APP") {
-    return `${source.label} can call ${target.label} using the application permissions ${edge.permissions.join(" and ")}.`;
+    return `${source.label} can call ${target.label} as itself — no signed-in person involved — using ${permissionPhrase(edge.permissions)}.`;
   }
   if (edge.type === "CAN_CALL_DELEGATED") {
-    return `${source.label} can call ${target.label} on behalf of a signed-in person using ${edge.permissions.join(" and ")}.`;
+    return `${source.label} can call ${target.label} on behalf of a signed-in person using ${permissionPhrase(edge.permissions)}.`;
   }
   if (edge.type === "INSTANTIATES_AS") {
     return `${source.label} is the blueprint that creates the ${target.label} tenant identity.`;
@@ -78,7 +80,9 @@ export function RelationshipExplorer({ snapshot }: { snapshot: TenantSnapshot })
   const searchParams = useSearchParams();
   const initialEdgeId = searchParams.get("edge");
   const [query, setQuery] = useState(searchParams.get("q") ?? "");
-  const [selectedKinds, setSelectedKinds] = useState<NodeKind[]>([]);
+  const [selectedKinds, setSelectedKinds] = useState<NodeKind[]>(() =>
+    searchParams.getAll("kind").filter((kind): kind is NodeKind => Object.hasOwn(kindLabels, kind)),
+  );
   const [viewMode, setViewMode] = useState<"map" | "table">(snapshot.mode === "tenant" ? "table" : "map");
   const allViews = useMemo(() => filterRelationships(snapshot, {}), [snapshot]);
   const initialEdge = allViews.find(({ edge }) => edge.id === initialEdgeId) ??
@@ -102,37 +106,127 @@ export function RelationshipExplorer({ snapshot }: { snapshot: TenantSnapshot })
     [query, selectedKinds, scopedSnapshot],
   );
   const visibleNodes = useMemo(() => connectedNodes(filteredViews), [filteredViews]);
-  const layout = useMemo(() => layoutGraph(visibleNodes, filteredViews), [visibleNodes, filteredViews]);
   const canvasRef = useRef<HTMLDivElement>(null);
   const [viewport, setViewport] = useState({ width: 0, height: 0 });
   const [zoom, setZoom] = useState(1);
+  const [zoomTouched, setZoomTouched] = useState(false);
+  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const [panning, setPanning] = useState(false);
+  const panState = useRef({ pointerId: -1, startX: 0, startY: 0, panX: 0, panY: 0 });
+  const layout = useMemo(() => layoutGraph(visibleNodes, filteredViews, zoom), [visibleNodes, filteredViews, zoom]);
+
+  // The graph moves by translating the scaled canvas, not by scrolling overflow,
+  // so panning works even when the fitted graph is smaller than the viewport.
+  // `base` centers the content; `pan` is the user's offset, clamped so at least
+  // an 80px sliver of the graph always stays on screen.
+  const scaledWidth = layout.width * zoom;
+  const scaledHeight = layout.height * zoom;
+  const baseX = (viewport.width - scaledWidth) / 2;
+  const baseY = (viewport.height - scaledHeight) / 2;
+  const panBounds = {
+    minX: 80 - scaledWidth - baseX,
+    maxX: viewport.width - 80 - baseX,
+    minY: 80 - scaledHeight - baseY,
+    maxY: viewport.height - 80 - baseY,
+  };
+  const panBoundsRef = useRef(panBounds);
+  panBoundsRef.current = panBounds;
 
   useEffect(() => {
     const element = canvasRef.current;
     if (!element) return;
-    const observer = new ResizeObserver(([entry]) => {
-      if (entry) setViewport({ width: entry.contentRect.width, height: entry.contentRect.height });
-    });
+    // Ignore zero-sized measurements: a tab rendered while hidden reports 0×0,
+    // and adopting that would mis-fit the graph. Re-measure on reveal instead.
+    const measure = () => {
+      if (element.clientWidth > 0 && element.clientHeight > 0) {
+        setViewport({ width: element.clientWidth, height: element.clientHeight });
+      }
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
     observer.observe(element);
-    return () => observer.disconnect();
+    document.addEventListener("visibilitychange", measure);
+    return () => {
+      observer.disconnect();
+      document.removeEventListener("visibilitychange", measure);
+    };
   }, [viewMode]);
 
   const fitZoom = useMemo(() => {
     if (!viewport.width || !viewport.height || !layout.width || !layout.height) return 1;
-    const fit = Math.min(viewport.width / layout.width, viewport.height / layout.height);
-    return Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, Number(fit.toFixed(2))));
+    const fit = Math.floor(Math.min(viewport.width / layout.width, viewport.height / layout.height) * 100) / 100;
+    return Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, fit));
   }, [viewport, layout]);
 
   const changeZoom = useCallback(
-    (delta: number) => setZoom((current) => Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, Number((current + delta).toFixed(2))))),
+    (delta: number) => {
+      setZoomTouched(true);
+      setZoom((current) => Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, Number((current + delta).toFixed(2)))));
+    },
     [],
   );
   const selectedView = filteredViews.find(({ edge }) => edge.id === selectedEdgeId) ?? filteredViews[0];
   const unresolvedCount = filteredViews.filter(({ edge }) => edge.evidence.completeness === "unresolved").length;
 
+  // Every new layout starts fitted to the viewport (never enlarged past 100%) so
+  // the whole graph is visible at once. Connection labels render at constant
+  // screen size regardless of zoom, so fitting never shrinks a control below an
+  // accessible target size. Manual zooming takes over until the layout changes.
   useEffect(() => {
-    setZoom(1);
-  }, [layout]);
+    setZoomTouched(false);
+  }, [visibleNodes, filteredViews]);
+
+  useEffect(() => {
+    if (!zoomTouched) {
+      setZoom(Math.min(1, fitZoom));
+      setPan({ x: 0, y: 0 });
+    }
+  }, [fitZoom, zoomTouched]);
+
+  // Scroll pans the graph; ctrl/cmd + scroll (also trackpad pinch) zooms. Needs
+  // a non-passive native listener because React's delegated wheel handler
+  // cannot preventDefault.
+  useEffect(() => {
+    const element = canvasRef.current;
+    if (!element) return;
+    const onWheel = (event: WheelEvent) => {
+      event.preventDefault();
+      if (event.ctrlKey || event.metaKey) {
+        changeZoom(event.deltaY > 0 ? -0.1 : 0.1);
+        return;
+      }
+      const bounds = panBoundsRef.current;
+      setPan((current) => ({
+        x: Math.min(bounds.maxX, Math.max(bounds.minX, current.x - event.deltaX)),
+        y: Math.min(bounds.maxY, Math.max(bounds.minY, current.y - event.deltaY)),
+      }));
+    };
+    element.addEventListener("wheel", onWheel, { passive: false });
+    return () => element.removeEventListener("wheel", onWheel);
+  }, [changeZoom, viewMode]);
+
+  function beginPan(event: ReactPointerEvent<HTMLDivElement>) {
+    if ((event.target as HTMLElement).closest("button")) return;
+    const element = canvasRef.current;
+    if (!element) return;
+    panState.current = { pointerId: event.pointerId, startX: event.clientX, startY: event.clientY, panX: pan.x, panY: pan.y };
+    element.setPointerCapture(event.pointerId);
+    setPanning(true);
+  }
+
+  function movePan(event: ReactPointerEvent<HTMLDivElement>) {
+    if (!panning || event.pointerId !== panState.current.pointerId) return;
+    const bounds = panBoundsRef.current;
+    setPan({
+      x: Math.min(bounds.maxX, Math.max(bounds.minX, panState.current.panX + (event.clientX - panState.current.startX))),
+      y: Math.min(bounds.maxY, Math.max(bounds.minY, panState.current.panY + (event.clientY - panState.current.startY))),
+    });
+  }
+
+  function endPan(event: ReactPointerEvent<HTMLDivElement>) {
+    if (event.pointerId !== panState.current.pointerId) return;
+    setPanning(false);
+  }
 
   useEffect(() => {
     try {
@@ -186,7 +280,7 @@ export function RelationshipExplorer({ snapshot }: { snapshot: TenantSnapshot })
             <p className="eyebrow">Explore</p>
             <h1>Relationship map</h1>
           </div>
-          <span title={snapshot.mode === "fixture" ? "All records are synthetic" : "Encrypted tenant snapshot"}>{snapshot.mode === "fixture" ? "Fixture" : "Tenant"}</span>
+          <span title={snapshot.mode === "fixture" ? "All records are synthetic sample data" : "Encrypted read-only snapshot of your tenant"}>{snapshot.mode === "fixture" ? "Sample data" : "Live tenant"}</span>
         </div>
 
         <label className="map-search">
@@ -254,13 +348,14 @@ export function RelationshipExplorer({ snapshot }: { snapshot: TenantSnapshot })
               <button type="button" onClick={() => changeZoom(-0.15)} disabled={zoom <= MIN_ZOOM} aria-label="Zoom out">−</button>
               <span aria-live="polite">{Math.round(zoom * 100)}%</span>
               <button type="button" onClick={() => changeZoom(0.15)} disabled={zoom >= MAX_ZOOM} aria-label="Zoom in">+</button>
-              <button type="button" className="zoom-fit" onClick={() => setZoom(fitZoom)}>Fit</button>
+              <button type="button" className="zoom-fit" onClick={() => { setZoomTouched(true); setZoom(fitZoom); }}>Fit</button>
             </div>
           ) : null}
           <div className="configured-key">
             <span aria-hidden="true" />
             Configured directory facts · no observed activity
           </div>
+          {viewMode === "map" ? <span className="map-hint">Drag or scroll to pan · ⌘/Ctrl + scroll to zoom</span> : null}
         </div>
 
         {focusNodeId ? <div className="scope-banner"><strong>One-hop view.</strong> Select an object to expand its direct relationships.{neighborhood?.truncated ? ` Limited to ${MAP_NODE_LIMIT} objects; use the table for the complete result.` : ""}</div> : null}
@@ -274,9 +369,18 @@ export function RelationshipExplorer({ snapshot }: { snapshot: TenantSnapshot })
             <button className="button button-secondary" onClick={() => { setQuery(""); setSelectedKinds([]); }}>Clear filters</button>
           </div>
         ) : viewMode === "map" ? (
-          <div className="relationship-canvas" ref={canvasRef} role="group" aria-label={`${visibleNodes.length} objects and ${filteredViews.length} configured connections`}>
-            <div className="canvas-scaler" style={{ width: layout.width * zoom, height: layout.height * zoom }}>
-            <div className="canvas-inner" style={{ width: layout.width, height: layout.height, transform: `scale(${zoom})` }}>
+          <div
+            className={`relationship-canvas ${panning ? "panning" : ""}`}
+            ref={canvasRef}
+            role="group"
+            aria-label={`${visibleNodes.length} objects and ${filteredViews.length} configured connections`}
+            onPointerDown={beginPan}
+            onPointerMove={movePan}
+            onPointerUp={endPan}
+            onPointerCancel={endPan}
+          >
+            <div className="canvas-scaler" style={{ width: scaledWidth, height: scaledHeight, transform: `translate(${Math.round(baseX + pan.x)}px, ${Math.round(baseY + pan.y)}px)` }}>
+            <div className="canvas-inner" style={{ width: layout.width, height: layout.height, transform: `scale(${zoom})`, "--zoom": zoom } as CSSProperties}>
               <svg
                 className="edge-lines"
                 width={layout.width}
@@ -316,7 +420,7 @@ export function RelationshipExplorer({ snapshot }: { snapshot: TenantSnapshot })
                 <button
                   key={view.edge.id}
                   className={`connection-label ${selectedView?.edge.id === view.edge.id ? "selected" : ""}`}
-                  style={{ left: label.x, top: label.y, width: label.width }}
+                  style={{ left: label.x, top: label.y, width: label.width, transform: `translate(-50%, -50%) scale(${(1 / zoom).toFixed(3)})` }}
                   onClick={() => setSelectedEdgeId(view.edge.id)}
                   title={`${view.source.label} ${view.edge.plainLabel} ${view.target.label}: ${label.full}`}
                   aria-label={`${view.source.label} ${view.edge.plainLabel} ${view.target.label}: ${label.full}. Configured relationship.`}
@@ -380,7 +484,7 @@ function RelationshipTable({
               <td><strong>{source.label}</strong><small>{kindLabels[source.kind].plain}</small></td>
               <td>{relationshipLabels[edge.type]}<small>Configured</small></td>
               <td><strong>{target.label}</strong><small>{kindLabels[target.kind].plain}</small></td>
-              <td className="mono">{edge.permissions.join(", ") || "—"}</td>
+              <td className="mono">{edge.permissions.length > 4 ? `${edge.permissions.slice(0, 4).join(", ")} +${edge.permissions.length - 4} more` : edge.permissions.join(", ") || "—"}</td>
               <td><button className="text-button" onClick={() => onSelect(edge.id)}>Inspect</button></td>
             </tr>
           ))}
@@ -415,10 +519,8 @@ function EvidenceInspector({ view }: { view?: RelationshipView }) {
 
       {edge.permissions.length > 0 ? (
         <section className="inspector-section">
-          <h3>Permission values</h3>
-          <div className="permission-pills">
-            {edge.permissions.map((permission) => <span key={permission}>{permission}</span>)}
-          </div>
+          <h3>Permission values{edge.permissions.length > 1 ? ` (${edge.permissions.length})` : ""}</h3>
+          <PermissionPills permissions={edge.permissions} limit={6} />
         </section>
       ) : null}
 

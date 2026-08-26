@@ -133,12 +133,17 @@ function borderPoint(center: Point, toward: Point): Point {
   return { x: center.x + dx * scale, y: center.y + dy * scale };
 }
 
+const GUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-/i;
+
 function labelText(view: RelationshipView): { text: string; full: string } {
   const { permissions, plainLabel, type } = view.edge;
   const full = permissions.length ? permissions.join(" · ") : plainLabel;
-  if (permissions.length === 1) return { text: permissions[0]!, full };
-  if (permissions.length > 1) return { text: `${permissions[0]!} +${permissions.length - 1}`, full };
-  return { text: shortRelationshipLabel[type], full };
+  // A raw GUID means the scan could not resolve the role name; the relationship
+  // word is more useful on the map than an identifier nobody can read.
+  const named = permissions.filter((permission) => !GUID_PATTERN.test(permission));
+  if (named.length === 0) return { text: shortRelationshipLabel[type], full };
+  if (permissions.length === 1) return { text: named[0]!, full };
+  return { text: `${named[0]!} +${permissions.length - 1}`, full };
 }
 
 function labelWidth(text: string): number {
@@ -171,8 +176,15 @@ function cubicAt(t: number, p0: Point, c1: Point, c2: Point, p3: Point): Point {
   };
 }
 
-export function layoutGraph(nodes: DirectoryNode[], views: RelationshipView[]): GraphLayout {
+/**
+ * `labelZoom` is the zoom the canvas will render at. Connection labels render at
+ * constant screen size (the canvas counter-scales them), so their footprint in
+ * layout coordinates grows as the canvas zooms out; collision placement has to
+ * use that zoom-relative footprint or labels overlap when the graph is fitted.
+ */
+export function layoutGraph(nodes: DirectoryNode[], views: RelationshipView[], labelZoom = 1): GraphLayout {
   if (nodes.length === 0) return { width: PADDING * 2, height: PADDING * 2, nodes: [], edges: [] };
+  const labelScale = 1 / Math.min(1.6, Math.max(0.25, labelZoom));
 
   const present = new Set(nodes.map((node) => node.id));
   const internal = views.filter(({ source, target }) => present.has(source.id) && present.has(target.id));
@@ -234,14 +246,15 @@ export function layoutGraph(nodes: DirectoryNode[], views: RelationshipView[]): 
     const path = `M ${start.x} ${start.y} C ${control1.x} ${control1.y}, ${control2.x} ${control2.y}, ${end.x} ${end.y}`;
 
     const { text, full } = labelText(view);
-    const boxWidth = labelWidth(text);
+    const boxWidth = labelWidth(text) * labelScale;
+    const boxHeight = LABEL_HEIGHT * labelScale;
     const boxAt = (t: number, nudge: number): Box => {
       const point = cubicAt(t, start, control1, control2, end);
       return {
         x: point.x - boxWidth / 2,
-        y: point.y - LABEL_HEIGHT / 2 + nudge,
+        y: point.y - boxHeight / 2 + nudge * labelScale,
         width: boxWidth,
-        height: LABEL_HEIGHT,
+        height: boxHeight,
       };
     };
 
@@ -265,7 +278,7 @@ export function layoutGraph(nodes: DirectoryNode[], views: RelationshipView[]): 
     return {
       view,
       path,
-      label: { text, full, x: chosen.x + boxWidth / 2, y: chosen.y + LABEL_HEIGHT / 2, width: boxWidth },
+      label: { text, full, x: chosen.x + boxWidth / 2, y: chosen.y + boxHeight / 2, width: labelWidth(text) },
     };
   });
 
