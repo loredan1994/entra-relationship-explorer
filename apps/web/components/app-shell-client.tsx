@@ -112,7 +112,8 @@ export function AppShellClient({
         })}
       </nav>
       <ConnectionBanner connection={connection} />
-      <main id="main-content">{children}</main>
+      {/* tabIndex lets keyboard users focus and scroll the content region */}
+      <main id="main-content" tabIndex={0}>{children}</main>
     </div>
   );
 }

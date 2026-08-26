@@ -30,7 +30,13 @@ button, a, input { -webkit-tap-highlight-color: transparent; }
 .skip-link { position: fixed; z-index: 100; left: 16px; top: -64px; background: #fff; color: var(--ink-strong); padding: 12px 16px; border-radius: 4px; font-weight: 700; transition: top 120ms ease-out; }
 .skip-link:focus { top: 12px; }
 
-.app-shell { min-height: 100vh; }
+/* Fixed application frame: the header, nav, and any connection banner stay
+   pinned; only the main content area scrolls. The page body never scrolls,
+   so the map (and every other page) can size itself to the real remaining
+   space instead of assuming a fixed header height. */
+.app-shell { height: 100vh; height: 100dvh; display: flex; flex-direction: column; }
+.topbar, .primary-nav, .connection-banner { flex: none; }
+#main-content { flex: 1; min-height: 0; overflow-y: auto; }
 .topbar { height: 72px; display: flex; align-items: center; gap: 28px; padding: 0 28px; color: white; background: var(--canvas-deep); border-bottom: 1px solid rgba(255, 255, 255, 0.08); }
 .brand { display: flex; align-items: center; gap: 11px; min-width: 240px; text-decoration: none; }
 .brand-mark { position: relative; display: block; width: 31px; height: 31px; }
@@ -142,7 +148,7 @@ button, a, input { -webkit-tap-highlight-color: transparent; }
 .priority-path-steps b { color: var(--action); }
 
 /* Relationship explorer */
-.explorer-layout { height: calc(100vh - 117px); min-height: 650px; display: grid; grid-template-columns: 280px minmax(520px, 1fr) 380px; overflow: hidden; }
+.explorer-layout { height: 100%; min-height: 650px; display: grid; grid-template-columns: 280px minmax(520px, 1fr) 380px; overflow: hidden; }
 .filter-rail { overflow-y: auto; padding: 22px 20px; background: #fff; border-right: 1px solid var(--line-light); }
 .saved-filters { padding: 14px 0; border-top: 1px solid var(--line-light); border-bottom: 1px solid var(--line-light); }
 .saved-filters > div:first-child { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
@@ -176,7 +182,7 @@ button, a, input { -webkit-tap-highlight-color: transparent; }
 .legend .line-dotted { border-top-style: dotted; }
 .legend .legend-note { display: block; margin-top: 14px; padding: 9px; background: #f4f7fa; border-radius: 4px; }
 .map-workspace { min-width: 0; display: flex; flex-direction: column; background: var(--canvas-deep); }
-.map-toolbar { height: 54px; flex: none; display: flex; justify-content: space-between; align-items: center; gap: 15px; padding: 0 16px; color: #aebbd0; background: var(--canvas-raised); border-bottom: 1px solid #203247; }
+.map-toolbar { min-height: 54px; flex: none; display: flex; justify-content: space-between; align-items: center; gap: 15px; padding: 6px 16px; color: #aebbd0; background: var(--canvas-raised); border-bottom: 1px solid #203247; }
 .segmented-control { display: flex; padding: 3px; background: #071422; border: 1px solid #263a50; border-radius: 5px; }
 .segmented-control button { min-width: 64px; padding: 5px 11px; color: #9eacc0; background: transparent; border: 0; border-radius: 3px; font-size: 11px; font-weight: 700; cursor: pointer; }
 .segmented-control button.active { color: #fff; background: #2a3b50; }
@@ -361,7 +367,7 @@ button, a, input { -webkit-tap-highlight-color: transparent; }
   .primary-nav { overflow-x: auto; padding-inline: 20px; }
   .page-container { width: min(100% - 32px, 1380px); padding-top: 30px; }
   .overview-grid { grid-template-columns: 1fr; }
-  .explorer-layout { height: auto; min-height: calc(100vh - 117px); grid-template-columns: 230px 1fr; overflow: visible; }
+  .explorer-layout { height: auto; min-height: 100%; grid-template-columns: 230px 1fr; overflow: visible; }
   .filter-rail { grid-row: 1 / span 2; }
   .map-workspace { min-height: 620px; }
   .evidence-inspector { grid-column: 2; min-height: 500px; border-top: 1px solid var(--line-light); border-left: 0; }

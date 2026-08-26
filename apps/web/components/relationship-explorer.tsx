@@ -46,7 +46,7 @@ const relationshipLabels: Record<RelationshipType, string> = {
 };
 
 const MAP_NODE_LIMIT = 15;
-const MIN_ZOOM = 0.3;
+const MIN_ZOOM = 0.2;
 const MAX_ZOOM = 1.6;
 
 interface SavedFilter {
