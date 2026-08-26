@@ -16,8 +16,8 @@ export default async function ChangesPage() {
         <PageHeading eyebrow="Snapshot comparison" title="Changes" description="Compare read-only snapshots without changing the tenant." />
         {!diff ? <section className="panel empty-state-large">
           <span className="empty-icon" aria-hidden="true">↔</span>
-          <h2>One {current.mode === "fixture" ? "fixture" : "tenant"} snapshot is available</h2>
-          <p>Changes need two snapshots from the same tenant. With only the current snapshot, no difference is inferred.</p>
+          <h2>One {current.mode === "fixture" ? "sample" : "tenant"} snapshot is available</h2>
+          <p>Change tracking compares two scans of the same tenant. Run another read-only scan later and this page will show exactly which objects and permissions were added, removed, or changed in between.</p>
           <div className="empty-state-facts"><span><strong>1</strong> snapshot</span><span><strong>0</strong> inferred changes</span><span><strong>30 days</strong> proposed default retention</span></div>
         </section> : <>
           <section className="summary-strip change-summary" aria-label="Snapshot change summary">

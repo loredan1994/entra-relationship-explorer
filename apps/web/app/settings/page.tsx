@@ -42,7 +42,7 @@ export default async function SettingsPage() {
         <section className="settings-section">
           <div><h2>Tenant connection</h2><p>Live access is disabled unless an operator deliberately configures it.</p></div>
           <div className="settings-card">
-            <div className="setting-row"><div><strong>Data source</strong><p>{snapshot.tenant.tenantLabel}</p></div><span className="completion-badge neutral">{snapshot.mode === "tenant" ? "Tenant snapshot" : "Fixture only"}</span></div>
+            <div className="setting-row"><div><strong>Data source</strong><p>{snapshot.tenant.tenantLabel}</p></div><span className="completion-badge neutral">{snapshot.mode === "tenant" ? "Live tenant snapshot" : "Sample data only"}</span></div>
             <div className="setting-row"><div><strong>Microsoft sign-in</strong><p>{config.enabled ? "Single configured tenant only; tokens remain server-side." : config.reason}</p></div><span>{connected ? "Connected" : "Not connected"}</span></div>
             <div className="setting-row"><div><strong>Tenant changes</strong><p>The product exposes no grant, revoke, edit, or remediation action.</p></div><span className="read-only-badge">Read-only</span></div>
             <ScanControl enabled={config.enabled} connected={connected} initialJob={latestJob} />

@@ -60,7 +60,7 @@ export function ScanControl({ enabled, connected, initialJob }: { enabled: boole
         <div className="scan-actions">
           <button className="button button-primary" type="button" disabled={busy || active} onClick={startScan}>{active ? "Scan in progress" : "Start read-only scan"}</button>
           {active ? <button className="button button-secondary" type="button" disabled={job?.status === "cancel_requested"} onClick={cancelScan}>{job?.status === "cancel_requested" ? "Cancelling safely" : "Cancel scan"}</button> : null}
-          <a className="button button-secondary" href="/api/v1/exports/relationships.csv">Export relationship table</a>
+          <a className="button button-secondary" href="/api/export/relationships.csv">Export relationship table</a>
           <button className="text-button" type="button" onClick={signOut}>Sign out</button>
         </div>
       )}

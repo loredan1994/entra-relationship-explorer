@@ -52,6 +52,8 @@ export function parseEntraConfig(environment: NodeJS.ProcessEnv): EntraConfig {
   const dataEncryptionKey = Uint8Array.from(Buffer.from(encodedKey, "base64"));
   if (dataEncryptionKey.byteLength !== 32) throw new Error("ENTRA_DATA_ENCRYPTION_KEY must be a base64-encoded 32-byte key.");
 
+  const sessionMaxAgeSeconds = parseSessionMaxAge(environment.ENTRA_SESSION_MAX_AGE_SECONDS);
+
   const requestedOptional = (environment.ENTRA_OPTIONAL_GRAPH_SCOPES ?? "").split(/[\s,]+/).filter(Boolean).map((scope) => scope.startsWith("https://") ? scope : `https://graph.microsoft.com/${scope}`);
   const approvedOptional = new Set<string>(OPTIONAL_GRAPH_SCOPES);
   for (const scope of requestedOptional) if (!approvedOptional.has(scope)) throw new Error(`Optional Graph scope is not approved by the product: ${scope}`);
@@ -69,8 +71,18 @@ export function parseEntraConfig(environment: NodeJS.ProcessEnv): EntraConfig {
     graphScopes,
     databaseUrl,
     dataEncryptionKey,
-    sessionMaxAgeSeconds: 60 * 60,
+    sessionMaxAgeSeconds,
   };
+}
+
+// Bounded to [15 minutes, 24 hours]; Graph access tokens are still refreshed on
+// their own shorter schedule, so a longer app session never extends token life.
+function parseSessionMaxAge(raw: string | undefined): number {
+  const defaultSeconds = 8 * 60 * 60;
+  if (!raw?.trim()) return defaultSeconds;
+  const parsed = Number.parseInt(raw, 10);
+  if (!Number.isFinite(parsed)) throw new Error("ENTRA_SESSION_MAX_AGE_SECONDS must be an integer number of seconds.");
+  return Math.min(24 * 60 * 60, Math.max(15 * 60, parsed));
 }
 
 function required(environment: NodeJS.ProcessEnv, name: string): string {
