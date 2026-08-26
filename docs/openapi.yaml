@@ -1,0 +1,50 @@
+openapi: 3.1.0
+info:
+  title: Entra Relationship Explorer local API
+  version: 1.0.0
+  description: Read-only local API. It queues Microsoft Graph reads and never changes Microsoft Entra.
+servers:
+  - url: http://127.0.0.1:3200/api/v1
+paths:
+  /health:
+    get:
+      summary: Check web and PostgreSQL readiness
+      responses:
+        "200": { description: Ready }
+        "503": { description: PostgreSQL unavailable }
+  /session:
+    get:
+      summary: Read the current local session state
+      responses:
+        "200": { description: Session state }
+  /scans:
+    get:
+      summary: Read the latest scan job for the authenticated tenant
+      responses:
+        "200": { description: Latest job }
+        "401": { description: Authentication required }
+    post:
+      summary: Queue one read-only tenant scan
+      responses:
+        "202": { description: Scan accepted or existing active scan returned }
+        "401": { description: Authentication required }
+        "403": { description: Same-origin check failed }
+  /scans/{id}:
+    get:
+      summary: Read one tenant-scoped scan job
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200": { description: Scan job }
+        "401": { description: Authentication required }
+        "404": { description: Job absent from this tenant }
+  /exports/relationships.csv:
+    get:
+      summary: Export the latest tenant snapshot as CSV
+      responses:
+        "200": { description: CSV export }
+        "401": { description: Authentication required }
+        "404": { description: No tenant snapshot }

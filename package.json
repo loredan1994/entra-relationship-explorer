@@ -1,0 +1,29 @@
+{
+  "name": "entra-relationship-explorer",
+  "version": "0.0.0",
+  "private": true,
+  "packageManager": "pnpm@11.23.0",
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "scripts": {
+    "dev": "pnpm --filter @entra-explorer/web dev",
+    "dev:live": "scripts/dev-live.sh",
+    "build": "pnpm --filter @entra-explorer/domain build && pnpm --filter @entra-explorer/graph build && pnpm --filter @entra-explorer/backend build && pnpm --filter @entra-explorer/web build",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm --filter @entra-explorer/domain test && pnpm --filter @entra-explorer/graph test && pnpm --filter @entra-explorer/backend test && pnpm --filter @entra-explorer/web test:unit",
+    "test:e2e": "pnpm --filter @entra-explorer/web test:e2e",
+    "test:security": "pnpm --filter @entra-explorer/domain test && pnpm --filter @entra-explorer/graph test && pnpm --filter @entra-explorer/backend test && pnpm --filter @entra-explorer/web test:unit",
+    "security:models": "scripts/security-tools.sh models",
+    "security:gitleaks": "scripts/security-tools.sh gitleaks",
+    "security:trivy:repo": "scripts/security-tools.sh trivy-repo",
+    "security:trivy:image": "scripts/security-tools.sh trivy-image",
+    "security:zap": "scripts/security-tools.sh zap",
+    "security:sbom": "scripts/security-tools.sh sbom",
+    "security:compose": "node scripts/validate-compose-security.mjs",
+    "verify": "pnpm security:models && pnpm typecheck && pnpm test && pnpm build && pnpm test:e2e"
+  },
+  "devDependencies": {
+    "typescript": "5.9.2"
+  }
+}

@@ -1,0 +1,61 @@
+name: Security bootstrap gates
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  models-and-invariants:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.23.0
+          run_install: false
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: Install locked dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Validate aligned threat models
+        run: pnpm security:models
+      - name: Run security invariants
+        run: pnpm test:security
+      - name: Fail on confirmed secret exposure
+        run: pnpm security:gitleaks
+      - name: Report repository and container configuration findings
+        run: pnpm security:trivy:repo
+
+  image-supply-chain:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Build releasable image without tenant configuration
+        run: docker build --tag entra-relationship-explorer-app:local .
+      - name: Gate fixable HIGH and CRITICAL image findings
+        run: scripts/security-tools.sh trivy-image
+      - name: Generate CycloneDX SBOM
+        run: scripts/security-tools.sh sbom
+      - name: Upload safe scanner output
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-generated
+          path: |
+            security/generated/trivy/app-image.json
+            security/generated/sbom/entra-relationship-explorer-app.cdx.json
+          if-no-files-found: error
+          retention-days: 14

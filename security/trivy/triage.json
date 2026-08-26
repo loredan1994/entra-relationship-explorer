@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "entries": [
+    {
+      "id": "trivy-triage-001",
+      "vulnerability_id": "CVE-2026-14456",
+      "package": "libssl3t64",
+      "installed_version": "3.5.6-1~deb13u2",
+      "status": "upstream-blocked",
+      "rationale": "The finding is present in the current immutable official distroless Node 24 Debian 13 image. A Debian package fix exists, but no newer reviewed distroless digest is currently published. A custom mutable runtime base would reduce reproducibility and expand the package-manager attack surface.",
+      "risk_id": "risk-006",
+      "review_by": "2026-09-02"
+    }
+  ]
+}

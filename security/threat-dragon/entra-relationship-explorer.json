@@ -1,0 +1,167 @@
+{
+  "version": "2.5.0",
+  "summary": {
+    "title": "Entra Relationship Explorer — local read-only architecture",
+    "owner": "product-owner",
+    "description": "STRIDE model for the local containerized Entra Relationship Explorer. Stable IDs match the canonical Threagile, ASVS, LINDDUN, invariant, and risk-register artifacts. df-07 is the only Microsoft Graph flow and is GET-only/read-only."
+  },
+  "detail": {
+    "contributors": [{ "name": "Codex security-modeling bootstrap" }],
+    "reviewer": "owner review pending",
+    "diagrams": [
+      {
+        "diagramType": "STRIDE",
+        "id": 0,
+        "size": { "height": 1040, "width": 1840 },
+        "thumbnail": "./public/content/images/thumbnail.stride.jpg",
+        "title": "Runtime containers, external services, and trust boundaries",
+        "version": "2.5.0",
+        "diagramJson": {
+          "cells": [
+            {
+              "type": "tm.Actor", "size": { "width": 180, "height": 80 }, "position": { "x": 40, "y": 150 }, "angle": 0,
+              "id": "00000000-0000-4000-8000-000000000001", "z": 1, "hasOpenThreats": false,
+              "description": "ta-browser. Operator-controlled browser on the local device. Processes da-oauth-flow, da-tenant-session, da-tenant-snapshot, and da-csv-export.",
+              "attrs": { ".element-shape": { "class": "element-shape hasNoOpenThreats isInScope" }, "text": { "text": "ta-browser\nLocal browser" }, ".element-text": { "class": "element-text hasNoOpenThreats isInScope" } }
+            },
+            {
+              "type": "tm.Process", "size": { "width": 140, "height": 110 }, "position": { "x": 380, "y": 140 }, "angle": 0,
+              "id": "00000000-0000-4000-8000-000000000002", "z": 2, "hasOpenThreats": true, "isWebApplication": true,
+              "description": "ta-web. Next.js web container on loopback. Stores no plaintext tenant payload outside PostgreSQL and never calls Microsoft Graph directly.",
+              "threats": [
+                { "title": "thr-002 Cross-tenant disclosure", "type": "Information disclosure", "modelType": "STRIDE", "status": "Mitigated", "severity": "High", "description": "A session or resource identifier could be used to retrieve another tenant's session, job, snapshot, or access event.", "mitigation": "Concrete-tenant configuration, tenant-bound cookies and queries, tenant-scoped backend methods, authenticated encryption AAD, and invariant tests.", "threatId": "10000000-0000-4000-8000-000000000002" },
+                { "title": "thr-003 OAuth replay or substitution", "type": "Spoofing", "modelType": "STRIDE", "status": "Mitigated", "severity": "High", "description": "A stolen or substituted callback could bind the wrong authorization transaction or tenant.", "mitigation": "Short-lived single-use flow records, 256-bit state, PKCE, constant-time state comparison, tenant binding, and HttpOnly SameSite cookies.", "threatId": "10000000-0000-4000-8000-000000000003" },
+                { "title": "thr-007 Sensitive material leakage", "type": "Information disclosure", "modelType": "STRIDE", "status": "Mitigated", "severity": "High", "description": "Secrets, tokens, encryption keys, raw Graph responses, or tenant exports could leak through APIs, logs, reports, or Git.", "mitigation": "Typed sanitization, safe error codes, generic top-level logs, server-only sessions, no-store responses, ignored generated output, and Gitleaks/invariant tests.", "threatId": "10000000-0000-4000-8000-000000000007" },
+                { "title": "thr-010 Configured access misrepresented as activity", "type": "Repudiation", "modelType": "STRIDE", "status": "Mitigated", "severity": "Medium", "description": "Configured grants might be presented as evidence that an API was actually used.", "mitigation": "Domain evidence keeps configured=true and observed=null; product language and tests preserve the distinction.", "threatId": "10000000-0000-4000-8000-000000000010" }
+              ],
+              "attrs": { ".element-shape": { "class": "element-shape hasOpenThreats isInScope" }, "text": { "text": "ta-web\nNext.js web" }, ".element-text": { "class": "element-text hasOpenThreats isInScope" } }
+            },
+            {
+              "type": "tm.Process", "size": { "width": 140, "height": 110 }, "position": { "x": 660, "y": 140 }, "angle": 0,
+              "id": "00000000-0000-4000-8000-000000000003", "z": 3, "hasOpenThreats": true,
+              "description": "ta-worker. Durable scan worker; sole component allowed to call Microsoft Graph, through df-07 GET-only.",
+              "threats": [
+                { "title": "thr-001 Entra write capability introduced", "type": "Elevation of privilege", "modelType": "STRIDE", "status": "Mitigated", "severity": "Critical", "description": "A code or configuration change could request write scopes or issue non-GET Microsoft Graph calls.", "mitigation": "Fixed read-only scope allowlist, GET-only transport, explicit read-only model flow, tests, and owner approval required for any separate write phase.", "threatId": "10000000-0000-4000-8000-000000000001" },
+                { "title": "thr-004 Job ownership tampering", "type": "Tampering", "modelType": "STRIDE", "status": "Mitigated", "severity": "High", "description": "A worker could update or complete a job claimed by another worker.", "mitigation": "Atomic SKIP LOCKED claim and worker_id/status predicates on every progress, completion, and failure update.", "threatId": "10000000-0000-4000-8000-000000000004" },
+                { "title": "thr-006 Throttling or endpoint failure hides partial data", "type": "Denial of service", "modelType": "STRIDE", "status": "Mitigated", "severity": "Medium", "description": "Graph throttling, transient failures, or endpoint denial could exhaust resources or yield a misleading complete result.", "mitigation": "Retry-After, bounded exponential backoff, request/page/item/concurrency limits, durable progress, and explicit partial completion.", "threatId": "10000000-0000-4000-8000-000000000006" }
+              ],
+              "attrs": { ".element-shape": { "class": "element-shape hasOpenThreats isInScope" }, "text": { "text": "ta-worker\nScan worker" }, ".element-text": { "class": "element-text hasOpenThreats isInScope" } }
+            },
+            {
+              "type": "tm.Process", "size": { "width": 140, "height": 110 }, "position": { "x": 380, "y": 380 }, "angle": 0,
+              "id": "00000000-0000-4000-8000-000000000004", "z": 4, "hasOpenThreats": false,
+              "description": "ta-migration. One-shot schema migration container. It can change only the local application database, never Microsoft Entra.",
+              "attrs": { ".element-shape": { "class": "element-shape hasNoOpenThreats isInScope" }, "text": { "text": "ta-migration\nDB migration" }, ".element-text": { "class": "element-text hasNoOpenThreats isInScope" } }
+            },
+            {
+              "type": "tm.Store", "size": { "width": 180, "height": 90 }, "position": { "x": 660, "y": 390 }, "angle": 0,
+              "id": "00000000-0000-4000-8000-000000000005", "z": 5, "hasOpenThreats": true, "storesCredentials": true, "isALog": true,
+              "description": "ta-postgres. Local PostgreSQL container. Stores encrypted da-oauth-flow, da-msal-material, da-tenant-session, da-tenant-snapshot plus da-scan-jobs and da-audit-records.",
+              "threats": [
+                { "title": "thr-008 Ciphertext swap or tampering", "type": "Tampering", "modelType": "STRIDE", "status": "Mitigated", "severity": "High", "description": "Encrypted sessions or snapshots could be moved between tenants/records or modified.", "mitigation": "AES-256-GCM with fresh IVs and AAD containing record type, ID, tenant ID, and snapshot time; tamper and wrong-context tests.", "threatId": "10000000-0000-4000-8000-000000000008" }
+              ],
+              "attrs": { ".element-shape": { "class": "element-shape hasOpenThreats isInScope" }, "text": { "text": "ta-postgres\nPostgreSQL" }, ".element-text": { "class": "element-text hasOpenThreats isInScope" } }
+            },
+            {
+              "type": "tm.Store", "size": { "width": 180, "height": 80 }, "position": { "x": 660, "y": 610 }, "angle": 0,
+              "id": "00000000-0000-4000-8000-000000000006", "z": 6, "hasOpenThreats": false, "storesCredentials": true,
+              "description": "ta-pg-volume. Docker-managed persistent PostgreSQL volume; inherits host-disk protections.",
+              "attrs": { ".element-shape": { "class": "element-shape hasNoOpenThreats isInScope" }, "text": { "text": "ta-pg-volume\nPersistent volume" }, ".element-text": { "class": "element-text hasNoOpenThreats isInScope" } }
+            },
+            {
+              "type": "tm.Process", "size": { "width": 150, "height": 100 }, "position": { "x": 90, "y": 410 }, "angle": 0,
+              "id": "00000000-0000-4000-8000-000000000007", "z": 7, "hasOpenThreats": true,
+              "description": "ta-docker-host. Local Docker Desktop host and daemon; starts the isolated Compose project and retrieves secrets from Key Vault through the operator startup script.",
+              "threats": [
+                { "title": "thr-011 Local host or container administration compromise", "type": "Information disclosure", "modelType": "STRIDE", "status": "Open", "severity": "Medium", "description": "A Docker administrator or compromised host process can inspect runtime secret material or the local volume.", "mitigation": "Single-user local deployment, Key Vault retrieval, no secrets in Git/reports, loopback binding, and migration to workload identity or mounted secrets before shared hosting. Tracked as risk-001.", "threatId": "10000000-0000-4000-8000-000000000011" }
+              ],
+              "attrs": { ".element-shape": { "class": "element-shape hasOpenThreats isInScope" }, "text": { "text": "ta-docker-host\nDocker host" }, ".element-text": { "class": "element-text hasOpenThreats isInScope" } }
+            },
+            {
+              "type": "tm.Process", "size": { "width": 150, "height": 90 }, "position": { "x": 380, "y": 620 }, "angle": 0,
+              "id": "00000000-0000-4000-8000-000000000008", "z": 8, "hasOpenThreats": false,
+              "description": "ta-docker-network. Private Compose bridge connecting web, worker, migration, and PostgreSQL. No public binding.",
+              "attrs": { ".element-shape": { "class": "element-shape hasNoOpenThreats isInScope" }, "text": { "text": "ta-docker-network\nCompose bridge" }, ".element-text": { "class": "element-text hasNoOpenThreats isInScope" } }
+            },
+            {
+              "type": "tm.Process", "size": { "width": 170, "height": 100 }, "position": { "x": 1090, "y": 120 }, "angle": 0,
+              "id": "00000000-0000-4000-8000-000000000009", "z": 9, "hasOpenThreats": false, "outOfScope": true, "reasonOutOfScope": "Microsoft-managed identity platform; application OAuth usage remains in scope.",
+              "description": "ta-ms-identity. Microsoft identity platform issues authorization codes and delegated tokens for the concrete tenant.",
+              "attrs": { ".element-shape": { "class": "element-shape hasNoOpenThreats isOutOfScope" }, "text": { "text": "ta-ms-identity\nMicrosoft identity" }, ".element-text": { "class": "element-text hasNoOpenThreats isOutOfScope" } }
+            },
+            {
+              "type": "tm.Process", "size": { "width": 170, "height": 100 }, "position": { "x": 1090, "y": 390 }, "angle": 0,
+              "id": "00000000-0000-4000-8000-000000000010", "z": 10, "hasOpenThreats": true, "outOfScope": true, "reasonOutOfScope": "Microsoft-managed API; application request construction and response handling remain in scope.",
+              "description": "ta-ms-graph. Microsoft Graph v1.0. Receives only df-07 HTTPS GET requests using the two approved delegated read scopes.",
+              "threats": [
+                { "title": "thr-005 Untrusted nextLink SSRF or API drift", "type": "Spoofing", "modelType": "STRIDE", "status": "Mitigated", "severity": "High", "description": "A malicious or unexpected nextLink could send a bearer token to another origin or switch to an unreviewed API version.", "mitigation": "Every initial and continuation URL is reparsed and requires HTTPS, exact graph.microsoft.com origin, and /v1.0/ path.", "threatId": "10000000-0000-4000-8000-000000000005" }
+              ],
+              "attrs": { ".element-shape": { "class": "element-shape hasOpenThreats isOutOfScope" }, "text": { "text": "ta-ms-graph\nGraph v1.0" }, ".element-text": { "class": "element-text hasOpenThreats isOutOfScope" } }
+            },
+            {
+              "type": "tm.Store", "size": { "width": 180, "height": 90 }, "position": { "x": 1090, "y": 650 }, "angle": 0,
+              "id": "00000000-0000-4000-8000-000000000011", "z": 11, "hasOpenThreats": false, "storesCredentials": true, "outOfScope": true, "reasonOutOfScope": "Azure-managed vault; application secret retrieval remains in scope.",
+              "description": "ta-key-vault. Stores da-app-credential, da-encryption-key, and da-database-credential outside Git.",
+              "attrs": { ".element-shape": { "class": "element-shape hasNoOpenThreats isOutOfScope" }, "text": { "text": "ta-key-vault\nAzure Key Vault" }, ".element-text": { "class": "element-text hasNoOpenThreats isOutOfScope" } }
+            },
+            {
+              "type": "tm.Store", "size": { "width": 180, "height": 90 }, "position": { "x": 90, "y": 720 }, "angle": 0,
+              "id": "00000000-0000-4000-8000-000000000012", "z": 12, "hasOpenThreats": true, "outOfScope": true, "reasonOutOfScope": "The operator controls exported files after explicit download.",
+              "description": "ta-export-destination. Explicit CSV boundary on the operator filesystem; stores da-csv-export.",
+              "threats": [
+                { "title": "thr-009 CSV execution or uncontrolled disclosure", "type": "Information disclosure", "modelType": "STRIDE", "status": "Open", "severity": "Medium", "description": "Spreadsheet formulas could execute and exported relationship data can be copied outside application controls.", "mitigation": "Neutralize formula prefixes, quote fields, require tenant authentication, no-store, explicit download, and access-event recording. Residual handling risk is risk-002.", "threatId": "10000000-0000-4000-8000-000000000009" }
+              ],
+              "attrs": { ".element-shape": { "class": "element-shape hasOpenThreats isOutOfScope" }, "text": { "text": "ta-export-destination\nCSV destination" }, ".element-text": { "class": "element-text hasOpenThreats isOutOfScope" } }
+            },
+
+            { "type": "tm.Boundary", "size": { "width": 10, "height": 10 }, "smooth": true, "source": { "x": 270, "y": 50 }, "target": { "x": 270, "y": 900 }, "vertices": [], "labels": [{ "position": 0.1, "attrs": { "text": { "text": "tb-loopback", "font-weight": "600", "font-size": "small" } } }], "id": "20000000-0000-4000-8000-000000000001", "z": 20, "isTrustBoundary": true, "description": "tb-loopback. Only 127.0.0.1 host publications cross this boundary.", "attrs": {} },
+            { "type": "tm.Boundary", "size": { "width": 10, "height": 10 }, "smooth": true, "source": { "x": 570, "y": 50 }, "target": { "x": 570, "y": 900 }, "vertices": [], "labels": [{ "position": 0.1, "attrs": { "text": { "text": "tb-compose-network", "font-weight": "600", "font-size": "small" } } }], "id": "20000000-0000-4000-8000-000000000002", "z": 21, "isTrustBoundary": true, "description": "tb-compose-network. Private Docker bridge.", "attrs": {} },
+            { "type": "tm.Boundary", "size": { "width": 10, "height": 10 }, "smooth": true, "source": { "x": 900, "y": 50 }, "target": { "x": 900, "y": 900 }, "vertices": [], "labels": [{ "position": 0.1, "attrs": { "text": { "text": "tb-ms-cloud", "font-weight": "600", "font-size": "small" } } }], "id": "20000000-0000-4000-8000-000000000003", "z": 22, "isTrustBoundary": true, "description": "tb-ms-cloud. Internet/TLS boundary to Microsoft services.", "attrs": {} },
+            { "type": "tm.Boundary", "size": { "width": 10, "height": 10 }, "smooth": true, "source": { "x": 55, "y": 650 }, "target": { "x": 255, "y": 650 }, "vertices": [], "labels": [{ "position": 0.5, "attrs": { "text": { "text": "tb-export", "font-weight": "600", "font-size": "small" } } }], "id": "20000000-0000-4000-8000-000000000004", "z": 23, "isTrustBoundary": true, "description": "tb-export. Explicit operator-controlled file boundary.", "attrs": {} },
+            { "type": "tm.Boundary", "size": { "width": 10, "height": 10 }, "smooth": true, "source": { "x": 1020, "y": 570 }, "target": { "x": 1300, "y": 570 }, "vertices": [], "labels": [{ "position": 0.5, "attrs": { "text": { "text": "tb-key-vault", "font-weight": "600", "font-size": "small" } } }], "id": "20000000-0000-4000-8000-000000000005", "z": 24, "isTrustBoundary": true, "description": "tb-key-vault. Separate secret-management boundary.", "attrs": {} },
+            { "type": "tm.Boundary", "size": { "width": 10, "height": 10 }, "smooth": true, "source": { "x": 620, "y": 555 }, "target": { "x": 875, "y": 555 }, "vertices": [], "labels": [{ "position": 0.5, "attrs": { "text": { "text": "tb-persistent-storage", "font-weight": "600", "font-size": "small" } } }], "id": "20000000-0000-4000-8000-000000000006", "z": 25, "isTrustBoundary": true, "description": "tb-persistent-storage. Docker volume to host disk.", "attrs": {} },
+            { "type": "tm.Boundary", "size": { "width": 10, "height": 10 }, "smooth": true, "source": { "x": 20, "y": 30 }, "target": { "x": 250, "y": 30 }, "vertices": [], "labels": [{ "position": 0.5, "attrs": { "text": { "text": "tb-operator-device", "font-weight": "600", "font-size": "small" } } }], "id": "20000000-0000-4000-8000-000000000007", "z": 26, "isTrustBoundary": true, "description": "tb-operator-device. Local operator device and browser boundary.", "attrs": {} },
+            { "type": "tm.Boundary", "size": { "width": 10, "height": 10 }, "smooth": true, "source": { "x": 300, "y": 875 }, "target": { "x": 875, "y": 875 }, "vertices": [], "labels": [{ "position": 0.5, "attrs": { "text": { "text": "tb-docker-host", "font-weight": "600", "font-size": "small" } } }], "id": "20000000-0000-4000-8000-000000000008", "z": 27, "isTrustBoundary": true, "description": "tb-docker-host. Docker daemon, runtime, and host-disk boundary.", "attrs": {} },
+
+            { "type": "tm.Flow", "size": { "width": 10, "height": 10 }, "smooth": true, "source": { "id": "00000000-0000-4000-8000-000000000001" }, "target": { "id": "00000000-0000-4000-8000-000000000002" }, "vertices": [], "labels": [{ "position": 0.5, "attrs": { "text": { "text": "df-01 OAuth + UI HTTPS/loopback", "font-weight": "400", "font-size": "small" } } }], "id": "30000000-0000-4000-8000-000000000001", "z": 30, "isEncrypted": false, "hasOpenThreats": false, "description": "df-01. Browser initiates OAuth and sends callback state/code; da-oauth-flow and da-tenant-session. Loopback HTTP is the documented local-only exception.", "attrs": {} },
+            { "type": "tm.Flow", "size": { "width": 10, "height": 10 }, "smooth": true, "source": { "id": "00000000-0000-4000-8000-000000000002" }, "target": { "id": "00000000-0000-4000-8000-000000000009" }, "vertices": [], "labels": [{ "position": 0.5, "attrs": { "text": { "text": "df-02 OAuth token exchange HTTPS", "font-weight": "400", "font-size": "small" } } }], "id": "30000000-0000-4000-8000-000000000002", "z": 31, "isEncrypted": true, "hasOpenThreats": false, "description": "df-02. Authorization code/token exchange for da-oauth-flow and da-msal-material.", "attrs": {} },
+            { "type": "tm.Flow", "size": { "width": 10, "height": 10 }, "smooth": true, "source": { "id": "00000000-0000-4000-8000-000000000007" }, "target": { "id": "00000000-0000-4000-8000-000000000011" }, "vertices": [], "labels": [{ "position": 0.5, "attrs": { "text": { "text": "df-03 Key Vault secret retrieval HTTPS", "font-weight": "400", "font-size": "small" } } }], "id": "30000000-0000-4000-8000-000000000003", "z": 32, "isEncrypted": true, "hasOpenThreats": false, "description": "df-03. Startup retrieves da-app-credential, da-encryption-key, and da-database-credential; values are not committed.", "attrs": {} },
+            { "type": "tm.Flow", "size": { "width": 10, "height": 10 }, "smooth": true, "source": { "id": "00000000-0000-4000-8000-000000000002" }, "target": { "id": "00000000-0000-4000-8000-000000000005" }, "vertices": [], "labels": [{ "position": 0.5, "attrs": { "text": { "text": "df-04 tenant-bound DB access", "font-weight": "400", "font-size": "small" } } }], "id": "30000000-0000-4000-8000-000000000004", "z": 33, "isEncrypted": false, "hasOpenThreats": false, "description": "df-04. Web reads/writes application sessions, jobs, encrypted snapshots, and audit records on the private bridge. This is not an Entra write.", "attrs": {} },
+            { "type": "tm.Flow", "size": { "width": 10, "height": 10 }, "smooth": true, "source": { "id": "00000000-0000-4000-8000-000000000003" }, "target": { "id": "00000000-0000-4000-8000-000000000005" }, "vertices": [], "labels": [{ "position": 0.5, "attrs": { "text": { "text": "df-05 claimed jobs + snapshots", "font-weight": "400", "font-size": "small" } } }], "id": "30000000-0000-4000-8000-000000000005", "z": 34, "isEncrypted": false, "hasOpenThreats": false, "description": "df-05. Worker claims/updates local jobs and persists encrypted tenant snapshots and audit records.", "attrs": {} },
+            { "type": "tm.Flow", "size": { "width": 10, "height": 10 }, "smooth": true, "source": { "id": "00000000-0000-4000-8000-000000000003" }, "target": { "id": "00000000-0000-4000-8000-000000000009" }, "vertices": [], "labels": [{ "position": 0.5, "attrs": { "text": { "text": "df-06 delegated token refresh HTTPS", "font-weight": "400", "font-size": "small" } } }], "id": "30000000-0000-4000-8000-000000000006", "z": 35, "isEncrypted": true, "hasOpenThreats": false, "description": "df-06. MSAL silent refresh for da-msal-material; no admin-consent change or tenant mutation.", "attrs": {} },
+            { "type": "tm.Flow", "size": { "width": 10, "height": 10 }, "smooth": true, "source": { "id": "00000000-0000-4000-8000-000000000003" }, "target": { "id": "00000000-0000-4000-8000-000000000010" }, "vertices": [], "labels": [{ "position": 0.5, "attrs": { "text": { "text": "df-07 GRAPH GET-ONLY /v1.0 (READ-ONLY)", "font-weight": "700", "font-size": "small" } } }], "id": "30000000-0000-4000-8000-000000000007", "z": 36, "isEncrypted": true, "hasOpenThreats": false, "description": "df-07. STRICTLY READ-ONLY Microsoft Graph flow. HTTPS GET only; Application.Read.All and Directory.Read.All only; origin and API version allowlisted; da-graph-response is sanitized before persistence.", "attrs": {} },
+            { "type": "tm.Flow", "size": { "width": 10, "height": 10 }, "smooth": true, "source": { "id": "00000000-0000-4000-8000-000000000004" }, "target": { "id": "00000000-0000-4000-8000-000000000005" }, "vertices": [], "labels": [{ "position": 0.5, "attrs": { "text": { "text": "df-08 local schema migration", "font-weight": "400", "font-size": "small" } } }], "id": "30000000-0000-4000-8000-000000000008", "z": 37, "isEncrypted": false, "hasOpenThreats": false, "description": "df-08. Local PostgreSQL DDL only. No Microsoft Graph or Entra access.", "attrs": {} },
+            { "type": "tm.Flow", "size": { "width": 10, "height": 10 }, "smooth": true, "source": { "id": "00000000-0000-4000-8000-000000000005" }, "target": { "id": "00000000-0000-4000-8000-000000000006" }, "vertices": [], "labels": [{ "position": 0.5, "attrs": { "text": { "text": "df-09 PostgreSQL persistence", "font-weight": "400", "font-size": "small" } } }], "id": "30000000-0000-4000-8000-000000000009", "z": 38, "isEncrypted": false, "hasOpenThreats": false, "description": "df-09. PostgreSQL persists database pages to Docker volume; sensitive payload columns are application encrypted.", "attrs": {} },
+            { "type": "tm.Flow", "size": { "width": 10, "height": 10 }, "smooth": true, "source": { "id": "00000000-0000-4000-8000-000000000002" }, "target": { "id": "00000000-0000-4000-8000-000000000001" }, "vertices": [], "labels": [{ "position": 0.5, "attrs": { "text": { "text": "df-10 UI/API responses", "font-weight": "400", "font-size": "small" } } }], "id": "30000000-0000-4000-8000-000000000010", "z": 39, "isEncrypted": false, "hasOpenThreats": false, "description": "df-10. No-store tenant-scoped UI/API output; excludes tokens, keys, raw Graph bodies, and saved exports.", "attrs": {} },
+            { "type": "tm.Flow", "size": { "width": 10, "height": 10 }, "smooth": true, "source": { "id": "00000000-0000-4000-8000-000000000002" }, "target": { "id": "00000000-0000-4000-8000-000000000012" }, "vertices": [], "labels": [{ "position": 0.5, "attrs": { "text": { "text": "df-11 explicit CSV export", "font-weight": "400", "font-size": "small" } } }], "id": "30000000-0000-4000-8000-000000000011", "z": 40, "isEncrypted": false, "hasOpenThreats": true, "description": "df-11. Explicit authenticated export of da-csv-export. Formula-neutralized, no-store, and audit-recorded; downstream handling is outside application control.", "attrs": {} },
+            { "type": "tm.Flow", "size": { "width": 10, "height": 10 }, "smooth": true, "source": { "id": "00000000-0000-4000-8000-000000000007" }, "target": { "id": "00000000-0000-4000-8000-000000000008" }, "vertices": [], "labels": [{ "position": 0.5, "attrs": { "text": { "text": "df-12 Compose control", "font-weight": "400", "font-size": "small" } } }], "id": "30000000-0000-4000-8000-000000000012", "z": 41, "isEncrypted": false, "hasOpenThreats": false, "description": "df-12. Operator-controlled Docker host starts local containers and private network.", "attrs": {} }
+          ]
+        }
+      },
+      {
+        "diagramType": "STRIDE",
+        "id": 1,
+        "size": { "height": 720, "width": 1220 },
+        "thumbnail": "./public/content/images/thumbnail.stride.jpg",
+        "title": "Data asset inventory",
+        "version": "2.5.0",
+        "diagramJson": {
+          "cells": [
+            { "type":"tm.Store","size":{"width":180,"height":70},"position":{"x":40,"y":40},"angle":0,"id":"40000000-0000-4000-8000-000000000001","z":1,"hasOpenThreats":false,"description":"da-oauth-flow. PKCE verifier, state, flow ID, tenant ID, and expiry. Strictly confidential; encrypted at rest.","attrs":{".element-shape":{"class":"element-shape hasNoOpenThreats isInScope"},"text":{"text":"da-oauth-flow"},".element-text":{"class":"element-text hasNoOpenThreats isInScope"}}},
+            { "type":"tm.Store","size":{"width":180,"height":70},"position":{"x":260,"y":40},"angle":0,"id":"40000000-0000-4000-8000-000000000002","z":2,"hasOpenThreats":false,"storesCredentials":true,"description":"da-msal-material. Delegated access token, MSAL cache, and account material. Strictly confidential; server-side only.","attrs":{".element-shape":{"class":"element-shape hasNoOpenThreats isInScope"},"text":{"text":"da-msal-material"},".element-text":{"class":"element-text hasNoOpenThreats isInScope"}}},
+            { "type":"tm.Store","size":{"width":180,"height":70},"position":{"x":480,"y":40},"angle":0,"id":"40000000-0000-4000-8000-000000000003","z":3,"hasOpenThreats":false,"storesCredentials":true,"description":"da-app-credential. Local app registration client secret held in Azure Key Vault and runtime environment only.","attrs":{".element-shape":{"class":"element-shape hasNoOpenThreats isInScope"},"text":{"text":"da-app-credential"},".element-text":{"class":"element-text hasNoOpenThreats isInScope"}}},
+            { "type":"tm.Store","size":{"width":180,"height":70},"position":{"x":700,"y":40},"angle":0,"id":"40000000-0000-4000-8000-000000000004","z":4,"hasOpenThreats":false,"storesCredentials":true,"description":"da-encryption-key. 256-bit AES-GCM key held in Azure Key Vault and runtime environment only.","attrs":{".element-shape":{"class":"element-shape hasNoOpenThreats isInScope"},"text":{"text":"da-encryption-key"},".element-text":{"class":"element-text hasNoOpenThreats isInScope"}}},
+            { "type":"tm.Store","size":{"width":180,"height":70},"position":{"x":920,"y":40},"angle":0,"id":"40000000-0000-4000-8000-000000000005","z":5,"hasOpenThreats":false,"storesCredentials":true,"description":"da-database-credential. Local PostgreSQL password held in Azure Key Vault and runtime environment only.","attrs":{".element-shape":{"class":"element-shape hasNoOpenThreats isInScope"},"text":{"text":"da-database-credential"},".element-text":{"class":"element-text hasNoOpenThreats isInScope"}}},
+            { "type":"tm.Store","size":{"width":180,"height":70},"position":{"x":40,"y":180},"angle":0,"id":"40000000-0000-4000-8000-000000000006","z":6,"hasOpenThreats":false,"storesCredentials":true,"description":"da-tenant-session. Tenant-bound session ID, account, access token, token cache, and expiries. Authenticated-encrypted.","attrs":{".element-shape":{"class":"element-shape hasNoOpenThreats isInScope"},"text":{"text":"da-tenant-session"},".element-text":{"class":"element-text hasNoOpenThreats isInScope"}}},
+            { "type":"tm.Store","size":{"width":180,"height":70},"position":{"x":260,"y":180},"angle":0,"id":"40000000-0000-4000-8000-000000000007","z":7,"hasOpenThreats":false,"description":"da-tenant-snapshot. Normalized directory objects and explainable relationships. Confidential; tenant-bound authenticated encryption.","attrs":{".element-shape":{"class":"element-shape hasNoOpenThreats isInScope"},"text":{"text":"da-tenant-snapshot"},".element-text":{"class":"element-text hasNoOpenThreats isInScope"}}},
+            { "type":"tm.Store","size":{"width":180,"height":70},"position":{"x":480,"y":180},"angle":0,"id":"40000000-0000-4000-8000-000000000008","z":8,"hasOpenThreats":false,"description":"da-permissions. Configured grants and assignments with evidence. Never implies observed use.","attrs":{".element-shape":{"class":"element-shape hasNoOpenThreats isInScope"},"text":{"text":"da-permissions"},".element-text":{"class":"element-text hasNoOpenThreats isInScope"}}},
+            { "type":"tm.Store","size":{"width":180,"height":70},"position":{"x":700,"y":180},"angle":0,"id":"40000000-0000-4000-8000-000000000009","z":9,"hasOpenThreats":false,"description":"da-scan-jobs. Tenant, session reference, ownership, status, progress, completion, and safe error code.","attrs":{".element-shape":{"class":"element-shape hasNoOpenThreats isInScope"},"text":{"text":"da-scan-jobs"},".element-text":{"class":"element-text hasNoOpenThreats isInScope"}}},
+            { "type":"tm.Store","size":{"width":180,"height":70},"position":{"x":920,"y":180},"angle":0,"id":"40000000-0000-4000-8000-000000000010","z":10,"hasOpenThreats":false,"isALog":true,"description":"da-audit-records. Tenant-scoped metadata-only access events; excludes sensitive payloads.","attrs":{".element-shape":{"class":"element-shape hasNoOpenThreats isInScope"},"text":{"text":"da-audit-records"},".element-text":{"class":"element-text hasNoOpenThreats isInScope"}}},
+            { "type":"tm.Store","size":{"width":180,"height":70},"position":{"x":260,"y":320},"angle":0,"id":"40000000-0000-4000-8000-000000000011","z":11,"hasOpenThreats":true,"description":"da-csv-export. Explicitly generated relationship CSV crossing tb-export; formula-neutralized but downstream confidentiality is operator-managed.","attrs":{".element-shape":{"class":"element-shape hasOpenThreats isInScope"},"text":{"text":"da-csv-export"},".element-text":{"class":"element-text hasOpenThreats isInScope"}}},
+            { "type":"tm.Store","size":{"width":180,"height":70},"position":{"x":700,"y":320},"angle":0,"id":"40000000-0000-4000-8000-000000000012","z":12,"hasOpenThreats":false,"description":"da-graph-response. Transient Graph JSON. Sanitized into typed records; raw bodies and secret-like fields are never persisted or logged.","attrs":{".element-shape":{"class":"element-shape hasNoOpenThreats isInScope"},"text":{"text":"da-graph-response\ntransient only"},".element-text":{"class":"element-text hasNoOpenThreats isInScope"}}}
+          ]
+        }
+      }
+    ]
+  }
+}

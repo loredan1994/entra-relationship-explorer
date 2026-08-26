@@ -19,6 +19,13 @@ The first release is deliberately read-only. It does not grant permissions, remo
 - [Architecture and Graph model](docs/ARCHITECTURE.md)
 - [Security and privacy](docs/SECURITY_PRIVACY.md)
 - [Implementation plan](docs/IMPLEMENTATION_PLAN.md)
+- [Concrete Phase 0 plan](docs/PHASE_0_PLAN.md)
+- [Phase 1 read-only tenant scan](docs/PHASE_1_READ_ONLY.md)
+- [Phase 1 security validation](docs/PHASE_1_SECURITY_VALIDATION.md)
+- [Phase 2 investigation quality](docs/PHASE_2_INVESTIGATION.md)
+- [Local threat model and privacy review](docs/THREAT_MODEL.md)
+- [Local container operations](docs/LOCAL_OPERATIONS.md)
+- [Version 1 API contract](docs/openapi.yaml)
 - [Research notes and primary references](docs/RESEARCH_NOTES.md)
 - [Design system](DESIGN.md)
 - [Interactive visual preview](previews/design-system-preview.html)
@@ -33,4 +40,15 @@ The first release is deliberately read-only. It does not grant permissions, remo
 
 ## Current status
 
-This repository is the approved design and engineering foundation. No scanner has been deployed and no Entra object has been changed.
+Phases 0–2 are implemented locally. The product includes fixture-driven exploration, single-tenant Microsoft sign-in, GET-only paginated Graph readers, PostgreSQL-backed encrypted sessions and snapshots, a durable scan queue, a separate worker, throttling-aware progress, snapshot comparison, and explicit CSV export. The local app registration has only `Application.Read.All` and `Directory.Read.All`; no Entra object is changed.
+
+## Run locally
+
+```bash
+pnpm install --frozen-lockfile
+pnpm dev
+```
+
+Open `http://localhost:3000/overview`. The `/security` section reports tenant exposure: which applications hold powerful or write-capable permissions, which identities have no owner, and which credentials are expiring. Run the product gate with `pnpm run verify`; it validates the security models, type-checks the workspace, runs domain, scanner, storage, authentication, accessibility, and browser tests, and builds every product route. Containerized secret, repository, image, passive API, and SBOM checks are documented in [`security/README.md`](security/README.md).
+
+The product remains in fixture mode by default. For the approved live local stack, start Docker Desktop and run `pnpm dev:live`. It retrieves the app credential, encryption key, and database password from `your-key-vault`, builds the containers, applies idempotent migrations, and starts PostgreSQL, web, and worker services on loopback interfaces. No secret is written into the repository.

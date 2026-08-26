@@ -1,14 +1,27 @@
 .DS_Store
+node_modules/
+.pnpm-store/
+.next/
+dist/
+out/
+coverage/
+playwright-report/
+test-results/
+*.tsbuildinfo
 .env
 .env.*
 !.env.example
-node_modules/
-.next/
-dist/
-coverage/
 *.tfstate
 *.tfstate.*
 .terraform/
 .gstack/
 
-.gstack/
+# Tenant material must never enter the repository.
+exports/
+snapshots/
+tenant-data/
+**/.data/
+
+# Security scanner output can include file paths, snippets, and response metadata.
+security/generated/*
+!security/generated/.gitkeep

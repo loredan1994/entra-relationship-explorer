@@ -1,0 +1,150 @@
+const GRAPH_ORIGIN = "https://graph.microsoft.com";
+const GRAPH_ROOT = `${GRAPH_ORIGIN}/v1.0/`;
+
+interface GraphPage<T> {
+  value: T[];
+  "@odata.nextLink"?: string;
+}
+
+export interface ReadOnlyGraphClientOptions {
+  fetchImpl?: typeof fetch;
+  sleep?: (milliseconds: number) => Promise<void>;
+  maxRetries?: number;
+  maxPages?: number;
+  maxItems?: number;
+  maxRetryDelayMs?: number;
+  requestTimeoutMs?: number;
+  random?: () => number;
+  onRetry?: (event: { endpoint: string; status: number; attempt: number; delayMs: number }) => void;
+}
+
+export type AccessTokenProvider = string | (() => Promise<string>);
+
+export class GraphRequestError extends Error {
+  constructor(
+    readonly status: number,
+    readonly code: string,
+    readonly endpoint: string,
+  ) {
+    super(`Microsoft Graph read failed for ${endpoint} (${status}, ${code}).`);
+    this.name = "GraphRequestError";
+  }
+}
+
+export class ReadOnlyGraphClient {
+  private readonly fetchImpl: typeof fetch;
+  private readonly sleep: (milliseconds: number) => Promise<void>;
+  private readonly maxRetries: number;
+  private readonly maxPages: number;
+  private readonly maxItems: number;
+  private readonly maxRetryDelayMs: number;
+  private readonly requestTimeoutMs: number;
+  private readonly random: () => number;
+  private readonly onRetry?: ReadOnlyGraphClientOptions["onRetry"];
+
+  constructor(
+    private readonly accessToken: AccessTokenProvider,
+    options: ReadOnlyGraphClientOptions = {},
+  ) {
+    if (typeof accessToken === "string" && !accessToken.trim()) throw new Error("A Microsoft Graph access token is required.");
+    this.fetchImpl = options.fetchImpl ?? fetch;
+    this.sleep = options.sleep ?? ((milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds)));
+    this.maxRetries = options.maxRetries ?? 5;
+    this.maxPages = options.maxPages ?? 10_000;
+    this.maxItems = options.maxItems ?? 1_000_000;
+    this.maxRetryDelayMs = options.maxRetryDelayMs ?? 5 * 60 * 1_000;
+    this.requestTimeoutMs = options.requestTimeoutMs ?? 30_000;
+    this.random = options.random ?? Math.random;
+    this.onRetry = options.onRetry;
+  }
+
+  async getAll<T>(endpoint: string, onPage?: (totalItems: number) => void): Promise<T[]> {
+    let nextUrl: string | undefined = this.resolveGraphUrl(endpoint);
+    const items: T[] = [];
+    let pages = 0;
+
+    while (nextUrl) {
+      if (++pages > this.maxPages) throw new GraphRequestError(0, "page_limit", endpoint);
+      const page: GraphPage<T> = await this.getPage<T>(nextUrl);
+      if (!Array.isArray(page.value)) throw new GraphRequestError(0, "invalid_collection", endpoint);
+      items.push(...page.value);
+      if (items.length > this.maxItems) throw new GraphRequestError(0, "item_limit", endpoint);
+      onPage?.(items.length);
+      nextUrl = page["@odata.nextLink"] ? this.resolveGraphUrl(page["@odata.nextLink"]) : undefined;
+    }
+
+    return items;
+  }
+
+  private async getPage<T>(url: string): Promise<GraphPage<T>> {
+    const safeUrl = this.resolveGraphUrl(url);
+
+    for (let attempt = 0; attempt <= this.maxRetries; attempt++) {
+      let response: Response;
+      try {
+        const token = typeof this.accessToken === "string" ? this.accessToken : await this.accessToken();
+        if (!token.trim()) throw new Error("token_unavailable");
+        response = await this.fetchImpl(safeUrl, {
+          method: "GET",
+          headers: { Accept: "application/json", Authorization: `Bearer ${token}` },
+          cache: "no-store",
+          redirect: "error",
+          signal: AbortSignal.timeout(this.requestTimeoutMs),
+        });
+      } catch {
+        if (attempt >= this.maxRetries) throw new GraphRequestError(0, "network_error", new URL(safeUrl).pathname);
+        await this.waitBeforeRetry(safeUrl, 0, attempt, null);
+        continue;
+      }
+
+      if (response.ok) return response.json() as Promise<GraphPage<T>>;
+
+      if ([408, 429, 500, 502, 503, 504].includes(response.status) && attempt < this.maxRetries) {
+        await this.waitBeforeRetry(safeUrl, response.status, attempt, response.headers);
+        continue;
+      }
+
+      const code = await safeErrorCode(response);
+      throw new GraphRequestError(response.status, code, new URL(safeUrl).pathname);
+    }
+
+    throw new GraphRequestError(0, "retry_exhausted", new URL(safeUrl).pathname);
+  }
+
+  private async waitBeforeRetry(url: string, status: number, attempt: number, headers: Headers | null): Promise<void> {
+    const delayMs = Math.min(retryDelay(headers, attempt, this.random), this.maxRetryDelayMs);
+    this.onRetry?.({ endpoint: new URL(url).pathname, status, attempt: attempt + 1, delayMs });
+    await this.sleep(delayMs);
+  }
+
+  private resolveGraphUrl(value: string): string {
+    const url = value.startsWith("http") ? new URL(value) : new URL(value.replace(/^\//, ""), GRAPH_ROOT);
+    if (url.protocol !== "https:" || url.origin !== GRAPH_ORIGIN || !url.pathname.startsWith("/v1.0/")) {
+      throw new GraphRequestError(0, "invalid_next_link", url.pathname);
+    }
+    return url.toString();
+  }
+}
+
+function retryDelay(headers: Headers | null, attempt: number, random: () => number): number {
+  const milliseconds = Number.parseInt(headers?.get("x-ms-retry-after-ms") ?? "", 10);
+  if (Number.isFinite(milliseconds) && milliseconds >= 0) return milliseconds;
+  const retryAfter = headers?.get("retry-after")?.trim();
+  if (retryAfter) {
+    const seconds = Number.parseInt(retryAfter, 10);
+    if (Number.isFinite(seconds)) return Math.max(seconds, 1) * 1_000;
+    const date = Date.parse(retryAfter);
+    if (Number.isFinite(date)) return Math.max(date - Date.now(), 1_000);
+  }
+  const exponential = Math.min(2 ** attempt * 1_000, 30_000);
+  return Math.round(exponential * (0.8 + random() * 0.4));
+}
+
+async function safeErrorCode(response: Response): Promise<string> {
+  try {
+    const body = (await response.json()) as { error?: { code?: unknown } };
+    return typeof body.error?.code === "string" ? body.error.code : "request_failed";
+  } catch {
+    return "request_failed";
+  }
+}

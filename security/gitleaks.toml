@@ -1,0 +1,14 @@
+title = "Entra Relationship Explorer secret scanning"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Synthetic test placeholders and ignored generated output only"
+paths = [
+  '''^security/generated/''',
+  '''(^|/)node_modules/''',
+  '''(^|/)\.next/''',
+  '''(^|/)(dist|out|coverage|playwright-report|test-results)/''',
+  '''^apps/web/server/config-core\.test\.ts$'''
+]

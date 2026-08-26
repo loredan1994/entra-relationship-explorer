@@ -1,0 +1,16 @@
+format: json
+scanners:
+  - vuln
+  - misconfig
+  - secret
+scan:
+  skip-dirs:
+    - .git
+    - node_modules
+    - security/generated
+    - test-results
+    - playwright-report
+misconfiguration:
+  include-non-failures: false
+secret:
+  config: security/gitleaks.toml
