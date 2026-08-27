@@ -83,7 +83,15 @@ export class ReadOnlyGraphClient {
     return items;
   }
 
+  async getOne<T>(endpoint: string): Promise<T> {
+    return this.getJson<T>(this.resolveGraphUrl(endpoint), endpoint);
+  }
+
   private async getPage<T>(url: string): Promise<GraphPage<T>> {
+    return this.getJson<GraphPage<T>>(url, new URL(this.resolveGraphUrl(url)).pathname);
+  }
+
+  private async getJson<T>(url: string, endpoint: string): Promise<T> {
     const safeUrl = this.resolveGraphUrl(url);
 
     for (let attempt = 0; attempt <= this.maxRetries; attempt++) {
@@ -91,12 +99,12 @@ export class ReadOnlyGraphClient {
       try {
         response = await this.sdkClient.api(safeUrl).responseType(ResponseType.RAW).get() as Response;
       } catch {
-        if (attempt >= this.maxRetries) throw new GraphRequestError(0, "network_error", new URL(safeUrl).pathname);
+        if (attempt >= this.maxRetries) throw new GraphRequestError(0, "network_error", endpoint);
         await this.waitBeforeRetry(safeUrl, 0, attempt, null);
         continue;
       }
 
-      if (response.ok) return response.json() as Promise<GraphPage<T>>;
+      if (response.ok) return response.json() as Promise<T>;
 
       if ([408, 429, 500, 502, 503, 504].includes(response.status) && attempt < this.maxRetries) {
         await this.waitBeforeRetry(safeUrl, response.status, attempt, response.headers);
@@ -104,10 +112,10 @@ export class ReadOnlyGraphClient {
       }
 
       const code = await safeErrorCode(response);
-      throw new GraphRequestError(response.status, code, new URL(safeUrl).pathname);
+      throw new GraphRequestError(response.status, code, endpoint);
     }
 
-    throw new GraphRequestError(0, "retry_exhausted", new URL(safeUrl).pathname);
+    throw new GraphRequestError(0, "retry_exhausted", endpoint);
   }
 
   private async waitBeforeRetry(url: string, status: number, attempt: number, headers: Headers | null): Promise<void> {

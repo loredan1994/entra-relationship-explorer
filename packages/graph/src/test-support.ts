@@ -37,12 +37,20 @@ export function rawScan(partial: Partial<RawTenantScan> = {}): RawTenantScan {
     users: [],
     groups: [],
     groupMemberships: [],
+    devices: [],
+    administrativeUnits: [],
+    administrativeUnitMemberships: [],
+    federatedIdentityCredentials: [],
     roleDefinitions: [],
     roleAssignments: [],
     roleEligibilities: [],
     conditionalAccessPolicies: [],
     signIns: [],
     crossTenantPartners: [],
+    authorizationPolicies: [],
+    permissionGrantPolicies: [],
+    permissionGrantPolicyIncludes: [],
+    permissionGrantPolicyExcludes: [],
     collectedEndpoints: [],
     skippedEndpoints: [],
     errors: [],
@@ -126,7 +134,7 @@ export interface RouteRecorder {
  * Graph collection page; `Error` values reject, so tests can drive the collector's
  * failure branch without reaching the network.
  */
-export function routedFetch(routes: Record<string, unknown[] | Response | Error> = {}): RouteRecorder {
+export function routedFetch(routes: Record<string, unknown[] | Record<string, unknown> | Response | Error> = {}): RouteRecorder {
   const requested: string[] = [];
   const fetchImpl = vi.fn<typeof fetch>(async (input) => {
     const url = String(input instanceof Request ? input.url : input);
@@ -135,6 +143,7 @@ export function routedFetch(routes: Record<string, unknown[] | Response | Error>
     const route = match ? routes[match] : undefined;
     if (route instanceof Error) throw route;
     if (route instanceof Response) return route;
+    if (route && !Array.isArray(route)) return jsonResponse(route);
     return jsonResponse({ value: route ?? [] });
   });
   return {
@@ -164,5 +173,6 @@ export function clientFor(recorder: RouteRecorder, options: ReadOnlyGraphClientO
 export const ALL_OPTIONAL_SCOPES = [
   "https://graph.microsoft.com/RoleManagement.Read.Directory",
   "https://graph.microsoft.com/Policy.Read.All",
+  "https://graph.microsoft.com/Policy.Read.PermissionGrant",
   "https://graph.microsoft.com/AuditLog.Read.All",
 ] as const;

@@ -2,12 +2,19 @@ import { GraphRequestError, ReadOnlyGraphClient } from "./client";
 import type {
   GraphAppRoleAssignment,
   GraphApplication,
+  GraphAdministrativeUnit,
+  GraphAuthorizationPolicy,
   GraphCredentialMetadata,
+  GraphDevice,
   GraphDirectoryObject,
+  GraphFederatedIdentityCredential,
   GraphGroup,
   GraphConditionalAccessPolicy,
   GraphOAuth2PermissionGrant,
+  GraphPermissionGrantConditionSet,
+  GraphPermissionGrantPolicy,
   GraphServicePrincipal,
+  GraphServicePrincipalFederation,
   GraphRoleDefinition,
   GraphRoleSchedule,
   GraphSignIn,
@@ -45,13 +52,18 @@ interface ScanRun {
 
 const APPLICATIONS_ENDPOINT = "/applications?$select=id,appId,displayName,publisherDomain,appRoles,passwordCredentials,keyCredentials";
 const SERVICE_PRINCIPALS_ENDPOINT = "/servicePrincipals?$select=id,appId,displayName,publisherName,servicePrincipalType,appRoles,passwordCredentials,keyCredentials";
+const SERVICE_PRINCIPAL_FEDERATION_ENDPOINT = "/servicePrincipals?$select=id,servicePrincipalType&$expand=federatedIdentityCredentials($select=id,name,issuer,subject,audiences,description)";
 const USERS_ENDPOINT = "/users?$select=id,displayName,userType,externalUserState";
 const GROUPS_ENDPOINT = "/groups?$select=id,displayName,securityEnabled";
+const DEVICES_ENDPOINT = "/devices?$select=id,deviceId,displayName,accountEnabled,isCompliant,isManaged,isManagementRestricted,operatingSystem,operatingSystemVersion,profileType,registrationDateTime,trustType";
+const ADMINISTRATIVE_UNITS_ENDPOINT = "/directory/administrativeUnits?$select=id,displayName,description,isMemberManagementRestricted,membershipType,membershipRuleProcessingState,visibility";
 const GRANTS_ENDPOINT = "/oauth2PermissionGrants?$select=id,clientId,consentType,principalId,resourceId,scope";
 const ROLE_DEFINITIONS_ENDPOINT = "/roleManagement/directory/roleDefinitions?$select=id,displayName,templateId,isBuiltIn";
 const ROLE_ASSIGNMENTS_ENDPOINT = "/roleManagement/directory/roleAssignments?$select=id,principalId,roleDefinitionId,directoryScopeId";
 const ROLE_ELIGIBILITIES_ENDPOINT = "/roleManagement/directory/roleEligibilitySchedules?$select=id,principalId,roleDefinitionId,directoryScopeId";
 const CONDITIONAL_ACCESS_ENDPOINT = "/identity/conditionalAccess/policies?$select=id,displayName,state,conditions,grantControls";
+const AUTHORIZATION_POLICY_ENDPOINT = "/policies/authorizationPolicy?$select=id,displayName,allowInvitesFrom,allowEmailVerifiedUsersToJoinOrganization,blockMsolPowerShell,defaultUserRolePermissions";
+const PERMISSION_GRANT_POLICIES_ENDPOINT = "/policies/permissionGrantPolicies?$select=id,displayName,description";
 const CROSS_TENANT_ENDPOINT = "/policies/crossTenantAccessPolicy/partners?$select=tenantId,inboundTrust,isInMultiTenantOrganization";
 /** Sign-in activity is read for the 30 days before the scan, never the whole history. */
 const ACTIVITY_WINDOW_MS = 30 * 24 * 60 * 60 * 1_000;
@@ -64,6 +76,7 @@ export async function scanTenant(
   if (!TENANT_ID_PATTERN.test(tenantId)) throw new Error("A concrete Microsoft Entra tenant ID is required.");
   if (options.resumeFrom && options.resumeFrom.tenantId !== tenantId) throw new Error("A scan checkpoint cannot cross tenant boundaries.");
   const scan: RawTenantScan = options.resumeFrom ? structuredClone(options.resumeFrom) : emptyScan(tenantId, options);
+  initializeAddedCollections(scan);
   const run: ScanRun = {
     client,
     scan,
@@ -75,17 +88,33 @@ export async function scanTenant(
   // Stage order is the collection order: later stages fan out over what earlier ones found.
   await runStage(run, "applications", () => collectApplications(run));
   await runStage(run, "servicePrincipals", () => collectServicePrincipals(run));
+  await runStage(run, "federatedIdentityCredentials", () => collectFederatedIdentityCredentials(run));
   await runStage(run, "usersAndGroups", () => collectUsersAndGroups(run));
   await runStage(run, "groupMemberships", () => collectGroupMemberships(run));
+  await runStage(run, "devices", () => collectDevices(run));
+  await runStage(run, "administrativeUnits", () => collectAdministrativeUnits(run));
   await runStage(run, "delegatedPermissionGrants", () => collectDelegatedGrants(run));
   await runStage(run, "appRoleAssignments", () => collectAppRoleAssignments(run));
   await collectOwners(run);
   await runStage(run, "roles", () => collectDirectoryRoles(run));
   await runStage(run, "conditionalAccess", () => collectConditionalAccess(run));
+  await runStage(run, "authorizationPolicy", () => collectAuthorizationPolicy(run));
+  await runStage(run, "permissionGrantPolicies", () => collectPermissionGrantPolicies(run));
   await runStage(run, "crossTenantAccess", () => collectCrossTenantAccess(run));
   await runStage(run, "activity", () => collectActivity(run));
 
   return scan;
+}
+
+function initializeAddedCollections(scan: RawTenantScan): void {
+  scan.devices ??= [];
+  scan.administrativeUnits ??= [];
+  scan.administrativeUnitMemberships ??= [];
+  scan.federatedIdentityCredentials ??= [];
+  scan.authorizationPolicies ??= [];
+  scan.permissionGrantPolicies ??= [];
+  scan.permissionGrantPolicyIncludes ??= [];
+  scan.permissionGrantPolicyExcludes ??= [];
 }
 
 function emptyScan(tenantId: string, options: ScanTenantOptions): RawTenantScan {
@@ -101,12 +130,20 @@ function emptyScan(tenantId: string, options: ScanTenantOptions): RawTenantScan 
     users: [],
     groups: [],
     groupMemberships: [],
+    devices: [],
+    administrativeUnits: [],
+    administrativeUnitMemberships: [],
+    federatedIdentityCredentials: [],
     roleDefinitions: [],
     roleAssignments: [],
     roleEligibilities: [],
     conditionalAccessPolicies: [],
     signIns: [],
     crossTenantPartners: [],
+    authorizationPolicies: [],
+    permissionGrantPolicies: [],
+    permissionGrantPolicyIncludes: [],
+    permissionGrantPolicyExcludes: [],
     collectedEndpoints: [],
     skippedEndpoints: [],
     errors: [],
@@ -148,6 +185,17 @@ function read<TInput, TOutput>(
   return collect(run.client, endpoint, sanitize, run.scan, onPage);
 }
 
+async function readOne<TInput, TOutput>(run: ScanRun, endpoint: string, sanitize: (record: TInput) => TOutput): Promise<Sourced<TOutput> | null> {
+  try {
+    const record = sanitize(await run.client.getOne<TInput>(endpoint));
+    run.scan.collectedEndpoints.push(endpoint);
+    return { endpoint, record };
+  } catch (error) {
+    recordCollectionError(run.scan, endpoint, error);
+    return null;
+  }
+}
+
 async function collectApplications(run: ScanRun): Promise<void> {
   run.scan.applications.push(...await read(run, APPLICATIONS_ENDPOINT, sanitizeApplication, (count) =>
     report(run, "applications", count, "Application blueprints collected"),
@@ -158,6 +206,23 @@ async function collectServicePrincipals(run: ScanRun): Promise<void> {
   run.scan.servicePrincipals.push(...await read(run, SERVICE_PRINCIPALS_ENDPOINT, sanitizeServicePrincipal, (count) =>
     report(run, "servicePrincipals", count, "Tenant identities collected"),
   ));
+}
+
+async function collectFederatedIdentityCredentials(run: ScanRun): Promise<void> {
+  const { scan } = run;
+  await mapLimit(scan.applications, run.concurrency, async ({ record }) => {
+    await ensureActive(run);
+    const endpoint = `/applications/${encodeURIComponent(record.id)}/federatedIdentityCredentials?$select=id,name,issuer,subject,audiences,description`;
+    const credentials = await read(run, endpoint, sanitizeFederatedIdentityCredential);
+    scan.federatedIdentityCredentials!.push(...credentials.map((credential) => ({ ...credential, parentId: record.id, parentType: "application" as const })));
+    report(run, "federatedIdentityCredentials", scan.federatedIdentityCredentials!.length, "Federated workload trust credentials collected");
+  });
+  const managedIdentityContainers = await read(run, SERVICE_PRINCIPAL_FEDERATION_ENDPOINT, sanitizeServicePrincipalFederation);
+  for (const container of managedIdentityContainers) {
+    if (container.record.servicePrincipalType?.toLocaleLowerCase() !== "managedidentity") continue;
+    scan.federatedIdentityCredentials!.push(...(container.record.federatedIdentityCredentials ?? []).map((record) => ({ endpoint: container.endpoint, record, parentId: container.record.id, parentType: "managedIdentity" as const })));
+  }
+  report(run, "federatedIdentityCredentials", scan.federatedIdentityCredentials!.length, "Federated workload trust credentials collected");
 }
 
 async function collectUsersAndGroups(run: ScanRun): Promise<void> {
@@ -178,6 +243,26 @@ async function collectGroupMemberships(run: ScanRun): Promise<void> {
     scan.groupMemberships!.push(...members.map((member) => ({ ...member, groupId: record.id })));
     report(run, "groupMemberships", scan.groupMemberships!.length, "Direct group memberships collected");
   });
+}
+
+async function collectDevices(run: ScanRun): Promise<void> {
+  run.scan.devices!.push(...await read(run, DEVICES_ENDPOINT, sanitizeDevice, (count) =>
+    report(run, "devices", count, "Directory devices collected"),
+  ));
+}
+
+async function collectAdministrativeUnits(run: ScanRun): Promise<void> {
+  const { scan } = run;
+  const units = await read(run, ADMINISTRATIVE_UNITS_ENDPOINT, sanitizeAdministrativeUnit);
+  scan.administrativeUnits!.push(...units);
+  await mapLimit(units, run.concurrency, async ({ record }) => {
+    await ensureActive(run);
+    const endpoint = `/directory/administrativeUnits/${encodeURIComponent(record.id)}/members?$select=id,displayName,userType,deviceId`;
+    const members = await read(run, endpoint, sanitizeDirectoryObject);
+    scan.administrativeUnitMemberships!.push(...members.map((member) => ({ ...member, administrativeUnitId: record.id })));
+    report(run, "administrativeUnits", scan.administrativeUnitMemberships!.length, "Administrative unit membership collected");
+  });
+  report(run, "administrativeUnits", units.length, "Administrative units collected");
 }
 
 async function collectDelegatedGrants(run: ScanRun): Promise<void> {
@@ -242,6 +327,31 @@ async function collectConditionalAccess(run: ScanRun): Promise<void> {
   report(run, "conditionalAccess", scan.conditionalAccessPolicies!.length, "Conditional Access policies collected");
 }
 
+async function collectAuthorizationPolicy(run: ScanRun): Promise<void> {
+  if (!hasScope(run.options.enabledScopes, "Policy.Read.All")) return;
+  const policy = await readOne(run, AUTHORIZATION_POLICY_ENDPOINT, sanitizeAuthorizationPolicy);
+  if (policy) run.scan.authorizationPolicies!.push(policy);
+  report(run, "authorizationPolicy", run.scan.authorizationPolicies!.length, "Authorization policy collected");
+}
+
+async function collectPermissionGrantPolicies(run: ScanRun): Promise<void> {
+  if (!hasScope(run.options.enabledScopes, "Policy.Read.PermissionGrant")) return;
+  const { scan } = run;
+  const policies = await read(run, PERMISSION_GRANT_POLICIES_ENDPOINT, sanitizePermissionGrantPolicy);
+  scan.permissionGrantPolicies!.push(...policies);
+  await mapLimit(policies, run.concurrency, async ({ record }) => {
+    await ensureActive(run);
+    const includesEndpoint = `/policies/permissionGrantPolicies/${encodeURIComponent(record.id)}/includes`;
+    const excludesEndpoint = `/policies/permissionGrantPolicies/${encodeURIComponent(record.id)}/excludes`;
+    const includes = await read(run, includesEndpoint, sanitizePermissionGrantConditionSet);
+    const excludes = await read(run, excludesEndpoint, sanitizePermissionGrantConditionSet);
+    scan.permissionGrantPolicyIncludes!.push(...includes.map((condition) => ({ ...condition, policyId: record.id })));
+    scan.permissionGrantPolicyExcludes!.push(...excludes.map((condition) => ({ ...condition, policyId: record.id })));
+    report(run, "permissionGrantPolicies", scan.permissionGrantPolicyIncludes!.length + scan.permissionGrantPolicyExcludes!.length, "Consent policy conditions collected");
+  });
+  report(run, "permissionGrantPolicies", policies.length, "Consent policies collected");
+}
+
 async function collectCrossTenantAccess(run: ScanRun): Promise<void> {
   if (!hasScope(run.options.enabledScopes, "Policy.Read.All")) return;
   await ensureActive(run);
@@ -275,15 +385,15 @@ async function collect<TInput, TOutput>(
     scan.collectedEndpoints.push(endpoint);
     return collected;
   } catch (error) {
-    const graphError = error instanceof GraphRequestError ? error : null;
-    scan.skippedEndpoints.push(endpoint);
-    scan.errors.push({
-      endpoint,
-      code: graphError?.code ?? "unexpected_error",
-      message: graphError?.message ?? "The read failed without exposing response data.",
-    });
+    recordCollectionError(scan, endpoint, error);
     return [];
   }
+}
+
+function recordCollectionError(scan: RawTenantScan, endpoint: string, error: unknown): void {
+  const graphError = error instanceof GraphRequestError ? error : null;
+  scan.skippedEndpoints.push(endpoint);
+  scan.errors.push({ endpoint, code: graphError?.code ?? "unexpected_error", message: graphError?.message ?? "The read failed without exposing response data." });
 }
 
 async function mapLimit<T>(items: T[], limit: number, task: (item: T) => Promise<void>): Promise<void> {
@@ -334,6 +444,14 @@ function sanitizeServicePrincipal(value: GraphServicePrincipal): GraphServicePri
   };
 }
 
+function sanitizeFederatedIdentityCredential(value: GraphFederatedIdentityCredential): GraphFederatedIdentityCredential {
+  return { id: requiredString(value.id), name: requiredString(value.name), issuer: requiredString(value.issuer), subject: requiredString(value.subject), audiences: stringArray(value.audiences), description: stringOrNull(value.description) };
+}
+
+function sanitizeServicePrincipalFederation(value: GraphServicePrincipalFederation): GraphServicePrincipalFederation {
+  return { id: requiredString(value.id), servicePrincipalType: stringOrNull(value.servicePrincipalType), federatedIdentityCredentials: Array.isArray(value.federatedIdentityCredentials) ? value.federatedIdentityCredentials.map(sanitizeFederatedIdentityCredential) : [] };
+}
+
 function sanitizeRoles(value: unknown) {
   if (!Array.isArray(value)) return [];
   return value.flatMap((candidate) => {
@@ -367,6 +485,8 @@ function sanitizeDirectoryObject(value: GraphDirectoryObject): GraphDirectoryObj
 
 function sanitizeUser(value: GraphUser): GraphUser { return { ...sanitizeDirectoryObject(value), userType: stringOrNull(value.userType), externalUserState: stringOrNull(value.externalUserState), "@odata.type": "#microsoft.graph.user" }; }
 function sanitizeGroup(value: GraphGroup): GraphGroup { return { ...sanitizeDirectoryObject(value), securityEnabled: typeof value.securityEnabled === "boolean" ? value.securityEnabled : null, "@odata.type": "#microsoft.graph.group" }; }
+function sanitizeDevice(value: GraphDevice): GraphDevice { return { ...sanitizeDirectoryObject(value), deviceId: requiredString(value.deviceId), accountEnabled: booleanOrNull(value.accountEnabled), isCompliant: booleanOrNull(value.isCompliant), isManaged: booleanOrNull(value.isManaged), isManagementRestricted: booleanOrNull(value.isManagementRestricted), operatingSystem: stringOrNull(value.operatingSystem), operatingSystemVersion: stringOrNull(value.operatingSystemVersion), profileType: stringOrNull(value.profileType), registrationDateTime: stringOrNull(value.registrationDateTime), trustType: stringOrNull(value.trustType), "@odata.type": "#microsoft.graph.device" }; }
+function sanitizeAdministrativeUnit(value: GraphAdministrativeUnit): GraphAdministrativeUnit { return { ...sanitizeDirectoryObject(value), description: stringOrNull(value.description), isMemberManagementRestricted: booleanOrNull(value.isMemberManagementRestricted), membershipType: stringOrNull(value.membershipType), membershipRuleProcessingState: stringOrNull(value.membershipRuleProcessingState), visibility: stringOrNull(value.visibility), "@odata.type": "#microsoft.graph.administrativeUnit" }; }
 function sanitizeRoleDefinition(value: GraphRoleDefinition): GraphRoleDefinition { return { id: requiredString(value.id), displayName: requiredString(value.displayName), templateId: stringOrNull(value.templateId), isBuiltIn: typeof value.isBuiltIn === "boolean" ? value.isBuiltIn : null }; }
 function sanitizeRoleSchedule(value: GraphRoleSchedule): GraphRoleSchedule { return { id: requiredString(value.id), principalId: requiredString(value.principalId), roleDefinitionId: requiredString(value.roleDefinitionId), directoryScopeId: stringOrNull(value.directoryScopeId) }; }
 // Stryker disable next-line ConditionalExpression,LogicalOperator: Graph returns JSON, whose only
@@ -375,6 +495,9 @@ function sanitizeRoleSchedule(value: GraphRoleSchedule): GraphRoleSchedule { ret
 function sanitizeConditionalAccessPolicy(value: GraphConditionalAccessPolicy): GraphConditionalAccessPolicy { const conditions = value.conditions && typeof value.conditions === "object" ? value.conditions : {}; const users = conditions.users && typeof conditions.users === "object" ? conditions.users : {}; const applications = conditions.applications && typeof conditions.applications === "object" ? conditions.applications : {}; const strings = (item: unknown) => Array.isArray(item) ? item.filter((entry): entry is string => typeof entry === "string") : []; return { id: requiredString(value.id), displayName: requiredString(value.displayName), state: requiredString(value.state), conditions: { users: { includeUsers: strings(users.includeUsers), includeGroups: strings(users.includeGroups) }, applications: { includeApplications: strings(applications.includeApplications) } }, grantControls: value.grantControls && typeof value.grantControls === "object" ? { builtInControls: strings(value.grantControls.builtInControls), operator: stringOrNull(value.grantControls.operator) } : null }; }
 function sanitizeSignIn(value: GraphSignIn): GraphSignIn { return { id: requiredString(value.id), createdDateTime: requiredString(value.createdDateTime), servicePrincipalId: stringOrNull(value.servicePrincipalId), resourceServicePrincipalId: stringOrNull(value.resourceServicePrincipalId), appDisplayName: stringOrNull(value.appDisplayName), resourceDisplayName: stringOrNull(value.resourceDisplayName), status: value.status && typeof value.status === "object" ? { errorCode: typeof value.status.errorCode === "number" ? value.status.errorCode : null } : null }; }
 function sanitizeCrossTenantPartner(value: GraphCrossTenantPartner): GraphCrossTenantPartner { return { tenantId: requiredString(value.tenantId), inboundTrust: value.inboundTrust ? { isMfaAccepted: value.inboundTrust.isMfaAccepted === true, isCompliantDeviceAccepted: value.inboundTrust.isCompliantDeviceAccepted === true, isHybridAzureADJoinedDeviceAccepted: value.inboundTrust.isHybridAzureADJoinedDeviceAccepted === true } : null, isInMultiTenantOrganization: value.isInMultiTenantOrganization === true }; }
+function sanitizeAuthorizationPolicy(value: GraphAuthorizationPolicy): GraphAuthorizationPolicy { const permissions = value.defaultUserRolePermissions && typeof value.defaultUserRolePermissions === "object" ? value.defaultUserRolePermissions : {}; return { id: requiredString(value.id), displayName: requiredString(value.displayName), allowInvitesFrom: stringOrNull(value.allowInvitesFrom), allowEmailVerifiedUsersToJoinOrganization: booleanOrNull(value.allowEmailVerifiedUsersToJoinOrganization), blockMsolPowerShell: booleanOrNull(value.blockMsolPowerShell), defaultUserRolePermissions: { allowedToCreateApps: booleanOrNull(permissions.allowedToCreateApps), allowedToCreateSecurityGroups: booleanOrNull(permissions.allowedToCreateSecurityGroups), allowedToCreateTenants: booleanOrNull(permissions.allowedToCreateTenants), allowedToReadBitlockerKeysForOwnedDevice: booleanOrNull(permissions.allowedToReadBitlockerKeysForOwnedDevice), allowedToReadOtherUsers: booleanOrNull(permissions.allowedToReadOtherUsers), permissionGrantPoliciesAssigned: stringArray(permissions.permissionGrantPoliciesAssigned) } }; }
+function sanitizePermissionGrantPolicy(value: GraphPermissionGrantPolicy): GraphPermissionGrantPolicy { return { id: requiredString(value.id), displayName: requiredString(value.displayName), description: stringOrNull(value.description) }; }
+function sanitizePermissionGrantConditionSet(value: GraphPermissionGrantConditionSet): GraphPermissionGrantConditionSet { return { id: requiredString(value.id), permissionClassification: stringOrNull(value.permissionClassification), permissionType: stringOrNull(value.permissionType), resourceApplication: stringOrNull(value.resourceApplication), permissions: stringArray(value.permissions), clientApplicationIds: stringArray(value.clientApplicationIds), clientApplicationTenantIds: stringArray(value.clientApplicationTenantIds), clientApplicationPublisherIds: stringArray(value.clientApplicationPublisherIds), clientApplicationsFromVerifiedPublisherOnly: booleanOrNull(value.clientApplicationsFromVerifiedPublisherOnly) }; }
 
 function hasScope(scopes: readonly string[] | undefined, shortName: string): boolean { return Boolean(scopes?.some((scope) => scope === shortName || scope.endsWith(`/${shortName}`))); }
 
@@ -388,3 +511,6 @@ function requiredString(value: unknown): string {
 function stringOrNull(value: unknown): string | null {
   return typeof value === "string" ? value : null;
 }
+
+function booleanOrNull(value: unknown): boolean | null { return typeof value === "boolean" ? value : null; }
+function stringArray(value: unknown): string[] { return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : []; }
