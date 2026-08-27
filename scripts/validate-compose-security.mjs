@@ -5,8 +5,14 @@ import { fileURLToPath } from "node:url";
 import path from "node:path";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+// Compose requires every interpolated variable to resolve before it will render
+// the configuration. These placeholders exist only so the isolation checks below
+// can run; none of them is a real credential, and the tenant identifiers are
+// deliberately synthetic so no contributor's tenant leaks into a check.
 const safeEnvironment = {
   ...process.env,
+  ENTRA_TENANT_ID: process.env.ENTRA_TENANT_ID ?? "11111111-1111-4111-8111-111111111111",
+  ENTRA_CLIENT_ID: process.env.ENTRA_CLIENT_ID ?? "11111111-1111-4111-8111-111111111112",
   ENTRA_CLIENT_SECRET: "validation-placeholder-not-a-secret",
   ENTRA_DATA_ENCRYPTION_KEY: "validation-placeholder-not-a-key",
   POSTGRES_PASSWORD: "validation-placeholder-not-a-password",

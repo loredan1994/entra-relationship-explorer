@@ -4,7 +4,7 @@
 
 Phase 1 established the opt-in local administrator workflow. The current product extends it with optional read-only evidence, resumable stage checkpoints, cancellation, tenant-synchronized finding reviews, and IAM intelligence. The application still has no Entra mutation path.
 
-The repository is code-complete for this workflow. On 2026-08-26, the owner explicitly approved creation of the single-tenant `Entra Relationship Explorer Local` registration in tenant `11111111-1111-4111-8111-111111111111`. Its client ID is `11111111-1111-4111-8111-111111111112`; its callbacks are the local-only `http://127.0.0.1:3000/api/auth/callback` and `http://127.0.0.1:3200/api/auth/callback`; and administrator consent is effective only for delegated `Application.Read.All Directory.Read.All`. Credentials are stored in `your-key-vault`; no value is committed. Nothing has been deployed.
+The repository is code-complete for this workflow. Running it against a live tenant requires a single-tenant app registration that you create and consent to yourself, with local-only callbacks (`http://127.0.0.1:3000/api/auth/callback` and `http://127.0.0.1:3200/api/auth/callback`) and delegated `Application.Read.All Directory.Read.All` consent. See [CONTRIBUTING.md](../CONTRIBUTING.md) for the registration steps. No credential is ever committed.
 
 ## Safety boundary
 

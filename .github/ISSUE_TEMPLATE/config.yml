@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Report a security vulnerability
+    url: https://github.com/loredan1994/entra-relationship-explorer/security/advisories/new
+    about: Never report a security defect in a public issue. Use private vulnerability reporting; see SECURITY.md.
+  - name: Ask a question or propose a design
+    url: https://github.com/loredan1994/entra-relationship-explorer/discussions
+    about: For open questions, larger feature ideas, and anything that needs agreement before code.

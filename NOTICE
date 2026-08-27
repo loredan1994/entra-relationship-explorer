@@ -1,0 +1,28 @@
+Entra Relationship Explorer
+Copyright 2026 Nicolae-Loredan Calimanu
+
+This product is licensed under the Apache License, Version 2.0.
+A copy of the license is included in the LICENSE file at the root of this
+repository, and is also available at http://www.apache.org/licenses/LICENSE-2.0
+
+--------------------------------------------------------------------------------
+Third-party components
+
+A component-level inventory with versions, licenses, and copyright holders is
+maintained in oss-inventory.json, and human-readable notices are collected in
+THIRD_PARTY_NOTICES.md.
+
+--------------------------------------------------------------------------------
+Data attribution
+
+This product references technique identifiers and names from MITRE ATT&CK(R)
+and produces exports in the MITRE Attack Flow format.
+
+ATT&CK(R) and ATT&CK Navigator(R) are registered trademarks of The MITRE
+Corporation. Use of these identifiers does not imply MITRE's endorsement of, or
+affiliation with, this product. MITRE ATT&CK terms of use are published at
+https://attack.mitre.org/resources/terms-of-use/
+
+Microsoft, Microsoft Entra, Microsoft Entra ID, Microsoft Graph, and Azure are
+trademarks of the Microsoft group of companies. This product is not affiliated
+with, endorsed by, or sponsored by Microsoft.

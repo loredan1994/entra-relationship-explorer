@@ -4,9 +4,9 @@
 
 1. Start Docker Desktop.
 2. Run `pnpm dev:live` from the repository root.
-3. Open `http://127.0.0.1:3200/settings` and connect the configured tenant.
+3. Open `http://127.0.0.1:3200/settings` and connect the tenant you configured in `ENTRA_TENANT_ID`.
 
-Startup retrieves three values directly from Azure Key Vault `your-key-vault`: the local app-registration credential, the 32-byte data-encryption key, and the PostgreSQL password. Values remain in process and container environment memory and are never written to Git.
+Startup reads three values from outside the repository: the app-registration credential, the 32-byte data-encryption key, and the PostgreSQL password. Set `ENTRA_KEY_VAULT_NAME` to read them from an Azure Key Vault you control, or place them in a git-ignored `.env.local`. Values remain in process and container environment memory and are never written to Git.
 
 ## Services
 

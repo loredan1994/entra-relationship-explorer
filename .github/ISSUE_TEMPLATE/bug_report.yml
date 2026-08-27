@@ -1,0 +1,90 @@
+name: Bug report
+description: Something behaves incorrectly
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Never paste real tenant data.** Object IDs, display names, and app
+        registrations from a live tenant describe your organization's privilege
+        topology. Redact them, or reproduce in fixture mode first.
+
+        If this is a security defect, stop and follow
+        [SECURITY.md](../blob/main/SECURITY.md) instead.
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What did you observe, and what did you expect instead?
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Run `pnpm dev`
+        2. Open /security
+        3. ...
+    validations:
+      required: true
+
+  - type: dropdown
+    id: mode
+    attributes:
+      label: Which mode?
+      options:
+        - Fixture mode (synthetic sample tenant)
+        - Live tenant, local dev server
+        - Live tenant, container stack
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Which area?
+      options:
+        - Overview
+        - Relationship map
+        - Permissions
+        - Changes / snapshot comparison
+        - Threat workspace and findings
+        - Scanning and Graph reads
+        - Exports (CSV, HTML report, Attack Flow)
+        - Authentication and sessions
+        - Setup, Docker, or configuration
+        - Other / not sure
+    validations:
+      required: true
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      value: |
+        - Commit or version:
+        - OS:
+        - Node.js version:
+        - Browser (if relevant):
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant output
+      description: Console errors, server logs, or failing test output. Redact tenant identifiers.
+      render: shell
+
+  - type: checkboxes
+    id: confirmations
+    attributes:
+      label: Before submitting
+      options:
+        - label: I have removed all real tenant identifiers from this report.
+          required: true
+        - label: I searched existing issues for a duplicate.
+          required: true

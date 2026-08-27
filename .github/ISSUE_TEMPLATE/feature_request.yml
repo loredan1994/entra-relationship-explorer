@@ -1,0 +1,63 @@
+name: Feature request
+description: Propose a capability or an improvement
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        For anything substantial — a new finding type, a new export format, a new
+        Graph endpoint — please open this issue before writing code, so the design
+        can be agreed first.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: What can you not do today, and who does that affect? Describe the situation rather than the solution.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What you would like to happen
+    validations:
+      required: true
+
+  - type: dropdown
+    id: graph-permission
+    attributes:
+      label: Does this need Microsoft Graph permission the product does not already request?
+      description: |
+        The product defaults to delegated Application.Read.All and Directory.Read.All,
+        with an optional fixed read-only set. Any new scope needs explicit justification,
+        and write-capable scopes are never acceptable.
+      options:
+        - "No, existing read-only scopes are enough"
+        - "Yes, one of the existing optional scopes"
+        - "Yes, a scope the product does not currently support"
+        - "I do not know"
+    validations:
+      required: true
+
+  - type: textarea
+    id: evidence-class
+    attributes:
+      label: What evidence would back it?
+      description: |
+        The product separates configured access, observed activity, inferred
+        possibility, and missing evidence. Which of those would this feature
+        produce, and what Graph endpoint proves it?
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives you considered
+
+  - type: checkboxes
+    id: constraints
+    attributes:
+      label: Constraints
+      options:
+        - label: This can be built without the product ever writing to Microsoft Entra.
+          required: true
