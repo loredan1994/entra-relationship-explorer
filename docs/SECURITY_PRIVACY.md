@@ -27,7 +27,7 @@ The default implementation uses the two core delegated permissions above. Option
 - Store object IDs, names, metadata, relationships, permission values, scan timestamps, encrypted stage checkpoints, and encrypted tenant-scoped review decisions.
 - Never store access tokens, refresh tokens, private keys, secret values, or certificate private material in the graph store.
 - Encrypt storage and transport; isolate tenants with a mandatory tenant key in every query.
-- Default snapshot retention: 30 days, configurable. Exports are explicitly initiated and clearly labeled sensitive.
+- Snapshot retention is currently fixed at 30 days. Exports are explicitly initiated and clearly labeled sensitive.
 - Redact user email/UPN in shared screenshots and diagnostics by default.
 
 ## Trust rules

@@ -29,8 +29,9 @@ export class MemoryBackend implements Backend {
 
   async consumeAuthFlow(id: string, tenantId: string, state: string): Promise<DurableAuthFlow | null> {
     const flow = this.flows.get(id);
+    if (!flow || flow.tenantId !== tenantId || !secretsEqual(flow.state, state)) return null;
     this.flows.delete(id);
-    if (!flow || flow.tenantId !== tenantId || flow.expiresAt <= Date.now() || !secretsEqual(flow.state, state)) return null;
+    if (flow.expiresAt <= Date.now()) return null;
     return copy(flow);
   }
 
@@ -74,9 +75,10 @@ export class MemoryBackend implements Backend {
     return job ? copy(job) : null;
   }
 
-  async recoverStaleJobs(staleBefore: Date): Promise<number> {
+  async recoverStaleJobs(tenantId: string, staleBefore: Date): Promise<number> {
     let recovered = 0;
     for (const job of this.jobs.values()) {
+      if (job.tenantId !== tenantId) continue;
       if (job.status === "cancel_requested" && new Date(job.updatedAt) < staleBefore) {
         job.status = "cancelled";
         job.workerId = null;
@@ -96,9 +98,9 @@ export class MemoryBackend implements Backend {
     return recovered;
   }
 
-  async claimNextJob(workerId: string): Promise<ScanJob | null> {
+  async claimNextJob(workerId: string, tenantId: string): Promise<ScanJob | null> {
     // Stryker disable next-line MethodExpression,ArrowFunction: Map iteration is insertion order, which is already createdAt order; the sort states the intent.
-    const job = [...this.jobs.values()].filter((candidate) => candidate.status === "queued").sort((a, b) => a.createdAt.localeCompare(b.createdAt))[0];
+    const job = [...this.jobs.values()].filter((candidate) => candidate.tenantId === tenantId && candidate.status === "queued").sort((a, b) => a.createdAt.localeCompare(b.createdAt))[0];
     if (!job) return null;
     job.status = "running";
     job.workerId = workerId;
@@ -143,12 +145,13 @@ export class MemoryBackend implements Backend {
     job.finishedAt = new Date().toISOString();
     job.updatedAt = job.finishedAt;
     job.workerId = null;
+    this.scanCheckpoints.delete(id);
   }
 
   async requestScanCancellation(id: string, tenantId: string): Promise<ScanJob | null> {
     const job = this.jobs.get(id);
     if (!job || job.tenantId !== tenantId || !["queued", "running", "cancel_requested"].includes(job.status)) return null;
-    if (job.status === "queued") { job.status = "cancelled"; job.finishedAt = new Date().toISOString(); job.detail = "Cancelled before Microsoft Graph collection began"; }
+    if (job.status === "queued") { job.status = "cancelled"; job.finishedAt = new Date().toISOString(); job.detail = "Cancelled before Microsoft Graph collection began"; this.scanCheckpoints.delete(id); }
     else { job.status = "cancel_requested"; job.detail = "Cancellation requested; finishing the current read safely"; }
     job.updatedAt = new Date().toISOString();
     return copy(job);

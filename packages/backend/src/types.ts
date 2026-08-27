@@ -85,8 +85,8 @@ export interface Backend {
   enqueueScan(tenantId: string, sessionId: string): Promise<ScanJob>;
   getJob(id: string, tenantId: string): Promise<ScanJob | null>;
   getLatestJob(tenantId: string): Promise<ScanJob | null>;
-  recoverStaleJobs(staleBefore: Date): Promise<number>;
-  claimNextJob(workerId: string): Promise<ScanJob | null>;
+  recoverStaleJobs(tenantId: string, staleBefore: Date): Promise<number>;
+  claimNextJob(workerId: string, tenantId: string): Promise<ScanJob | null>;
   updateJobProgress(id: string, workerId: string, stage: ScanJobStage, collected: number, detail: string): Promise<void>;
   completeJob(id: string, workerId: string, snapshot: TenantSnapshot, retainAfter: Date): Promise<void>;
   failJob(id: string, workerId: string, error: string): Promise<void>;

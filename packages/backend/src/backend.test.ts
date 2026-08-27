@@ -7,10 +7,11 @@ const tenantId = "11111111-1111-4111-8111-111111111111";
 function session(id = randomUUID(), tenant = tenantId) { return { id, tenantId: tenant, account: {}, accessToken: "token", accessTokenExpiresAt: Date.now() + 60_000, tokenCache: "cache", sessionExpiresAt: Date.now() + 60_000 }; }
 
 describe("Backend contract", () => {
-  it("consumes auth flows once and consumes mismatched state", async () => {
+  it("consumes auth flows once without letting mismatched state destroy them", async () => {
     const backend = new MemoryBackend(); const id = randomUUID();
     await backend.createAuthFlow({ id, tenantId, state: "expected", verifier: "verifier", expiresAt: Date.now() + 60_000 });
     expect(await backend.consumeAuthFlow(id, tenantId, "wrong")).toBeNull();
+    expect(await backend.consumeAuthFlow(id, tenantId, "expected")).toMatchObject({ id, tenantId });
     expect(await backend.consumeAuthFlow(id, tenantId, "expected")).toBeNull();
   });
 
@@ -20,7 +21,7 @@ describe("Backend contract", () => {
     const tenantBoundId = randomUUID();
     await backend.createAuthFlow({ id: tenantBoundId, tenantId, state: "expected", verifier: "verifier", expiresAt: Date.now() + 60_000 });
     expect(await backend.consumeAuthFlow(tenantBoundId, wrongTenant, "expected")).toBeNull();
-    expect(await backend.consumeAuthFlow(tenantBoundId, tenantId, "expected")).toBeNull();
+    expect(await backend.consumeAuthFlow(tenantBoundId, tenantId, "expected")).toMatchObject({ id: tenantBoundId, tenantId });
     const expiredId = randomUUID();
     await backend.createAuthFlow({ id: expiredId, tenantId, state: "expected", verifier: "verifier", expiresAt: Date.now() - 1 });
     expect(await backend.consumeAuthFlow(expiredId, tenantId, "expected")).toBeNull();
@@ -35,6 +36,19 @@ describe("Backend contract", () => {
     expect(await backend.recentSnapshots(randomUUID())).toEqual([]);
   });
 
+  it("lets a worker claim only the tenant it is configured to scan", async () => {
+    const backend = new MemoryBackend();
+    const otherTenant = randomUUID();
+    const first = session(randomUUID(), tenantId);
+    const second = session(randomUUID(), otherTenant);
+    await backend.createSession(first);
+    await backend.createSession(second);
+    const otherJob = await backend.enqueueScan(otherTenant, second.id);
+    const ownJob = await backend.enqueueScan(tenantId, first.id);
+    expect((await backend.claimNextJob("tenant-worker", tenantId))?.id).toBe(ownJob.id);
+    expect((await backend.getJob(otherJob.id, otherTenant))?.status).toBe("queued");
+  });
+
   it("tenant-isolates access events", async () => {
     const backend = new MemoryBackend();
     const otherTenant = randomUUID();
@@ -46,7 +60,7 @@ describe("Backend contract", () => {
 
   it("claims, updates, and atomically completes a scan", async () => {
     const backend = new MemoryBackend(); const valid = session(); await backend.createSession(valid);
-    const queued = await backend.enqueueScan(tenantId, valid.id); const claimed = await backend.claimNextJob("worker-1");
+    const queued = await backend.enqueueScan(tenantId, valid.id); const claimed = await backend.claimNextJob("worker-1", tenantId);
     expect(claimed?.id).toBe(queued.id);
     const snapshot = { ...cleanProjectFixture, id: randomUUID(), tenant: { ...cleanProjectFixture.tenant, tenantId }, scannedAt: new Date().toISOString() };
     await expect(backend.updateJobProgress(queued.id, "worker-2", "owners", 1, "wrong owner")).rejects.toThrow(/owned/i);
@@ -58,14 +72,14 @@ describe("Backend contract", () => {
 
   it("rejects a snapshot from another tenant", async () => {
     const backend = new MemoryBackend(); const valid = session(); await backend.createSession(valid);
-    const queued = await backend.enqueueScan(tenantId, valid.id); await backend.claimNextJob("worker-1");
+    const queued = await backend.enqueueScan(tenantId, valid.id); await backend.claimNextJob("worker-1", tenantId);
     const snapshot = { ...cleanProjectFixture, id: randomUUID(), tenant: { ...cleanProjectFixture.tenant, tenantId: randomUUID() }, scannedAt: new Date().toISOString() };
     await expect(backend.completeJob(queued.id, "worker-1", snapshot, new Date(0))).rejects.toThrow(/tenant boundaries/i);
   });
 
   it("tenant-binds resumable checkpoints and clears them on completion", async () => {
     const backend = new MemoryBackend(); const valid = session(); await backend.createSession(valid);
-    const queued = await backend.enqueueScan(tenantId, valid.id); await backend.claimNextJob("worker-1");
+    const queued = await backend.enqueueScan(tenantId, valid.id); await backend.claimNextJob("worker-1", tenantId);
     await backend.saveScanCheckpoint({ jobId: queued.id, tenantId, payload: { completedStages: ["applications"] }, updatedAt: new Date().toISOString() }, "worker-1");
     expect(await backend.getScanCheckpoint(queued.id, randomUUID())).toBeNull();
     expect(await backend.getScanCheckpoint(queued.id, tenantId)).toMatchObject({ payload: { completedStages: ["applications"] } });

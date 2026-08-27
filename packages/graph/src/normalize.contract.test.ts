@@ -205,7 +205,7 @@ describe("relationship wording", () => {
 
   it("labels the observed and cross-tenant relationships", () => {
     const snapshot = normalizeTenantScan(rawScan({
-      signIns: [sourced({ id: "s-1", createdDateTime: "2026-08-20T09:00:00Z", servicePrincipalId: "sp-1", resourceServicePrincipalId: "sp-2" })],
+      signIns: [sourced({ id: "s-1", createdDateTime: "2026-08-20T09:00:00Z", servicePrincipalId: "sp-1", resourceServicePrincipalId: "sp-2", status: { errorCode: 0 } })],
       crossTenantPartners: [sourced(crossTenantPartner({ tenantId: PARTNER_TENANT }))],
     }));
     expect(snapshot.edges.find((edge) => edge.type === "OBSERVED_CALL")?.plainLabel).toBe("Called recently");
@@ -340,7 +340,7 @@ describe("edge identity and evidence", () => {
       }],
       signIns: [{
         endpoint: "/auditLogs/signIns",
-        record: { id: "signin-1", createdDateTime: "2026-08-20T09:00:00Z", servicePrincipalId: "sp-caller", resourceServicePrincipalId: "sp-api" },
+        record: { id: "signin-1", createdDateTime: "2026-08-20T09:00:00Z", servicePrincipalId: "sp-caller", resourceServicePrincipalId: "sp-api", status: { errorCode: 0 } },
       }],
       crossTenantPartners: [{ endpoint: "/policies/crossTenantAccessPolicy/partners", record: crossTenantPartner({ tenantId: PARTNER_TENANT, inboundTrust: { isMfaAccepted: true } }) }],
     });

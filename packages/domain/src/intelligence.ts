@@ -49,6 +49,7 @@ export interface IamFinding {
 export interface TenantIntelligence {
   generatedAt: string;
   paths: AttackPath[];
+  pathAnalysis: { truncated: boolean; traversals: number; limits: { maxPaths: number; maxTraversals: number } };
   findings: IamFinding[];
   counts: Record<FindingSeverity, number>;
   evidence: Record<EvidenceClass, number>;
@@ -59,6 +60,8 @@ const DIRECTORY_ESCALATION = new Set([
   "directory.readwrite.all", "privilegedaccess.readwrite.azuread", "user.readwrite.all", "group.readwrite.all",
 ]);
 const WRITE_PATTERN = /\.(readwrite|write|send|manage|fullcontrol)\b/i;
+const MAX_ATTACK_PATHS = 2_000;
+const MAX_PATH_TRAVERSALS = 10_000;
 
 function severityFor(view: RelationshipView): FindingSeverity | null {
   const { edge, target } = view;
@@ -99,10 +102,13 @@ interface Traversal {
   visited: Set<string>;
 }
 
-function discoverPaths(snapshot: TenantSnapshot, maxDepth = 5): AttackPath[] {
+function discoverPaths(snapshot: TenantSnapshot, maxDepth = 5): { paths: AttackPath[]; truncated: boolean; traversals: number } {
   const outgoing = outgoingRelationships(snapshot);
   const paths: AttackPath[] = [];
+  let traversals = 0;
+  let truncated = false;
 
+  pathSearch:
   for (const origin of candidateOrigins(snapshot)) {
     const queue: Traversal[] = [{ nodeId: origin.id, traversed: [], visited: new Set([origin.id]) }];
     while (queue.length > 0) {
@@ -112,6 +118,8 @@ function discoverPaths(snapshot: TenantSnapshot, maxDepth = 5): AttackPath[] {
         // A path never revisits an object, and observed activity is evidence of use rather
         // than a relationship an attacker could traverse.
         if (current.visited.has(view.target.id) || view.edge.type === "OBSERVED_CALL") continue;
+        if (traversals >= MAX_PATH_TRAVERSALS || paths.length >= MAX_ATTACK_PATHS) { truncated = true; break pathSearch; }
+        traversals += 1;
         const traversed = [...current.traversed, view];
         const severity = severityFor(view);
         if (severity) paths.push(attackPath(snapshot, origin, view, traversed, severity));
@@ -119,7 +127,7 @@ function discoverPaths(snapshot: TenantSnapshot, maxDepth = 5): AttackPath[] {
       }
     }
   }
-  return rankPaths(paths);
+  return { paths: rankPaths(paths), truncated, traversals };
 }
 
 function outgoingRelationships(snapshot: TenantSnapshot): Map<string, RelationshipView[]> {
@@ -207,8 +215,8 @@ function dormantAccessFindings(snapshot: TenantSnapshot): IamFinding[] {
   const findings: IamFinding[] = [];
   const hasActivityCoverage = snapshot.completion.collectedEndpoints.some((endpoint) => endpoint.startsWith("/auditLogs/signIns"));
   if (hasActivityCoverage) {
-    const activeSources = new Set(snapshot.edges.filter((edge) => edge.type === "OBSERVED_CALL").map((edge) => edge.sourceId));
-    for (const view of relationships(snapshot).filter((item) => (item.edge.type === "CAN_CALL_AS_APP" || item.edge.type === "CAN_CALL_DELEGATED") && !activeSources.has(item.source.id))) findings.push({ id: stableId("finding-dormant", [view.edge.id]), title: `Configured access from ${view.source.label} had no observed sign-in in the collection window`, category: "dormant-access", severity: "medium", evidenceClass: "inferred", summary: `The permission remains configured, while the collected 30-day sign-in window contained no matching workload activity for this source identity.`, whyItMatters: "Unused access can remain exploitable even when normal business activity has stopped.", remediation: ["Confirm the access is still required with the owner.", "Use an approved change process to remove unnecessary grants, then re-scan."], affectedObjectIds: [view.source.id, view.target.id], edgeIds: [view.edge.id], attackPathId: null, sourceEndpoints: [view.edge.evidence.sourceEndpoint, ...snapshot.completion.collectedEndpoints.filter((endpoint) => endpoint.startsWith("/auditLogs/signIns"))], uncertainty: ["Absence in a bounded sign-in dataset is not proof that the permission was never used."] });
+    const activeRelationships = new Set(snapshot.edges.filter((edge) => edge.type === "OBSERVED_CALL").map((edge) => `${edge.sourceId}\0${edge.targetId}`));
+    for (const view of relationships(snapshot).filter((item) => (item.edge.type === "CAN_CALL_AS_APP" || item.edge.type === "CAN_CALL_DELEGATED") && !activeRelationships.has(`${item.source.id}\0${item.target.id}`))) findings.push({ id: stableId("finding-dormant", [view.edge.id]), title: `Configured access from ${view.source.label} had no observed sign-in in the collection window`, category: "dormant-access", severity: "medium", evidenceClass: "inferred", summary: `The permission remains configured, while the collected 30-day sign-in window contained no matching workload activity for this source identity and target resource.`, whyItMatters: "Unused access can remain exploitable even when normal business activity has stopped.", remediation: ["Confirm the access is still required with the owner.", "Use an approved change process to remove unnecessary grants, then re-scan."], affectedObjectIds: [view.source.id, view.target.id], edgeIds: [view.edge.id], attackPathId: null, sourceEndpoints: [view.edge.evidence.sourceEndpoint, ...snapshot.completion.collectedEndpoints.filter((endpoint) => endpoint.startsWith("/auditLogs/signIns"))], uncertainty: ["Absence in a bounded sign-in dataset is not proof that the permission was never used.", "Observed sign-ins identify the source and resource, but do not prove which configured permission was exercised."] });
   }
   return findings;
 }
@@ -268,10 +276,11 @@ function coverageFindings(snapshot: TenantSnapshot): IamFinding[] {
 }
 
 export function analyzeTenantIntelligence(snapshot: TenantSnapshot): TenantIntelligence {
-  const paths = discoverPaths(snapshot);
+  const pathResult = discoverPaths(snapshot);
+  const paths = pathResult.paths;
   const findings = findingsFor(snapshot, paths);
   const counts: Record<FindingSeverity, number> = { critical: 0, high: 0, medium: 0, low: 0 };
   const evidence: Record<EvidenceClass, number> = { configured: 0, observed: 0, inferred: 0, missing: 0 };
   for (const finding of findings) { counts[finding.severity] += 1; evidence[finding.evidenceClass] += 1; }
-  return { generatedAt: snapshot.scannedAt, paths, findings, counts, evidence };
+  return { generatedAt: snapshot.scannedAt, paths, pathAnalysis: { truncated: pathResult.truncated, traversals: pathResult.traversals, limits: { maxPaths: MAX_ATTACK_PATHS, maxTraversals: MAX_PATH_TRAVERSALS } }, findings, counts, evidence };
 }

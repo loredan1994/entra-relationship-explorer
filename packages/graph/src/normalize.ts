@@ -271,6 +271,7 @@ function policyEdges(raw: RawTenantScan, nodes: Map<string, DirectoryNode>): Rel
 
 function activityEdges(raw: RawTenantScan, nodes: Map<string, DirectoryNode>): RelationshipEdge[] {
   return (raw.signIns ?? []).flatMap(({ record, endpoint }) => {
+    if (record.status?.errorCode !== 0) return [];
     if (!record.servicePrincipalId || !record.resourceServicePrincipalId) return [];
     ensureMissingTarget(nodes, record.servicePrincipalId, record.appDisplayName, raw.tenantId);
     ensureMissingTarget(nodes, record.resourceServicePrincipalId, record.resourceDisplayName, raw.tenantId);

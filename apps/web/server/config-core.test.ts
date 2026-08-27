@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseEntraConfig } from "./config-core";
+import { parseBackendConfig, parseEntraConfig } from "./config-core";
 
 const validEnvironment: NodeJS.ProcessEnv = {
   NODE_ENV: "development",
@@ -11,6 +11,24 @@ const validEnvironment: NodeJS.ProcessEnv = {
   ENTRA_DATA_ENCRYPTION_KEY: Buffer.alloc(32, 7).toString("base64"),
   DATABASE_URL: "postgresql://entra:test@127.0.0.1:54320/entra_explorer",
 };
+
+describe("backend-only configuration", () => {
+  it("parses storage settings without requiring Microsoft Graph credentials", () => {
+    const config = parseBackendConfig({
+      NODE_ENV: "test",
+      ENTRA_DATA_ENCRYPTION_KEY: validEnvironment.ENTRA_DATA_ENCRYPTION_KEY,
+      DATABASE_URL: validEnvironment.DATABASE_URL,
+    });
+    expect(config.databaseUrl).toBe(validEnvironment.DATABASE_URL);
+    expect(config.dataEncryptionKey).toEqual(Uint8Array.from(Buffer.alloc(32, 7)));
+  });
+
+  it("requires both storage settings and a 32-byte encryption key", () => {
+    expect(() => parseBackendConfig({ NODE_ENV: "test", DATABASE_URL: validEnvironment.DATABASE_URL })).toThrow(/ENTRA_DATA_ENCRYPTION_KEY is required/);
+    expect(() => parseBackendConfig({ NODE_ENV: "test", ENTRA_DATA_ENCRYPTION_KEY: validEnvironment.ENTRA_DATA_ENCRYPTION_KEY })).toThrow(/DATABASE_URL is required/);
+    expect(() => parseBackendConfig({ NODE_ENV: "test", ENTRA_DATA_ENCRYPTION_KEY: Buffer.alloc(31).toString("base64"), DATABASE_URL: validEnvironment.DATABASE_URL })).toThrow(/32-byte key/);
+  });
+});
 
 describe("Phase 1 configuration boundary", () => {
   it("stays disabled unless explicitly enabled", () => {

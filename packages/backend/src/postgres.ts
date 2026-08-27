@@ -33,12 +33,14 @@ export class PostgresBackend implements Backend {
   }
 
   async consumeAuthFlow(id: string, tenantId: string, state: string): Promise<DurableAuthFlow | null> {
-    const result = await this.pool.query<EncryptedRow>("DELETE FROM auth_flows WHERE id=$1 AND tenant_id=$2 AND expires_at>now() RETURNING *", [id, tenantId]);
+    const result = await this.pool.query<EncryptedRow>("SELECT * FROM auth_flows WHERE id=$1 AND tenant_id=$2 AND expires_at>now()", [id, tenantId]);
     const row = result.rows[0];
     if (!row) return null;
     const flow = decryptJson<DurableAuthFlow>(encrypted(row), this.key, flowContext(id, tenantId));
     const a = Buffer.from(flow.state); const b = Buffer.from(state);
-    return a.length === b.length && timingSafeEqual(a, b) ? flow : null;
+    if (a.length !== b.length || !timingSafeEqual(a, b)) return null;
+    const deleted = await this.pool.query("DELETE FROM auth_flows WHERE id=$1 AND tenant_id=$2 AND expires_at>now()", [id, tenantId]);
+    return deleted.rowCount === 1 ? flow : null;
   }
 
   async createSession(session: DurableSession): Promise<void> {
@@ -72,15 +74,15 @@ export class PostgresBackend implements Backend {
   async getJob(id: string, tenantId: string): Promise<ScanJob | null> { const row = (await this.pool.query("SELECT * FROM scan_jobs WHERE id=$1 AND tenant_id=$2", [id, tenantId])).rows[0]; return row ? mapJob(row) : null; }
   async getLatestJob(tenantId: string): Promise<ScanJob | null> { const row = (await this.pool.query("SELECT * FROM scan_jobs WHERE tenant_id=$1 ORDER BY created_at DESC LIMIT 1", [tenantId])).rows[0]; return row ? mapJob(row) : null; }
 
-  async recoverStaleJobs(staleBefore: Date): Promise<number> {
-    const cancelled = await this.pool.query("UPDATE scan_jobs SET status='cancelled',worker_id=NULL,locked_at=NULL,detail='Cancellation completed after the previous worker stopped',finished_at=now(),updated_at=now() WHERE status='cancel_requested' AND updated_at<$1", [staleBefore]);
-    if ((cancelled.rowCount ?? 0) > 0) await this.pool.query("DELETE FROM scan_checkpoints c USING scan_jobs j WHERE c.job_id=j.id AND j.status='cancelled'");
-    const result = await this.pool.query("UPDATE scan_jobs SET status='queued',worker_id=NULL,locked_at=NULL,available_at=now(),detail='Recovered after the previous worker stopped',updated_at=now() WHERE status='running' AND updated_at<$1", [staleBefore]);
+  async recoverStaleJobs(tenantId: string, staleBefore: Date): Promise<number> {
+    const cancelled = await this.pool.query("UPDATE scan_jobs SET status='cancelled',worker_id=NULL,locked_at=NULL,detail='Cancellation completed after the previous worker stopped',finished_at=now(),updated_at=now() WHERE tenant_id=$1 AND status='cancel_requested' AND updated_at<$2", [tenantId, staleBefore]);
+    if ((cancelled.rowCount ?? 0) > 0) await this.pool.query("DELETE FROM scan_checkpoints c USING scan_jobs j WHERE c.job_id=j.id AND j.tenant_id=$1 AND j.status='cancelled'", [tenantId]);
+    const result = await this.pool.query("UPDATE scan_jobs SET status='queued',worker_id=NULL,locked_at=NULL,available_at=now(),detail='Recovered after the previous worker stopped',updated_at=now() WHERE tenant_id=$1 AND status='running' AND updated_at<$2", [tenantId, staleBefore]);
     return (result.rowCount ?? 0) + (cancelled.rowCount ?? 0);
   }
 
-  async claimNextJob(workerId: string): Promise<ScanJob | null> {
-    const row = (await this.pool.query("WITH candidate AS (SELECT id FROM scan_jobs WHERE status='queued' AND available_at<=now() ORDER BY created_at FOR UPDATE SKIP LOCKED LIMIT 1) UPDATE scan_jobs j SET status='running',worker_id=$1,locked_at=now(),attempt=attempt+1,detail='Starting Microsoft Graph reads',updated_at=now() FROM candidate WHERE j.id=candidate.id RETURNING j.*", [workerId])).rows[0];
+  async claimNextJob(workerId: string, tenantId: string): Promise<ScanJob | null> {
+    const row = (await this.pool.query("WITH candidate AS (SELECT id FROM scan_jobs WHERE tenant_id=$2 AND status='queued' AND available_at<=now() ORDER BY created_at FOR UPDATE SKIP LOCKED LIMIT 1) UPDATE scan_jobs j SET status='running',worker_id=$1,locked_at=now(),attempt=attempt+1,detail='Starting Microsoft Graph reads',updated_at=now() FROM candidate WHERE j.id=candidate.id AND j.tenant_id=$2 RETURNING j.*", [workerId, tenantId])).rows[0];
     return row ? mapJob(row) : null;
   }
 
@@ -104,16 +106,23 @@ export class PostgresBackend implements Backend {
   }
 
   async failJob(id: string, workerId: string, error: string): Promise<void> {
-    await this.pool.query("UPDATE scan_jobs SET status='failed',detail='The read-only scan stopped before a snapshot could be saved',error=$3,finished_at=now(),updated_at=now(),worker_id=NULL,locked_at=NULL WHERE id=$1 AND worker_id=$2 AND status='running'", [id, workerId, error.slice(0, 500)]);
+    await this.transaction(async (client) => {
+      const result = await client.query("UPDATE scan_jobs SET status='failed',detail='The read-only scan stopped before a snapshot could be saved',error=$3,finished_at=now(),updated_at=now(),worker_id=NULL,locked_at=NULL WHERE id=$1 AND worker_id=$2 AND status='running'", [id, workerId, error.slice(0, 500)]);
+      if (result.rowCount !== 1) throw new Error("The scan job is not owned by this worker.");
+      await client.query("DELETE FROM scan_checkpoints WHERE job_id=$1", [id]);
+    });
   }
 
   async requestScanCancellation(id: string, tenantId: string): Promise<ScanJob | null> {
-    const row = (await this.pool.query("UPDATE scan_jobs SET status=CASE WHEN status='queued' THEN 'cancelled' ELSE 'cancel_requested' END,detail=CASE WHEN status='queued' THEN 'Cancelled before Microsoft Graph collection began' ELSE 'Cancellation requested; finishing the current read safely' END,finished_at=CASE WHEN status='queued' THEN now() ELSE finished_at END,updated_at=now() WHERE id=$1 AND tenant_id=$2 AND status IN ('queued','running','cancel_requested') RETURNING *", [id, tenantId])).rows[0];
-    return row ? mapJob(row) : null;
+    return this.transaction(async (client) => {
+      const row = (await client.query("UPDATE scan_jobs SET status=CASE WHEN status='queued' THEN 'cancelled' ELSE 'cancel_requested' END,detail=CASE WHEN status='queued' THEN 'Cancelled before Microsoft Graph collection began' ELSE 'Cancellation requested; finishing the current read safely' END,finished_at=CASE WHEN status='queued' THEN now() ELSE finished_at END,updated_at=now() WHERE id=$1 AND tenant_id=$2 AND status IN ('queued','running','cancel_requested') RETURNING *", [id, tenantId])).rows[0];
+      if (row?.status === "cancelled") await client.query("DELETE FROM scan_checkpoints WHERE job_id=$1 AND tenant_id=$2", [id, tenantId]);
+      return row ? mapJob(row) : null;
+    });
   }
 
   async isScanCancellationRequested(id: string, workerId: string): Promise<boolean> { const row = (await this.pool.query("SELECT 1 FROM scan_jobs WHERE id=$1 AND worker_id=$2 AND status='cancel_requested'", [id, workerId])).rows[0]; return Boolean(row); }
-  async cancelJob(id: string, workerId: string): Promise<void> { const result = await this.pool.query("UPDATE scan_jobs SET status='cancelled',detail='Scan cancelled safely; no partial snapshot was published',finished_at=now(),updated_at=now(),worker_id=NULL,locked_at=NULL WHERE id=$1 AND worker_id=$2 AND status='cancel_requested'", [id, workerId]); if (result.rowCount !== 1) throw new Error("The scan job is not cancellable by this worker."); await this.pool.query("DELETE FROM scan_checkpoints WHERE job_id=$1", [id]); }
+  async cancelJob(id: string, workerId: string): Promise<void> { await this.transaction(async (client) => { const result = await client.query("UPDATE scan_jobs SET status='cancelled',detail='Scan cancelled safely; no partial snapshot was published',finished_at=now(),updated_at=now(),worker_id=NULL,locked_at=NULL WHERE id=$1 AND worker_id=$2 AND status='cancel_requested'", [id, workerId]); if (result.rowCount !== 1) throw new Error("The scan job is not cancellable by this worker."); await client.query("DELETE FROM scan_checkpoints WHERE job_id=$1", [id]); }); }
 
   async getScanCheckpoint(id: string, tenantId: string): Promise<ScanCheckpoint | null> {
     const row = (await this.pool.query<EncryptedRow>("SELECT job_id AS id,tenant_id,iv,ciphertext,auth_tag,updated_at FROM scan_checkpoints WHERE job_id=$1 AND tenant_id=$2", [id, tenantId])).rows[0];

@@ -23,6 +23,19 @@ export interface DisabledEntraConfig {
 
 export type EntraConfig = LiveEntraConfig | DisabledEntraConfig;
 
+export interface BackendConfig {
+  databaseUrl: string;
+  dataEncryptionKey: Uint8Array;
+}
+
+export function parseBackendConfig(environment: NodeJS.ProcessEnv): BackendConfig {
+  const encodedKey = required(environment, "ENTRA_DATA_ENCRYPTION_KEY");
+  const databaseUrl = required(environment, "DATABASE_URL");
+  const dataEncryptionKey = Uint8Array.from(Buffer.from(encodedKey, "base64"));
+  if (dataEncryptionKey.byteLength !== 32) throw new Error("ENTRA_DATA_ENCRYPTION_KEY must be a base64-encoded 32-byte key.");
+  return { databaseUrl, dataEncryptionKey };
+}
+
 export function parseEntraConfig(environment: NodeJS.ProcessEnv): EntraConfig {
   if (environment.ENTRA_ENABLE_LIVE !== "true") {
     return { enabled: false, reason: "Live Microsoft Entra access is disabled. The product is using synthetic fixtures." };
@@ -32,16 +45,12 @@ export function parseEntraConfig(environment: NodeJS.ProcessEnv): EntraConfig {
   const clientId = required(environment, "ENTRA_CLIENT_ID");
   const clientSecret = required(environment, "ENTRA_CLIENT_SECRET");
   const redirectUri = required(environment, "ENTRA_REDIRECT_URI");
-  const encodedKey = required(environment, "ENTRA_DATA_ENCRYPTION_KEY");
-  const databaseUrl = required(environment, "DATABASE_URL");
+  const { databaseUrl, dataEncryptionKey } = parseBackendConfig(environment);
 
   if (!UUID_PATTERN.test(tenantId)) throw new Error("ENTRA_TENANT_ID must be a concrete tenant UUID; common and organizations are not allowed.");
   if (!UUID_PATTERN.test(clientId)) throw new Error("ENTRA_CLIENT_ID must be a UUID.");
   const redirect = approvedRedirect(redirectUri);
   assertSecretIsAllowedHere(environment, redirect);
-
-  const dataEncryptionKey = Uint8Array.from(Buffer.from(encodedKey, "base64"));
-  if (dataEncryptionKey.byteLength !== 32) throw new Error("ENTRA_DATA_ENCRYPTION_KEY must be a base64-encoded 32-byte key.");
 
   const sessionMaxAgeSeconds = parseSessionMaxAge(environment.ENTRA_SESSION_MAX_AGE_SECONDS);
   const graphScopes = [...CORE_GRAPH_SCOPES, ...approvedOptionalScopes(environment.ENTRA_OPTIONAL_GRAPH_SCOPES)];

@@ -1,7 +1,12 @@
 name: entra-relationship-explorer
 
-x-app-environment: &app-environment
+x-data-environment: &data-environment
   NODE_ENV: production
+  ENTRA_DATA_ENCRYPTION_KEY: ${ENTRA_DATA_ENCRYPTION_KEY:?Retrieve ENTRA_DATA_ENCRYPTION_KEY from Key Vault}
+  DATABASE_URL: postgresql://entra:${POSTGRES_PASSWORD_URL_ENCODED:?URL-encode POSTGRES_PASSWORD}@postgres:5432/entra_explorer
+
+x-app-environment: &app-environment
+  <<: *data-environment
   HOSTNAME: 0.0.0.0
   PORT: "3200"
   ENTRA_ENABLE_LIVE: "true"
@@ -11,8 +16,6 @@ x-app-environment: &app-environment
   ENTRA_CLIENT_SECRET: ${ENTRA_CLIENT_SECRET:?Retrieve ENTRA_CLIENT_SECRET from Key Vault}
   ENTRA_REDIRECT_URI: http://127.0.0.1:3200/api/auth/callback
   ENTRA_OPTIONAL_GRAPH_SCOPES: ${ENTRA_OPTIONAL_GRAPH_SCOPES:-}
-  ENTRA_DATA_ENCRYPTION_KEY: ${ENTRA_DATA_ENCRYPTION_KEY:?Retrieve ENTRA_DATA_ENCRYPTION_KEY from Key Vault}
-  DATABASE_URL: postgresql://entra:${POSTGRES_PASSWORD_URL_ENCODED:?URL-encode POSTGRES_PASSWORD}@postgres:5432/entra_explorer
 
 x-app-image: &app-image
   image: entra-relationship-explorer-app:local
@@ -40,7 +43,7 @@ services:
 
   migrate:
     <<: *app-image
-    environment: *app-environment
+    environment: *data-environment
     working_dir: /app/apps/web
     command: ["--import", "tsx", "migrate.ts"]
     depends_on:

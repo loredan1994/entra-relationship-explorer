@@ -12,19 +12,24 @@ export async function GET(request: NextRequest) {
   if (!config.enabled) return noStoreJson({ error: "Live Entra access is disabled." }, { status: 404 });
 
   const settingsUrl = new URL("/settings", config.redirectUri);
+  const flow = await consumeAuthFlow(
+    config,
+    request.cookies.get(AUTH_FLOW_COOKIE)?.value,
+    request.nextUrl.searchParams.get("state"),
+  );
+  if (!flow) {
+    settingsUrl.searchParams.set("authError", "invalid_state");
+    return NextResponse.redirect(settingsUrl, { status: 302 });
+  }
+
   const providerError = request.nextUrl.searchParams.get("error");
   if (providerError) {
     settingsUrl.searchParams.set("authError", providerError === "access_denied" ? "access_denied" : "identity_error");
     return clearFlowCookie(NextResponse.redirect(settingsUrl, { status: 302 }), config.redirectUri);
   }
 
-  const flow = await consumeAuthFlow(
-    config,
-    request.cookies.get(AUTH_FLOW_COOKIE)?.value,
-    request.nextUrl.searchParams.get("state"),
-  );
   const code = request.nextUrl.searchParams.get("code");
-  if (!flow || !code) {
+  if (!code) {
     settingsUrl.searchParams.set("authError", "invalid_state");
     return clearFlowCookie(NextResponse.redirect(settingsUrl, { status: 302 }), config.redirectUri);
   }

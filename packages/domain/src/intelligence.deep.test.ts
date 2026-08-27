@@ -69,7 +69,9 @@ describe("attack path structure", () => {
   const fromPerson = () => analyzeTenantIntelligence(snap).paths.find((path) => path.source.label === "Maya Chen")!;
 
   it("threads a multi-step path from origin to powerful access with configured evidence", () => {
-    const path = fromPerson();
+    const intelligence = analyzeTenantIntelligence(snap);
+    expect(intelligence.pathAnalysis.truncated).toBe(false);
+    const path = intelligence.paths.find((item) => item.source.label === "Maya Chen")!;
     expect(path.source.label).toBe("Maya Chen");
     expect(path.target.label).toBe("Microsoft Graph");
     expect(path.title).toBe("Maya Chen can reach Microsoft Graph");
@@ -114,6 +116,26 @@ describe("attack path structure", () => {
     const b = node({ kind: "servicePrincipal", label: "B" });
     const observedOnly = snapshot([a, b], [edge("OBSERVED_CALL", a, b, { permissions: ["Mail.ReadWrite"] })]);
     expect(analyzeTenantIntelligence(observedOnly).paths).toHaveLength(0);
+  });
+});
+
+describe("attack path resource bounds", () => {
+  it("returns a clearly marked partial result instead of expanding an unbounded dense graph", () => {
+    const origin = node({ id: "user-origin", kind: "user", label: "Origin" });
+    const targets = Array.from({ length: 2_100 }, (_, index) => node({ id: `api-${index}`, kind: "servicePrincipal", label: `API ${index}` }));
+    const edges = targets.map((target, index) => edge("CAN_CALL_AS_APP", origin, target, { id: `edge-${index}`, permissions: ["Directory.ReadWrite.All"] }));
+    const result = analyzeTenantIntelligence(snapshot([origin, ...targets], edges));
+    expect(result.paths).toHaveLength(result.pathAnalysis.limits.maxPaths);
+    expect(result.pathAnalysis).toMatchObject({ truncated: true, traversals: result.pathAnalysis.limits.maxPaths });
+  });
+
+  it("also bounds traversals that do not themselves produce reportable paths", () => {
+    const origin = node({ id: "user-origin", kind: "user", label: "Origin" });
+    const targets = Array.from({ length: 10_001 }, (_, index) => node({ id: `app-${index}`, kind: "application", label: `App ${index}`, ownerIds: [origin.id] }));
+    const edges = targets.map((target, index) => edge("OWNS", origin, target, { id: `owner-edge-${index}` }));
+    const result = analyzeTenantIntelligence(snapshot([origin, ...targets], edges));
+    expect(result.paths).toEqual([]);
+    expect(result.pathAnalysis).toMatchObject({ truncated: true, traversals: result.pathAnalysis.limits.maxTraversals });
   });
 });
 
@@ -283,6 +305,20 @@ describe("dormant access finding", () => {
       completion: { status: "complete", collectedEndpoints: ["/servicePrincipals", "/auditLogs/signIns"], skippedEndpoints: [], errors: [] },
     });
     expect(findingByCategory(snap, "dormant-access")).toBeUndefined();
+  });
+
+  it("correlates observed activity to both the source identity and target resource", () => {
+    const caller = node({ kind: "servicePrincipal", label: "Busy App", metadata: { ownershipExpected: true }, ownerIds: ["o"] });
+    const graph = node({ id: "sp-graph", kind: "servicePrincipal", label: "Microsoft Graph" });
+    const vault = node({ id: "sp-vault", kind: "servicePrincipal", label: "Vault API" });
+    const snap = snapshot([caller, graph, vault], [
+      edge("CAN_CALL_AS_APP", caller, graph, { id: "graph-grant", permissions: ["User.Read"] }),
+      edge("CAN_CALL_AS_APP", caller, vault, { id: "vault-grant", permissions: ["Vault.Read"] }),
+      edge("OBSERVED_CALL", caller, graph),
+    ], {
+      completion: { status: "complete", collectedEndpoints: ["/servicePrincipals", "/auditLogs/signIns"], skippedEndpoints: [], errors: [] },
+    });
+    expect(analyzeTenantIntelligence(snap).findings.filter((finding) => finding.category === "dormant-access").map((finding) => finding.edgeIds)).toEqual([["vault-grant"]]);
   });
 });
 
