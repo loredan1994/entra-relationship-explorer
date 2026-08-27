@@ -3,6 +3,7 @@ import { expect, test } from "@playwright/test";
 
 test("map, table, search, filters, and evidence stay consistent", async ({ page }) => {
   await page.goto("/map");
+  if ((page.viewportSize()?.width ?? 1280) <= 700) await page.getByRole("button", { name: "Filters", exact: true }).click();
 
   await expect(page.getByRole("group", { name: /13 objects and 11 configured connections/ })).toBeVisible();
   await expect(page.getByRole("complementary", { name: "Selected relationship evidence" })).toContainText(
@@ -32,11 +33,13 @@ test("the relationship map is keyboard reachable", async ({ page }) => {
 
 test("filters can be saved locally and objects expand to a bounded one-hop view", async ({ page }) => {
   await page.goto("/map");
+  if ((page.viewportSize()?.width ?? 1280) <= 700) await page.getByRole("button", { name: "Filters", exact: true }).click();
   const search = page.getByPlaceholder("Name or permission", { exact: true });
   await search.fill("Api.Write");
   await page.getByRole("button", { name: "Save current" }).click();
   await expect(page.getByRole("button", { name: "Search: Api.Write", exact: true })).toBeVisible();
   await page.reload();
+  if ((page.viewportSize()?.width ?? 1280) <= 700) await page.getByRole("button", { name: "Filters", exact: true }).click();
   await page.getByRole("button", { name: "Search: Api.Write", exact: true }).click();
   await expect(search).toHaveValue("Api.Write");
   await search.fill("");
@@ -60,6 +63,26 @@ test("mobile layout does not overflow the page", async ({ page }, testInfo) => {
   await page.goto("/map");
   const metrics = await page.evaluate(() => ({ body: document.body.scrollWidth, viewport: window.innerWidth }));
   expect(metrics.body).toBeLessThanOrEqual(metrics.viewport + 1);
+});
+
+test("mobile navigation and relationship filters keep the map in reach", async ({ page }, testInfo) => {
+  test.skip(!testInfo.project.name.startsWith("mobile"), "Mobile-only assertion");
+  await page.goto("/map");
+
+  const navigation = page.getByRole("navigation", { name: "Product sections" });
+  for (const label of ["Overview", "Relationship map", "Permissions", "Changes", "Threat workspace", "Settings"]) {
+    await expect(navigation.getByRole("link", { name: label, exact: true })).toBeVisible();
+  }
+
+  const filterToggle = page.getByRole("button", { name: "Filters", exact: true });
+  await expect(filterToggle).toBeVisible();
+  await expect(page.getByPlaceholder("Name or permission", { exact: true })).toBeHidden();
+  await expect(page.getByRole("group", { name: /13 objects and 11 configured connections/ })).toBeVisible();
+
+  await filterToggle.click();
+  await expect(page.getByPlaceholder("Name or permission", { exact: true })).toBeVisible();
+  await expect(page.locator(".mobile-filter-toggle")).toHaveAttribute("aria-expanded", "true");
+  await expect(page.locator(".mobile-filter-toggle")).toHaveText("Hide filters");
 });
 
 test("the threat workspace explains transitive paths and keeps evidence classes separate", async ({ page }) => {

@@ -97,6 +97,7 @@ export function RelationshipExplorer({ snapshot }: { snapshot: TenantSnapshot })
   const [selectedEdgeId, setSelectedEdgeId] = useState(initialEdge?.edge.id ?? "");
   const [focusNodeId, setFocusNodeId] = useState<string | null>(null);
   const [savedFilters, setSavedFilters] = useState<SavedFilter[]>([]);
+  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const storageKey = `entra-explorer-filters:${snapshot.tenant.tenantId}`;
   const neighborhood = useMemo(
     () => focusNodeId ? boundedNeighborhood(snapshot, focusNodeId, MAP_NODE_LIMIT) : null,
@@ -286,61 +287,74 @@ export function RelationshipExplorer({ snapshot }: { snapshot: TenantSnapshot })
             <p className="eyebrow">Explore</p>
             <h1>Relationship map</h1>
           </div>
-          <span title={snapshot.mode === "fixture" ? "All records are synthetic sample data" : "Encrypted read-only snapshot of your tenant"}>{snapshot.mode === "fixture" ? "Sample data" : "Live tenant"}</span>
+          <div className="filter-heading-actions">
+            <span title={snapshot.mode === "fixture" ? "All records are synthetic sample data" : "Encrypted read-only snapshot of your tenant"}>{snapshot.mode === "fixture" ? "Sample data" : "Live tenant"}</span>
+            <button
+              className="button button-secondary mobile-filter-toggle"
+              type="button"
+              aria-expanded={mobileFiltersOpen}
+              aria-controls="relationship-filter-controls"
+              onClick={() => setMobileFiltersOpen((open) => !open)}
+            >
+              {mobileFiltersOpen ? "Hide filters" : "Filters"}
+            </button>
+          </div>
         </div>
 
-        <label className="map-search">
-          <span>Search the map</span>
-          <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Name or permission" />
-        </label>
+        <div id="relationship-filter-controls" className={`filter-controls ${mobileFiltersOpen ? "is-open" : ""}`}>
+          <label className="map-search">
+            <span>Search the map</span>
+            <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Name or permission" />
+          </label>
 
-        <fieldset className="filter-group">
-          <legend>Object type</legend>
-          {(Object.entries(kindLabels) as [NodeKind, (typeof kindLabels)[NodeKind]][]).map(([kind, labels]) => {
-            const count = snapshot.nodes.filter((node) => node.kind === kind).length;
-            return (
-              <label key={kind}>
-                <input type="checkbox" checked={selectedKinds.includes(kind)} onChange={() => toggleKind(kind)} />
-                <span>
-                  {labels.plain}
-                  <small>{labels.microsoft}</small>
-                </span>
-                <em>{count}</em>
-              </label>
-            );
-          })}
-        </fieldset>
+          <fieldset className="filter-group">
+            <legend>Object type</legend>
+            {(Object.entries(kindLabels) as [NodeKind, (typeof kindLabels)[NodeKind]][]).map(([kind, labels]) => {
+              const count = snapshot.nodes.filter((node) => node.kind === kind).length;
+              return (
+                <label key={kind}>
+                  <input type="checkbox" checked={selectedKinds.includes(kind)} onChange={() => toggleKind(kind)} />
+                  <span>
+                    {labels.plain}
+                    <small>{labels.microsoft}</small>
+                  </span>
+                  <em>{count}</em>
+                </label>
+              );
+            })}
+          </fieldset>
 
-        <section className="saved-filters" aria-label="Saved filters">
-          <div><h2>Saved filters</h2><button className="text-button" type="button" onClick={saveFilter}>Save current</button></div>
-          <p>Stored only in this browser.</p>
-          {savedFilters.length === 0 ? <small>No saved filters yet.</small> : savedFilters.map((filter) => <div className="saved-filter" key={filter.id}><button type="button" onClick={() => { setQuery(filter.query); setSelectedKinds(filter.nodeKinds); }}>{filter.label}</button><button type="button" aria-label={`Remove saved filter ${filter.label}`} onClick={() => persistFilters(savedFilters.filter((item) => item.id !== filter.id))}>×</button></div>)}
-        </section>
+          <section className="saved-filters" aria-label="Saved filters">
+            <div><h2>Saved filters</h2><button className="text-button" type="button" onClick={saveFilter}>Save current</button></div>
+            <p>Stored only in this browser.</p>
+            {savedFilters.length === 0 ? <small>No saved filters yet.</small> : savedFilters.map((filter) => <div className="saved-filter" key={filter.id}><button type="button" onClick={() => { setQuery(filter.query); setSelectedKinds(filter.nodeKinds); }}>{filter.label}</button><button type="button" aria-label={`Remove saved filter ${filter.label}`} onClick={() => persistFilters(savedFilters.filter((item) => item.id !== filter.id))}>×</button></div>)}
+          </section>
 
-        <div className="filter-group filter-summary">
-          <h2>Visible scope</h2>
-          <p>
-            <strong>{visibleNodes.length}</strong> objects
-          </p>
-          <p>
-            <strong>{filteredViews.length}</strong> connections
-          </p>
-          {focusNodeId ? <button className="text-button" type="button" onClick={() => { setFocusNodeId(null); if (snapshot.nodes.length > MAP_NODE_LIMIT) setViewMode("table"); }}>Clear one-hop focus</button> : null}
+          <div className="filter-group filter-summary">
+            <h2>Visible scope</h2>
+            <p>
+              <strong>{visibleNodes.length}</strong> objects
+            </p>
+            <p>
+              <strong>{filteredViews.length}</strong> connections
+            </p>
+            {focusNodeId ? <button className="text-button" type="button" onClick={() => { setFocusNodeId(null); if (snapshot.nodes.length > MAP_NODE_LIMIT) setViewMode("table"); }}>Clear one-hop focus</button> : null}
+          </div>
+
+          <div className="legend">
+            <h2>Connection meaning</h2>
+            <p><i className="line-solid" /> Configured access</p>
+            <p><i className="line-dashed" /> Assignment or ownership</p>
+            <p><i className="line-dotted" /> Blueprint match</p>
+            <p className="legend-note">Activity is not collected in this read-only phase.</p>
+          </div>
+
+          {(query || selectedKinds.length > 0) && (
+            <button className="button button-secondary button-full" onClick={() => { setQuery(""); setSelectedKinds([]); }}>
+              Clear filters
+            </button>
+          )}
         </div>
-
-        <div className="legend">
-          <h2>Connection meaning</h2>
-          <p><i className="line-solid" /> Configured access</p>
-          <p><i className="line-dashed" /> Assignment or ownership</p>
-          <p><i className="line-dotted" /> Blueprint match</p>
-          <p className="legend-note">Activity is not collected in this read-only phase.</p>
-        </div>
-
-        {(query || selectedKinds.length > 0) && (
-          <button className="button button-secondary button-full" onClick={() => { setQuery(""); setSelectedKinds([]); }}>
-            Clear filters
-          </button>
-        )}
       </aside>
 
       <section className="map-workspace" aria-label="Relationship results">

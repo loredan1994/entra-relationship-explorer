@@ -73,6 +73,7 @@ test("core routes render without UI errors or broken action labels", async ({ pa
 
 test("new collector objects, policy subtypes, and role scope remain inspectable", async ({ page }) => {
   await page.goto("/map");
+  if ((page.viewportSize()?.width ?? 1280) <= 700) await page.getByRole("button", { name: "Filters", exact: true }).click();
   await expect(page.getByRole("checkbox", { name: /Device Directory device/ })).toBeVisible();
   await expect(page.getByRole("checkbox", { name: /Administrative unit Directory scope/ })).toBeVisible();
   await expect(page.getByRole("checkbox", { name: /Federated credential Federated identity credential/ })).toBeVisible();
