@@ -1,4 +1,4 @@
-import { analyzeTenantIntelligence } from "@entra-explorer/domain";
+import { analyzeTenantIntelligenceHistory } from "@entra-explorer/domain";
 import { NextRequest } from "next/server";
 import { getServerSession, SESSION_COOKIE } from "@/server/auth/session-store";
 import { getBackend } from "@/server/backend";
@@ -15,9 +15,10 @@ async function contextFor(request: NextRequest, id: string) {
   const session = await getServerSession(request.cookies.get(SESSION_COOKIE)?.value, config);
   if (!session || session.tenantId !== config.tenantId) return { error: noStoreJson({ error: "Authentication required." }, { status: 401 }) };
   const backend = await getBackend(config);
-  const snapshot = (await backend.recentSnapshots(session.tenantId, 1))[0];
+  const history = await backend.recentSnapshots(session.tenantId, 20);
+  const snapshot = history[0];
   if (!snapshot) return { error: noStoreJson({ error: "No tenant snapshot is available." }, { status: 404 }) };
-  if (!analyzeTenantIntelligence(snapshot).findings.some((finding) => finding.id === id)) return { error: noStoreJson({ error: "Finding not found in the current tenant snapshot." }, { status: 404 }) };
+  if (!analyzeTenantIntelligenceHistory(history).findings.some((finding) => finding.id === id)) return { error: noStoreJson({ error: "Finding not found in the current tenant snapshot." }, { status: 404 }) };
   return { config, session, backend, snapshot };
 }
 

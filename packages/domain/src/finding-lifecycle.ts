@@ -1,4 +1,4 @@
-import { analyzeTenantIntelligence, type FindingSeverity, type IamFinding } from "./intelligence";
+import { analyzeTenantIntelligenceHistory, type FindingSeverity, type IamFinding } from "./intelligence";
 import { assertTenantBoundary } from "./queries";
 import type { TenantSnapshot } from "./types";
 
@@ -33,7 +33,7 @@ export function analyzeFindingLifecycle(history: TenantSnapshot[]): FindingLifec
   validateHistory(history);
 
   const [current, previous] = history;
-  const analyses = history.map((snapshot) => analyzeTenantIntelligence(snapshot));
+  const analyses = history.map((_, index) => analyzeTenantIntelligenceHistory(history.slice(index)));
   const findingsBySnapshot = analyses.map(({ findings }) => new Map(findings.map((finding) => [finding.id, finding])));
   const currentFindings = findingsBySnapshot[0]!;
   const previousFindings = findingsBySnapshot[1] ?? new Map<string, IamFinding>();

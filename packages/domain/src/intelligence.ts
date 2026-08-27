@@ -1,4 +1,5 @@
 import { relationships } from "./queries";
+import { evaluateEntraRules, type EntraRuleReference } from "./rules";
 import type { DirectoryNode, RelationshipView, TenantSnapshot } from "./types";
 
 export type EvidenceClass = "configured" | "observed" | "inferred" | "missing";
@@ -46,6 +47,9 @@ export interface IamFinding {
   attackPathId: string | null;
   sourceEndpoints: string[];
   uncertainty: string[];
+  rule?: EntraRuleReference;
+  requiredCoverage?: string[];
+  prerequisites?: string[];
 }
 
 export interface TenantIntelligence {
@@ -94,7 +98,9 @@ function step(view: RelationshipView, index: number): AttackStep {
 }
 
 function candidateOrigins(snapshot: TenantSnapshot): DirectoryNode[] {
-  return snapshot.nodes.filter((node) => node.kind === "user" || node.kind === "group" || node.kind === "federatedCredential" || ((node.kind === "servicePrincipal" || node.kind === "managedIdentity") && (node.ownerIds.length === 0 || node.credential?.status === "expired")));
+  const unownedRegistrations = new Set(snapshot.nodes.filter((node) => node.kind === "application" && node.ownerIds.length === 0).map((node) => node.id));
+  const identitiesForUnownedRegistrations = new Set(snapshot.edges.filter((edge) => edge.type === "INSTANTIATES_AS" && unownedRegistrations.has(edge.sourceId)).map((edge) => edge.targetId));
+  return snapshot.nodes.filter((node) => node.kind === "user" || node.kind === "group" || node.kind === "federatedCredential" || ((node.kind === "servicePrincipal" || node.kind === "managedIdentity") && (node.ownerIds.length === 0 || node.credential?.status === "expired" || identitiesForUnownedRegistrations.has(node.id))));
 }
 
 /** One hop of the walk: where it can go next, and whether arriving there is worth reporting. */
@@ -290,9 +296,36 @@ function coverageFindings(snapshot: TenantSnapshot): IamFinding[] {
 export function analyzeTenantIntelligence(snapshot: TenantSnapshot): TenantIntelligence {
   const pathResult = discoverPaths(snapshot);
   const paths = pathResult.paths;
-  const findings = findingsFor(snapshot, paths);
+  const focused = evaluateEntraRules({ current: snapshot, previous: null, paths, previousPaths: [] }, "snapshot");
+  const consumedPaths = new Set(focused.filter((finding) => finding.rule?.id === "ERE-IAM-001").map((finding) => finding.attackPathId));
+  const focusedOwnership = new Set(focused.filter((finding) => finding.rule?.id === "ERE-IAM-004").map((finding) => finding.affectedObjectIds[0]));
+  const findings = [...focused, ...findingsFor(snapshot, paths).filter((finding) => !consumedPaths.has(finding.attackPathId) && !(finding.category === "ownership" && focusedOwnership.has(finding.affectedObjectIds[0])))];
+  return summarizeIntelligence(snapshot, paths, findings, pathResult);
+}
+
+export function analyzeTenantIntelligenceHistory(history: TenantSnapshot[]): TenantIntelligence {
+  validateIntelligenceHistory(history);
+  const current = analyzeTenantIntelligence(history[0]!);
+  const previous = history[1] ? analyzeTenantIntelligence(history[1]) : null;
+  const historyFindings = evaluateEntraRules({ current: history[0]!, previous: history[1] ?? null, paths: current.paths, previousPaths: previous?.paths ?? [] }, "history");
+  return summarizeIntelligence(history[0]!, current.paths, [...historyFindings, ...current.findings], current.pathAnalysis);
+}
+
+function summarizeIntelligence(snapshot: TenantSnapshot, paths: AttackPath[], findings: IamFinding[], pathResult: { truncated: boolean; traversals: number }): TenantIntelligence {
   const counts: Record<FindingSeverity, number> = { critical: 0, high: 0, medium: 0, low: 0 };
   const evidence: Record<EvidenceClass, number> = { configured: 0, observed: 0, inferred: 0, missing: 0 };
   for (const finding of findings) { counts[finding.severity] += 1; evidence[finding.evidenceClass] += 1; }
   return { generatedAt: snapshot.scannedAt, paths, pathAnalysis: { truncated: pathResult.truncated, traversals: pathResult.traversals, limits: { maxPaths: MAX_ATTACK_PATHS, maxTraversals: MAX_PATH_TRAVERSALS } }, findings, counts, evidence };
+}
+
+function validateIntelligenceHistory(history: TenantSnapshot[]): void {
+  if (history.length === 0) throw new Error("At least one snapshot is required for intelligence history analysis.");
+  const tenantId = history[0]!.tenant.tenantId;
+  let newestAllowed = Number.POSITIVE_INFINITY;
+  for (const snapshot of history) {
+    if (snapshot.tenant.tenantId !== tenantId || snapshot.nodes.some((node) => node.tenantId !== tenantId) || snapshot.edges.some((edge) => edge.tenantId !== tenantId)) throw new Error("Intelligence history snapshots must belong to the same tenant.");
+    const scannedAt = new Date(snapshot.scannedAt).getTime();
+    if (!Number.isFinite(scannedAt) || scannedAt > newestAllowed) throw new Error("Intelligence history snapshots must be ordered newest to oldest.");
+    newestAllowed = scannedAt;
+  }
 }

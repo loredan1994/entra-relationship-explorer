@@ -58,11 +58,18 @@ Exit: production pilot with representative tenant scale.
 - Authorization policy and permission-grant policies, including include/exclude conditions when `Policy.Read.PermissionGrant` is explicitly enabled.
 - Policy subtype-aware UI labels, exact endpoint evidence, partial-collection warnings, comparison fingerprints, and export coverage.
 
+## Entra control-path rule catalog — complete
+
+- Trusted, versioned rule interface with stable `ERE-IAM-###` IDs, required coverage, prerequisites, uncertainty, and primary references.
+- Focused rules for privileged application control, privilege-path amplification across scans, privileged federated trust rewiring, and privileged workloads without accountable ownership.
+- History-aware lifecycle, review, CSV and HTML export integration without carrying analyst decisions forward automatically.
+- Fixture-based rule contracts, deterministic tenant isolation, and conservative partial-evidence language.
+
 ## Next product modules
 
 - Scheduled scans using managed identity or certificate authentication, with an explicit deployment and secret-handling design.
 - Notifications and hosted multi-tenancy only after the local recurring-review workflow is proven.
-- A contributor-friendly finding catalog and fixture template without runtime third-party plugin loading.
+- Additional contributor-authored control-path rules through the trusted catalog and fixture contract, without runtime third-party plugin loading.
 - Focused Markdown and versioned JSON evidence packets for one finding or attack path.
 - Deeper condition evaluation for custom permission-grant policies before generalized risk findings are emitted.
 

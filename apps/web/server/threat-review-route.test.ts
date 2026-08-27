@@ -51,6 +51,7 @@ describe("threat review revalidation route", () => {
     expect(response.status).toBe(200);
     expect(upsertThreatReview).toHaveBeenCalledWith(expect.objectContaining({ findingId, snapshotId: snapshot.id, disposition: "open", owner: "IAM" }), session.id);
     expect(recordAccess).toHaveBeenCalledWith(snapshot.tenant.tenantId, session.id, "revalidate", "threat_review", findingId);
+    expect(recentSnapshots).toHaveBeenCalledWith(snapshot.tenant.tenantId, 20);
   });
 
   it("returns current and prior decisions together without copying either", async () => {

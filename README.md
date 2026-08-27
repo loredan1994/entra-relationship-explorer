@@ -52,6 +52,7 @@ The product is deliberately read-only. It does not grant permissions, remove ass
 - [Local container operations](docs/LOCAL_OPERATIONS.md)
 - [Version 1 API contract](docs/openapi.yaml)
 - [Research notes and primary references](docs/RESEARCH_NOTES.md)
+- [Entra control-path rule catalog](docs/RULE_CATALOG.md)
 - [Design system](DESIGN.md)
 - [Third-party notices](THIRD_PARTY_NOTICES.md)
 
@@ -65,7 +66,7 @@ The product is deliberately read-only. It does not grant permissions, remove ass
 
 ## Current status
 
-The product includes fixture-driven exploration, single-tenant Microsoft sign-in, GET-only paginated Graph reads, PostgreSQL-backed encrypted sessions, checkpoints, snapshots, and finding decisions, a durable resumable scan queue, throttling-aware progress and cancellation, snapshot and finding-lifecycle comparison, explicit per-scan decision revalidation, bounded graph analysis, attack-path discovery, editable review copies of IAM attack flows, and CSV, standalone HTML, relationship, and MITRE Attack Flow exports. The default local registration requests only `Application.Read.All` and `Directory.Read.All`; optional evidence is explicitly gated.
+The product includes fixture-driven exploration, single-tenant Microsoft sign-in, GET-only paginated Graph reads, PostgreSQL-backed encrypted sessions, checkpoints, snapshots, and finding decisions, a durable resumable scan queue, throttling-aware progress and cancellation, snapshot and finding-lifecycle comparison, explicit per-scan decision revalidation, bounded graph analysis, attack-path discovery, a versioned Entra control-path rule catalog, editable review copies of IAM attack flows, and CSV, standalone HTML, relationship, and MITRE Attack Flow exports. The default local registration requests only `Application.Read.All` and `Directory.Read.All`; optional evidence is explicitly gated.
 
 The core scan also resolves devices, administrative units and scoped roles, plus application and managed-identity federated workload trust. Optional scopes are configured through `ENTRA_OPTIONAL_GRAPH_SCOPES`: `RoleManagement.Read.Directory` adds active and PIM-eligible administrative roles, `Policy.Read.All` adds Conditional Access, authorization, and partner cross-tenant settings, `Policy.Read.PermissionGrant` adds consent-policy conditions, and `AuditLog.Read.All` adds a 30-day observed sign-in overlay. Unknown and write-capable scopes are rejected. All Graph transport remains GET-only.
 
