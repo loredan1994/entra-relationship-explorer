@@ -5,7 +5,8 @@
     "src/**/*.ts",
     "!src/**/*.test.ts",
     "!src/**/*.integration.test.ts",
-    "!src/index.ts"
+    "!src/index.ts",
+    "!src/test-support.ts"
   ],
   "reporters": [
     "clear-text",
@@ -13,8 +14,9 @@
     "json"
   ],
   "thresholds": {
-    "high": 80,
-    "low": 60
+    "high": 100,
+    "low": 95,
+    "break": 95
   },
   "coverageAnalysis": "perTest",
   "incremental": true,

@@ -54,11 +54,15 @@ export function parseEntraConfig(environment: NodeJS.ProcessEnv): EntraConfig {
 
   const sessionMaxAgeSeconds = parseSessionMaxAge(environment.ENTRA_SESSION_MAX_AGE_SECONDS);
 
+  // Stryker disable next-line Regex: filter(Boolean) drops the empty entries a single-character separator would leave, so the quantifier cannot change the result.
   const requestedOptional = (environment.ENTRA_OPTIONAL_GRAPH_SCOPES ?? "").split(/[\s,]+/).filter(Boolean).map((scope) => scope.startsWith("https://") ? scope : `https://graph.microsoft.com/${scope}`);
   const approvedOptional = new Set<string>(OPTIONAL_GRAPH_SCOPES);
   for (const scope of requestedOptional) if (!approvedOptional.has(scope)) throw new Error(`Optional Graph scope is not approved by the product: ${scope}`);
   const graphScopes = [...CORE_GRAPH_SCOPES, ...requestedOptional];
   const scopes = [...IDENTITY_SCOPES, ...graphScopes];
+  // Stryker disable next-line all: defense in depth. Every scope reaching this line is already
+  // on the product allow-list, so no input can make removing the assertion observable — it exists
+  // to fail loudly if that allow-list ever grows a write-capable scope.
   assertReadOnlyScopes(scopes);
   return {
     enabled: true,

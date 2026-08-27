@@ -139,6 +139,8 @@ function assess(
 const EXPOSURE_ORDER: Record<Exposure, number> = { high: 0, review: 1, low: 2 };
 
 function daysUntil(value: string | null, now: number): number | null {
+  // Stryker disable next-line ConditionalExpression: Date.parse of a missing value is NaN, which
+  // returns null below anyway; the guard states the intent rather than changing the result.
   if (!value) return null;
   const parsed = Date.parse(value);
   return Number.isNaN(parsed) ? null : Math.round((parsed - now) / 86_400_000);

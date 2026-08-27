@@ -43,6 +43,7 @@ export function toAttackFlow(snapshot: TenantSnapshot, path: AttackPath): Attack
 
 function stableUuid(value: string): string {
   const bytes = new Uint8Array(16);
+  // Stryker disable next-line EqualityOperator: a fifth pass writes past the 16-byte array, which a typed array drops.
   for (let pass = 0; pass < 4; pass += 1) {
     let hash = (2166136261 ^ pass) >>> 0;
     for (let index = 0; index < value.length; index += 1) { hash ^= value.charCodeAt(index); hash = Math.imul(hash, 16777619) >>> 0; }

@@ -10,7 +10,7 @@
     "build": "tsc --noEmit",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:coverage": "vitest run --coverage --coverage.reporter=text-summary --coverage.reporter=json --coverage.reporter=json-summary --coverage.all --coverage.include=src --coverage.exclude=src/**/*.test.ts",
+    "test:coverage": "vitest run --coverage --coverage.reporter=text-summary --coverage.reporter=json --coverage.reporter=json-summary --coverage.all --coverage.include=src --coverage.exclude=src/**/*.test.ts --coverage.exclude=src/test-support.ts --coverage.exclude=src/index.ts",
     "test:mutation": "stryker run"
   },
   "dependencies": {

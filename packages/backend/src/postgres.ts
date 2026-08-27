@@ -161,7 +161,9 @@ export class PostgresBackend implements Backend {
   private async transaction<T>(operation: (client: PoolClient) => Promise<T>): Promise<T> {
     const client = await this.pool.connect();
     try { await client.query("BEGIN"); const result = await operation(client); await client.query("COMMIT"); return result; }
-    catch (error) { await client.query("ROLLBACK"); throw error; }
+    // The rethrow below is covered; v8 additionally counts the catch block's own normal
+    // completion, which an unconditional throw makes unreachable, hence the ignore.
+    catch (error) { await client.query("ROLLBACK"); /* c8 ignore next */ throw error; }
     finally { client.release(); }
   }
 }

@@ -8,10 +8,14 @@ import {
   type TenantSnapshot,
 } from "@entra-explorer/domain";
 import type {
+  GraphAppRole,
   GraphAppRoleAssignment,
   GraphApplication,
+  GraphConditionalAccessPolicy,
   GraphCredentialMetadata,
+  GraphCrossTenantPartner,
   GraphDirectoryObject,
+  GraphRoleDefinition,
   GraphServicePrincipal,
   RawTenantScan,
   Sourced,
@@ -23,6 +27,32 @@ export interface NormalizeOptions {
 }
 
 export function normalizeTenantScan(raw: RawTenantScan, options: NormalizeOptions = {}): TenantSnapshot {
+  const nodes = collectNodes(raw);
+  // The relationship builders below can add a placeholder for an object a relationship
+  // references but the inventory never returned, so the node list is read afterwards.
+  const edges = collectEdges(raw, nodes);
+
+  const snapshot: TenantSnapshot = {
+    id: options.snapshotId ?? randomUUID(),
+    tenant: {
+      tenantId: raw.tenantId,
+      tenantLabel: options.tenantLabel?.trim() || `Tenant ${raw.tenantId.slice(0, 8)}`,
+    },
+    scannedAt: raw.scannedAt,
+    mode: "tenant",
+    completion: scanCompletion(raw),
+    nodes: Array.from(nodes.values()),
+    edges,
+  };
+  // Stryker disable next-line all: defense in depth. Every node and edge above is stamped with
+  // raw.tenantId, so no input can make this assertion fail; it exists to stop a future change
+  // from letting another tenant's record into a snapshot.
+  assertTenantBoundary(snapshot);
+  return snapshot;
+}
+
+/** Every object the scan inventoried, keyed by id; later records never displace earlier ones. */
+function collectNodes(raw: RawTenantScan): Map<string, DirectoryNode> {
   const applicationOwners = ownerIndex(raw.applicationOwners);
   const servicePrincipalOwners = ownerIndex(raw.servicePrincipalOwners);
   const nodes = new Map<string, DirectoryNode>();
@@ -33,20 +63,17 @@ export function normalizeTenantScan(raw: RawTenantScan, options: NormalizeOption
   for (const { record } of raw.servicePrincipals) {
     nodes.set(record.id, servicePrincipalNode(record, raw, servicePrincipalOwners.get(record.id) ?? []));
     for (const role of record.appRoles) {
-      const roleId = appRoleNodeId(record.id, role.id);
-      nodes.set(roleId, { id: roleId, tenantId: raw.tenantId, kind: "appRole", label: role.value || role.displayName || `App role ${role.id.slice(0, 8)}`, description: `Application role exposed by ${record.displayName}.`, ownerIds: [], metadata: { appRoleId: role.id, resourceServicePrincipalId: record.id, enabled: role.isEnabled === true }, risk: { level: role.isEnabled === false ? "review" : "low", reason: role.isEnabled === false ? "The role is disabled but may remain referenced by assignments." : "Risk depends on the principals granted this role." } });
+      const node = appRoleNode(record, role, raw.tenantId);
+      nodes.set(node.id, node);
     }
   }
   for (const { record } of raw.users ?? []) ensureDirectoryObjectNode(nodes, record, raw.tenantId);
   for (const { record } of raw.groups ?? []) ensureDirectoryObjectNode(nodes, record, raw.tenantId);
   for (const membership of raw.groupMemberships ?? []) ensureDirectoryObjectNode(nodes, membership.record, raw.tenantId);
-  for (const { record } of raw.roleDefinitions ?? []) nodes.set(record.id, { id: record.id, tenantId: raw.tenantId, kind: "directoryRole", label: record.displayName, description: "Microsoft Entra administrative role.", ownerIds: [], metadata: { templateId: record.templateId ?? null, isBuiltIn: record.isBuiltIn ?? false }, risk: { level: "review", reason: "Administrative role membership can provide privileged directory access." } });
-  for (const { record } of raw.conditionalAccessPolicies ?? []) nodes.set(record.id, { id: record.id, tenantId: raw.tenantId, kind: "policy", label: record.displayName, description: "Conditional Access policy collected from Microsoft Graph.", ownerIds: [], metadata: { policyType: "conditionalAccess", state: record.state, controls: record.grantControls?.builtInControls?.join(", ") ?? "none" }, risk: { level: record.state === "enabled" ? "low" : "review", reason: record.state === "enabled" ? "Policy is enabled; applicability still depends on its conditions." : `Policy state is ${record.state}.` } });
+  for (const { record } of raw.roleDefinitions ?? []) nodes.set(record.id, directoryRoleNode(record, raw.tenantId));
+  for (const { record } of raw.conditionalAccessPolicies ?? []) nodes.set(record.id, conditionalAccessPolicyNode(record, raw.tenantId));
   for (const { record } of raw.crossTenantPartners ?? []) {
-    const id = `external-tenant:${record.tenantId}`;
-    nodes.set(id, { id, tenantId: raw.tenantId, kind: "externalTenant", label: `External tenant ${record.tenantId.slice(0, 8)}`, description: "Partner organization with explicit cross-tenant access settings.", isExternal: true, ownerIds: [], metadata: { externalTenantId: record.tenantId, trustsMfa: record.inboundTrust?.isMfaAccepted === true, trustsCompliantDevice: record.inboundTrust?.isCompliantDeviceAccepted === true, trustsHybridJoinedDevice: record.inboundTrust?.isHybridAzureADJoinedDeviceAccepted === true, multiTenantOrganization: record.isInMultiTenantOrganization === true }, risk: { level: record.inboundTrust?.isMfaAccepted || record.inboundTrust?.isCompliantDeviceAccepted || record.inboundTrust?.isHybridAzureADJoinedDeviceAccepted ? "review" : "low", reason: "Partner-specific cross-tenant trust must be reviewed in context." } });
-    const policyId = `cross-tenant-policy:${record.tenantId}`;
-    nodes.set(policyId, { id: policyId, tenantId: raw.tenantId, kind: "policy", label: `Partner policy ${record.tenantId.slice(0, 8)}`, description: "Partner-specific Microsoft Entra cross-tenant access policy.", ownerIds: [], metadata: { policyType: "crossTenantAccess", state: "configured" }, risk: { level: "review", reason: "Cross-tenant settings require periodic owner review." } });
+    for (const node of partnerNodes(record, raw.tenantId)) nodes.set(node.id, node);
   }
   for (const owner of [...raw.applicationOwners, ...raw.servicePrincipalOwners]) {
     ensureDirectoryObjectNode(nodes, owner.record, raw.tenantId);
@@ -54,38 +81,130 @@ export function normalizeTenantScan(raw: RawTenantScan, options: NormalizeOption
   for (const { record } of raw.appRoleAssignments) {
     ensureAssignmentPrincipalNode(nodes, record, raw.tenantId);
   }
+  return nodes;
+}
 
-  const edges: RelationshipEdge[] = [];
-  edges.push(...instantiationEdges(raw));
-  edges.push(...assignmentEdges(raw, nodes));
-  edges.push(...appRoleEdges(raw));
-  edges.push(...delegatedGrantEdges(raw, nodes));
-  edges.push(...ownershipEdges(raw, nodes));
-  edges.push(...membershipEdges(raw, nodes));
-  edges.push(...roleEdges(raw, nodes));
-  edges.push(...policyEdges(raw, nodes));
-  edges.push(...activityEdges(raw, nodes));
-  edges.push(...crossTenantEdges(raw, nodes));
+/** Every relationship the scan can justify, with each relationship appearing once. */
+function collectEdges(raw: RawTenantScan, nodes: Map<string, DirectoryNode>): RelationshipEdge[] {
+  const edges: RelationshipEdge[] = [
+    ...instantiationEdges(raw),
+    ...assignmentEdges(raw, nodes),
+    ...appRoleEdges(raw),
+    ...delegatedGrantEdges(raw, nodes),
+    ...ownershipEdges(raw, nodes),
+    ...membershipEdges(raw, nodes),
+    ...roleEdges(raw, nodes),
+    ...policyEdges(raw, nodes),
+    ...activityEdges(raw, nodes),
+    ...crossTenantEdges(raw),
+  ];
+  // Edge ids are derived from the relationship itself, so two edges sharing an id are
+  // the same relationship. A resumed scan re-runs the per-object owner and membership
+  // fan-out from the start and appends, which would otherwise emit it twice.
+  return Array.from(new Map(edges.map((edge) => [edge.id, edge])).values());
+}
 
-  const snapshot: TenantSnapshot = {
-    id: options.snapshotId ?? randomUUID(),
-    tenant: {
-      tenantId: raw.tenantId,
-      tenantLabel: options.tenantLabel?.trim() || `Tenant ${raw.tenantId.slice(0, 8)}`,
-    },
-    scannedAt: raw.scannedAt,
-    mode: "tenant",
-    completion: {
-      status: raw.errors.length > 0 ? "partial" : "complete",
-      collectedEndpoints: unique(raw.collectedEndpoints),
-      skippedEndpoints: unique(raw.skippedEndpoints),
-      errors: raw.errors.map((error) => `${error.endpoint}: ${error.code}`),
-    },
-    nodes: Array.from(nodes.values()),
-    edges,
+function scanCompletion(raw: RawTenantScan): TenantSnapshot["completion"] {
+  return {
+    status: raw.errors.length > 0 ? "partial" : "complete",
+    collectedEndpoints: unique(raw.collectedEndpoints),
+    skippedEndpoints: unique(raw.skippedEndpoints),
+    errors: raw.errors.map((error) => `${error.endpoint}: ${error.code}`),
   };
-  assertTenantBoundary(snapshot);
-  return snapshot;
+}
+
+function appRoleNode(record: GraphServicePrincipal, role: GraphAppRole, tenantId: string): DirectoryNode {
+  const disabled = role.isEnabled === false;
+  return {
+    id: appRoleNodeId(record.id, role.id),
+    tenantId,
+    kind: "appRole",
+    label: role.value || role.displayName || `App role ${role.id.slice(0, 8)}`,
+    description: `Application role exposed by ${record.displayName}.`,
+    ownerIds: [],
+    metadata: { appRoleId: role.id, resourceServicePrincipalId: record.id, enabled: role.isEnabled === true },
+    risk: {
+      level: disabled ? "review" : "low",
+      reason: disabled
+        ? "The role is disabled but may remain referenced by assignments."
+        : "Risk depends on the principals granted this role.",
+    },
+  };
+}
+
+function directoryRoleNode(record: GraphRoleDefinition, tenantId: string): DirectoryNode {
+  return {
+    id: record.id,
+    tenantId,
+    kind: "directoryRole",
+    label: record.displayName,
+    description: "Microsoft Entra administrative role.",
+    ownerIds: [],
+    metadata: { templateId: record.templateId ?? null, isBuiltIn: record.isBuiltIn ?? false },
+    risk: { level: "review", reason: "Administrative role membership can provide privileged directory access." },
+  };
+}
+
+function conditionalAccessPolicyNode(record: GraphConditionalAccessPolicy, tenantId: string): DirectoryNode {
+  const enabled = record.state === "enabled";
+  return {
+    id: record.id,
+    tenantId,
+    kind: "policy",
+    label: record.displayName,
+    description: "Conditional Access policy collected from Microsoft Graph.",
+    ownerIds: [],
+    metadata: {
+      policyType: "conditionalAccess",
+      state: record.state,
+      controls: record.grantControls?.builtInControls?.join(", ") ?? "none",
+    },
+    risk: {
+      level: enabled ? "low" : "review",
+      // An enabled policy is not the same as an effective one, and the snapshot cannot tell.
+      reason: enabled
+        ? "Policy is enabled; applicability still depends on its conditions."
+        : `Policy state is ${record.state}.`,
+    },
+  };
+}
+
+/** A partner tenant and the cross-tenant policy that describes what it is trusted for. */
+function partnerNodes(record: GraphCrossTenantPartner, tenantId: string): [DirectoryNode, DirectoryNode] {
+  const trust = record.inboundTrust;
+  const acceptsAnyClaim = Boolean(trust?.isMfaAccepted || trust?.isCompliantDeviceAccepted || trust?.isHybridAzureADJoinedDeviceAccepted);
+  return [
+    {
+      id: `external-tenant:${record.tenantId}`,
+      tenantId,
+      kind: "externalTenant",
+      label: `External tenant ${record.tenantId.slice(0, 8)}`,
+      description: "Partner organization with explicit cross-tenant access settings.",
+      isExternal: true,
+      ownerIds: [],
+      metadata: {
+        externalTenantId: record.tenantId,
+        trustsMfa: trust?.isMfaAccepted === true,
+        trustsCompliantDevice: trust?.isCompliantDeviceAccepted === true,
+        trustsHybridJoinedDevice: trust?.isHybridAzureADJoinedDeviceAccepted === true,
+        multiTenantOrganization: record.isInMultiTenantOrganization === true,
+      },
+      risk: {
+        level: acceptsAnyClaim ? "review" : "low",
+        reason: "Partner-specific cross-tenant trust must be reviewed in context.",
+      },
+    },
+    {
+      id: `cross-tenant-policy:${record.tenantId}`,
+      tenantId,
+      kind: "policy",
+      label: `Partner policy ${record.tenantId.slice(0, 8)}`,
+      description: "Partner-specific Microsoft Entra cross-tenant access policy.",
+      ownerIds: [],
+      metadata: { policyType: "crossTenantAccess", state: "configured" },
+      risk: { level: "review", reason: "Cross-tenant settings require periodic owner review." },
+    },
+  ];
 }
 
 function appRoleNodeId(resourceId: string, roleId: string): string { return `app-role:${resourceId}:${roleId}`; }
@@ -100,10 +219,11 @@ function appRoleEdges(raw: RawTenantScan): RelationshipEdge[] {
   return [...exposed, ...granted];
 }
 
-function crossTenantEdges(raw: RawTenantScan, nodes: Map<string, DirectoryNode>): RelationshipEdge[] {
+function crossTenantEdges(raw: RawTenantScan): RelationshipEdge[] {
   return (raw.crossTenantPartners ?? []).flatMap(({ record, endpoint }) => {
+    // Both endpoints of this edge are created from this same partner record above,
+    // so no presence check is needed here.
     const id = `external-tenant:${record.tenantId}`;
-    if (!nodes.has(id)) return [];
     const trusted = [record.inboundTrust?.isMfaAccepted ? "MFA" : null, record.inboundTrust?.isCompliantDeviceAccepted ? "compliant device" : null, record.inboundTrust?.isHybridAzureADJoinedDeviceAccepted ? "hybrid joined device" : null].filter((value): value is string => Boolean(value));
     const policyId = `cross-tenant-policy:${record.tenantId}`;
     return [{ id: stableId("cross-tenant", record.tenantId), tenantId: raw.tenantId, type: "CROSS_TENANT_ACCESS" as const, sourceId: id, targetId: policyId, plainLabel: "Has partner access settings", permissions: trusted, evidence: { configured: true, observed: null, scannedAt: raw.scannedAt, sourceEndpoint: endpoint, sourceRecordIds: [record.tenantId], sourceObjectId: id, targetObjectId: policyId, completeness: "complete" as const } }];
@@ -113,6 +233,7 @@ function crossTenantEdges(raw: RawTenantScan, nodes: Map<string, DirectoryNode>)
 function roleEdges(raw: RawTenantScan, nodes: Map<string, DirectoryNode>): RelationshipEdge[] {
   const schedules = [...(raw.roleAssignments ?? []).map((item) => ({ ...item, type: "ACTIVE_IN_ROLE" as const, label: "Active in role" })), ...(raw.roleEligibilities ?? []).map((item) => ({ ...item, type: "ELIGIBLE_FOR_ROLE" as const, label: "Eligible for role" }))];
   return schedules.flatMap((item) => {
+    // Stryker disable next-line ConditionalExpression: ensureDirectoryObjectNode returns an existing node untouched, so the guard only avoids the call.
     if (!nodes.has(item.record.principalId)) ensureDirectoryObjectNode(nodes, { id: item.record.principalId }, raw.tenantId);
     if (!nodes.has(item.record.roleDefinitionId)) return [];
     return [{ id: stableId("role", item.record.id), tenantId: raw.tenantId, type: item.type, sourceId: item.record.principalId, targetId: item.record.roleDefinitionId, plainLabel: item.label, permissions: item.record.directoryScopeId ? [item.record.directoryScopeId] : [], evidence: { configured: true, observed: null, scannedAt: raw.scannedAt, sourceEndpoint: item.endpoint, sourceRecordIds: [item.record.id], sourceObjectId: item.record.principalId, targetObjectId: item.record.roleDefinitionId, completeness: "complete" as const } }];
@@ -122,6 +243,7 @@ function roleEdges(raw: RawTenantScan, nodes: Map<string, DirectoryNode>): Relat
 function policyEdges(raw: RawTenantScan, nodes: Map<string, DirectoryNode>): RelationshipEdge[] {
   const appObjectByAppId = new Map(raw.servicePrincipals.map(({ record }) => [record.appId, record.id]));
   return (raw.conditionalAccessPolicies ?? []).flatMap(({ record, endpoint }) => {
+    // Stryker disable next-line ArrayDeclaration: a seeded id matches no collected object, so it is dropped by the `nodes.has` test below.
     const ids = [...(record.conditions?.users?.includeUsers ?? []), ...(record.conditions?.users?.includeGroups ?? []), ...(record.conditions?.applications?.includeApplications ?? []).map((id) => appObjectByAppId.get(id) ?? id)].filter((id) => !["All", "None", "GuestsOrExternalUsers", "Office365"].includes(id));
     return unique(ids).flatMap((id) => nodes.has(id) ? [{ id: stableId("policy", `${id}:${record.id}`), tenantId: raw.tenantId, type: "GOVERNED_BY" as const, sourceId: id, targetId: record.id, plainLabel: "Governed by", permissions: record.grantControls?.builtInControls ?? [], evidence: { configured: true, observed: null, scannedAt: raw.scannedAt, sourceEndpoint: endpoint, sourceRecordIds: [record.id], sourceObjectId: id, targetObjectId: record.id, completeness: "complete" as const } }] : []);
   });
@@ -177,6 +299,7 @@ function credentialState(credentials: GraphCredentialMetadata[], scannedAt: stri
     .map((value) => new Date(value))
     .filter((value) => Number.isFinite(value.getTime()))
     .sort((a, b) => a.getTime() - b.getTime());
+  // Stryker disable next-line ConditionalExpression: no credentials also means no expirations, so the second test already covers this one.
   if (credentials.length === 0 || expirations.length === 0) return { status: "none", expiresAt: null };
   const next = expirations[0]!;
   const scanTime = new Date(scannedAt).getTime();
@@ -253,11 +376,11 @@ function ensureAssignmentPrincipalNode(nodes: Map<string, DirectoryNode>, record
 }
 
 function instantiationEdges(raw: RawTenantScan): RelationshipEdge[] {
-  const applicationsByAppId = new Map(raw.applications.map(({ record }) => [record.appId, record]));
+  const applicationsByAppId = new Map(raw.applications.map((entry) => [entry.record.appId, entry]));
   return raw.servicePrincipals.flatMap(({ record: servicePrincipal, endpoint: serviceEndpoint }) => {
-    const application = applicationsByAppId.get(servicePrincipal.appId);
-    if (!application) return [];
-    const appSource = raw.applications.find(({ record }) => record.id === application.id);
+    const applicationSource = applicationsByAppId.get(servicePrincipal.appId);
+    if (!applicationSource) return [];
+    const { record: application, endpoint: applicationEndpoint } = applicationSource;
     return [{
       id: stableId("instantiates", `${application.id}:${servicePrincipal.id}`),
       tenantId: raw.tenantId,
@@ -270,7 +393,7 @@ function instantiationEdges(raw: RawTenantScan): RelationshipEdge[] {
         configured: true,
         observed: null,
         scannedAt: raw.scannedAt,
-        sourceEndpoint: `${appSource?.endpoint ?? "/applications"} + ${serviceEndpoint} (matching appId)`,
+        sourceEndpoint: `${applicationEndpoint} + ${serviceEndpoint} (matching appId)`,
         sourceRecordIds: [application.id, servicePrincipal.id],
         sourceObjectId: application.id,
         targetObjectId: servicePrincipal.id,
@@ -294,6 +417,7 @@ function assignmentEdges(raw: RawTenantScan, nodes: Map<string, DirectoryNode>):
     const record = first.record;
     ensureMissingTarget(nodes, record.resourceId, record.resourceDisplayName, raw.tenantId);
     const resource = services.get(record.resourceId);
+    // Stryker disable next-line ArrayDeclaration: a seeded entry indexes under an undefined id, which no assignment can look up.
     const roleIndex = new Map((resource?.appRoles ?? []).map((role) => [role.id, role]));
     const permissions = unique(assignments.map(({ record: item }) => roleIndex.get(item.appRoleId)?.value || roleIndex.get(item.appRoleId)?.displayName || `Unresolved role ${item.appRoleId}`));
     const unresolved = !resource || assignments.some(({ record: item }) => !roleIndex.has(item.appRoleId));
@@ -333,6 +457,7 @@ function delegatedGrantEdges(raw: RawTenantScan, nodes: Map<string, DirectoryNod
       sourceId: record.clientId,
       targetId: record.resourceId,
       plainLabel: "Can call with a signed-in person",
+      // Stryker disable next-line Regex: filter(Boolean) drops the empty entries a single-space split would leave.
       permissions: unique(record.scope.split(/\s+/).filter(Boolean)),
       evidence: {
         configured: true,

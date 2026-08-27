@@ -6,10 +6,7 @@
   },
   "mutate": [
     "server/**/*.ts",
-    "!server/**/*.test.ts",
-    "!server/auth/**",
-    "!server/config.ts",
-    "!server/backend.ts"
+    "!server/**/*.test.ts"
   ],
   "reporters": [
     "clear-text",
@@ -17,8 +14,9 @@
     "json"
   ],
   "thresholds": {
-    "high": 80,
-    "low": 60
+    "high": 100,
+    "low": 95,
+    "break": 95
   },
   "coverageAnalysis": "perTest",
   "incremental": true,

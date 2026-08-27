@@ -48,6 +48,8 @@ export function boundedNeighborhood(
 
   const nodeIndex = new Map(snapshot.nodes.map((node) => [node.id, node]));
   const focus = nodeIndex.get(focusNodeId);
+  // Stryker disable next-line ConditionalExpression: an unknown focus matches no relationship and
+  // resolves to no node, so continuing returns the same empty neighborhood; the guard states it plainly.
   if (!focus) return { nodes: [], edges: [], truncated: false };
 
   const connected = relationships(snapshot).filter(
@@ -64,6 +66,8 @@ export function boundedNeighborhood(
   }
 
   return {
+    // Stryker disable next-line MethodExpression: `relationships` already dropped any edge whose
+    // endpoints are missing, so every visible id resolves; the filter is what proves the type.
     nodes: Array.from(visibleIds, (id) => nodeIndex.get(id)).filter((node): node is DirectoryNode => Boolean(node)),
     edges: visibleEdges,
     truncated: visibleEdges.length < connected.length,
