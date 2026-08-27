@@ -27,6 +27,10 @@ A TypeScript monorepo with a Next.js web application, a background scanner, and 
 - `AppRoleAssignment`: grants a principal an app role on a resource service principal.
 - `OAuth2PermissionGrant`: delegated permission consent involving a user or all users.
 - `DirectoryObject`: user, group, or service principal assigned to an enterprise app.
+- `Device`: directory device inventory and administrative-unit membership evidence; sign-in timestamps are intentionally excluded from configured-access inventory.
+- `AdministrativeUnit`: a name-resolved directory scope for membership and scoped role assignments. Raw scope paths remain part of relationship evidence and fingerprints.
+- `FederatedCredential`: a stable synthetic node derived from its parent object and credential ID. It preserves issuer, subject, audiences, parent identity, collection time, and source endpoint without storing a token.
+- `Policy`: a metadata-discriminated Conditional Access, authorization, cross-tenant, or permission-grant policy node.
 
 ## Normalized edges
 
@@ -37,9 +41,12 @@ A TypeScript monorepo with a Next.js web application, a background scanner, and 
 | ServicePrincipal | `CAN_CALL_DELEGATED` | ServicePrincipal | OAuth2 permission grant |
 | User/Group | `ASSIGNED_TO` | ServicePrincipal | app-role assignment |
 | User/ServicePrincipal | `MEMBER_OF` | Group | direct group members |
+| User/Group/Device | `IN_ADMINISTRATIVE_UNIT` | AdministrativeUnit | administrative-unit members |
+| FederatedCredential | `FEDERATES_AS` | Application/ManagedIdentity | federated identity credentials |
 | Principal | `ACTIVE_IN_ROLE` / `ELIGIBLE_FOR_ROLE` | DirectoryRole | role management schedules, optional |
 | User | `OWNS` | Application/ServicePrincipal | owners relationship |
 | Object | `GOVERNED_BY` | Policy | Conditional Access, optional |
+| AuthorizationPolicy | `ASSIGNS_CONSENT_POLICY` | PermissionGrantPolicy | default user-consent policy assignment, optional |
 | ExternalTenant | `CROSS_TENANT_ACCESS` | Policy | partner cross-tenant settings, optional |
 | ServicePrincipal | `OBSERVED_CALL` | Resource | sign-in logs, optional |
 

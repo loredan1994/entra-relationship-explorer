@@ -62,19 +62,28 @@ Color never carries meaning alone. Every state also has a label, icon, shape, or
 | Enterprise application / service principal | Rounded rectangle | Cyan | Tenant identity |
 | User | Circle | Neutral | Person |
 | Group | Hexagon | Green | Group |
+| Device | Rounded rectangle | Violet | Device |
+| Administrative unit | Rounded rectangle | Green | Administrative unit |
+| Federated identity credential | Rounded rectangle, dashed accent | Amber | Federated credential |
 | Permission / app role | Small pill on an edge | Amber | Can call / can use |
+| Directory role | Rounded rectangle | Slate | Administrative role |
+| Authorization / consent policy | Rounded rectangle | Amber | Access policy |
 
 | Relationship | Stroke | Meaning |
 |---|---|---|
 | Registration → service principal | Thin dotted | “Creates a tenant identity” |
 | Client → resource | Solid arrow | “Can call” (application permission) |
 | User/group → service principal | Dashed arrow | “Assigned to use” |
+| Federated credential → application / managed identity | Solid arrow | “Can federate as” |
+| User/group/device → administrative unit | Solid arrow | “In administrative unit” |
+| Principal → directory role | Solid arrow | “Active in role” / “Eligible for role” |
+| Authorization policy → permission-grant policy | Solid arrow | “Assigns consent policy” |
 | Observed activity | Animated-looking double line, static in reduced motion | “Called recently” |
 
 ## Core components
 
 - `AppShell`: tenant, last scan, global search, export.
-- `FilterRail`: object type, permission type, risk, owner, credential state.
+- `FilterRail`: object type, permission type, risk, owner, credential state; collapsed behind an explicit Filters control on narrow screens.
 - `RelationshipCanvas`: pan, zoom, fit, selection, keyboard navigation.
 - `EntityNode`: name, object type, health indicator, relationship count.
 - `ConnectionLabel`: permission value plus “configured” or “observed”.
@@ -103,4 +112,3 @@ Color never carries meaning alone. Every state also has a label, icon, shape, or
 ## Voice
 
 Short, direct, factual. Preferred: “Orchestrator can call Clean Project API with Api.Read.” Avoid: “A service principal app-role assignment relationship exists.”
-

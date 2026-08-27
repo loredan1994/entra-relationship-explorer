@@ -45,15 +45,26 @@ Exit: production pilot with representative tenant scale.
 - Bounded transitive path discovery over evidence-bearing configured relationships.
 - Prioritized findings for powerful privilege paths, delegated OAuth consent, missing ownership, and missing scan evidence.
 - Multi-stage flows with prerequisites, per-step provenance, MITRE ATT&CK® mappings, confidence, mitigation, and uncertainty.
-- Browser-local decision records for status, owner, expiry, and assumptions, plus sanitized CSV finding exports.
+- Encrypted tenant-scoped decision records for status, owner, expiry, assumptions, and editable review-flow copies; fixture mode remains clearly labeled browser-local sample state.
+- Finding lifecycle across retained scans: new, ongoing, returned, no longer detected, and unconfirmed when current evidence is incomplete.
+- Explicit review revalidation, acceptance-expiry warnings, and reopening of resolved findings that remain or return.
+- Sanitized CSV findings, relationship CSV, standalone client report, and MITRE Attack Flow exports.
 - Strict configured / observed / inferred / missing evidence separation, including an optional 30-day observed sign-in overlay.
+
+## High-leverage Graph collector expansion — complete
+
+- Devices and administrative units, including member relationships and name-resolved role scopes while retaining the raw Graph scope path.
+- Application and managed-identity federated credentials with stable evidence nodes and focused findings only when a powerful path is reachable.
+- Authorization policy and permission-grant policies, including include/exclude conditions when `Policy.Read.PermissionGrant` is explicitly enabled.
+- Policy subtype-aware UI labels, exact endpoint evidence, partial-collection warnings, comparison fingerprints, and export coverage.
 
 ## Next product modules
 
-- Sign-in activity overlay behind separate `AuditLog.Read.All` consent.
-- Live collection for directory roles, group membership, PIM eligibility, Conditional Access, managed identities, and cross-tenant policy where least-privilege permissions permit it.
-- PostgreSQL-synchronized finding decisions and collaborative report generation.
-- Scheduled scans using managed identity or certificate authentication.
+- Scheduled scans using managed identity or certificate authentication, with an explicit deployment and secret-handling design.
+- Notifications and hosted multi-tenancy only after the local recurring-review workflow is proven.
+- A contributor-friendly finding catalog and fixture template without runtime third-party plugin loading.
+- Focused Markdown and versioned JSON evidence packets for one finding or attack path.
+- Deeper condition evaluation for custom permission-grant policies before generalized risk findings are emitted.
 
 ## Decisions requiring explicit approval later
 

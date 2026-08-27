@@ -9,6 +9,8 @@
 - The Changes page compares the latest two encrypted snapshots from the same tenant and reports added, removed, or materially changed objects and relationships. Scan timestamps alone do not produce changes.
 - A 10,000-object/9,999-edge contract test keeps one-hop traversal bounded and enforces a generous two-second regression ceiling.
 - Desktop and mobile accessibility checks cover the main routes, keyboard interactions, and responsive overflow.
+- Findings are classified across retained scans as new, ongoing, returned, no longer detected, or unconfirmed when absence is not trustworthy.
+- Prior decisions remain snapshot-scoped context until a reviewer explicitly revalidates them for the current scan.
 
 ## Investigation rules
 
@@ -28,4 +30,4 @@
 
 ## Phase 2 exit status
 
-The implementation and synthetic quality gates are complete. A representative GET-only live tenant scan passed. Two UI-triggered scans remain the final visual snapshot-comparison acceptance check.
+The implementation and synthetic quality gates are complete. A representative GET-only live tenant scan passed. Snapshot comparison, finding lifecycle, explicit review revalidation, acceptance-expiry handling, and partial-evidence language are covered by domain, route, storage, and browser tests. Operators should still validate the workflow against their own retained tenant snapshots before relying on it operationally.
