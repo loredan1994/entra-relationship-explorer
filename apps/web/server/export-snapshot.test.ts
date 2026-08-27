@@ -17,7 +17,7 @@ vi.mock("./auth/session-store", () => ({
   getServerSession: (...args: unknown[]) => getServerSession(...args),
 }));
 
-const { loadExportSnapshot } = await import("./export-snapshot");
+const { loadExportSnapshot, loadExportSnapshotHistory } = await import("./export-snapshot");
 
 const liveConfig = { enabled: true, tenantId: TENANT };
 
@@ -43,6 +43,11 @@ describe("demo exports", () => {
     expect(await loadExportSnapshot(request(), "graph_csv")).toBe(cleanProjectFixture);
     expect(getServerSession).not.toHaveBeenCalled();
     expect(recordAccess).not.toHaveBeenCalled();
+  });
+
+  it("returns fixture history in the same array shape as live history", async () => {
+    getEntraConfig.mockReturnValue({ enabled: false, reason: "off" });
+    expect(await loadExportSnapshotHistory(request(), "findings_csv")).toEqual([cleanProjectFixture]);
   });
 });
 
@@ -85,6 +90,15 @@ describe("snapshot availability", () => {
     recentSnapshots.mockResolvedValue([snapshot]);
     expect(await loadExportSnapshot(request(), "graph_csv")).toBe(snapshot);
     expect(recentSnapshots).toHaveBeenCalledWith(TENANT, 1);
+  });
+
+  it("returns retained history when an export needs cross-snapshot intelligence", async () => {
+    const newest = tenantSnapshot("snap-newest");
+    const prior = tenantSnapshot("snap-prior");
+    recentSnapshots.mockResolvedValue([newest, prior]);
+    expect(await loadExportSnapshotHistory(request(), "findings_csv")).toEqual([newest, prior]);
+    expect(recentSnapshots).toHaveBeenCalledWith(TENANT, 20);
+    expect(recordAccess).toHaveBeenCalledWith(TENANT, "session-1", "export", "findings_csv", "snap-newest");
   });
 });
 

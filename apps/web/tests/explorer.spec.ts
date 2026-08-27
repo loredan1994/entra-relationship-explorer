@@ -88,7 +88,11 @@ test("mobile navigation and relationship filters keep the map in reach", async (
 test("the threat workspace explains transitive paths and keeps evidence classes separate", async ({ page }) => {
   await page.goto("/security");
   await expect(page.getByRole("heading", { name: "Attack paths and threat workspace", level: 1 })).toBeVisible();
-  await page.getByRole("button", { name: /Maya Chen can reach Clean Project API/ }).click();
+  await page.getByRole("button", { name: /Maya Chen can control privileged access through Clean Project Orchestrator/ }).click();
+  await expect(page.getByText("ERE-IAM-001 · v1", { exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "ERE-IAM-001 · Privileged application control path" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Evidence required to evaluate this rule" })).toBeVisible();
+  await expect(page.getByText(/attacker first controls Maya Chen/i)).toBeVisible();
   await expect(page.getByRole("heading", { name: "Multi-stage attack flow" })).toBeVisible();
   await expect(page.getByText("3 configured steps")).toBeVisible();
   await expect(page.getByText("0 observed")).toBeVisible();
@@ -120,6 +124,8 @@ test("standalone report and MITRE Attack Flow exports are sanitized and interope
   expect(report.headers()["content-security-policy"]).toContain("frame-ancestors 'none'");
   const reportBody = await report.text();
   expect(reportBody).toContain("default-src 'none'");
+  expect(reportBody).toContain("ERE-IAM-001 v1");
+  expect(reportBody).toContain("Required coverage:");
   expect(reportBody).not.toContain("accessToken");
   const flow = await request.get("/api/export/attack-flow.json");
   expect(flow.ok()).toBeTruthy();
@@ -134,6 +140,11 @@ test("fixture findings export is sanitized and evidence-labelled", async ({ requ
   expect(response.headers()["content-type"]).toContain("text/csv");
   const body = await response.text();
   expect(body).toContain('"evidenceClass"');
+  expect(body).toContain('"ruleId"');
+  expect(body).toContain('"ruleVersion"');
+  expect(body).toContain('"ERE-IAM-001"');
+  expect(body).toContain('"prerequisites"');
+  expect(body).toContain('"requiredCoverage"');
   expect(body).toContain('"inferred"');
   expect(body).not.toContain("accessToken");
 });

@@ -105,6 +105,8 @@ The domain package discovers bounded directed paths over evidence-bearing normal
 
 MITRE ATT&CK® technique identifiers are classification references, not embedded product logic or an endorsement. Attack paths include prerequisites, confidence, mitigations, and residual uncertainty. Standards-oriented exports use STIX 2.1 with the MITRE Attack Flow 2.0 extension. Review decisions and editable analyst flow copies are encrypted and shared within the authenticated tenant and snapshot boundary.
 
+The trusted Entra control-path catalog evaluates that normalized evidence through a small, versioned rule interface. Snapshot rules describe current configured exposure; history rules compare the two most recent retained same-tenant snapshots. Cross-tenant or incorrectly ordered histories are rejected before evaluation. Rule findings carry stable IDs, required coverage, prerequisites, uncertainty, and public references into lifecycle, review, and export workflows. Runtime third-party executable rules are deliberately unsupported.
+
 The worker checkpoints sanitized collection state after each completed stage. A recovered job resumes at the next stage rather than re-reading completed stages. Checkpoints use tenant-bound authenticated encryption and are deleted after completion or cancellation.
 
 The Compose bridge is private. Web and PostgreSQL publish loopback ports only; worker and migration have no host port. All services use `no-new-privileges`; the application runtime is non-root. Sensitive PostgreSQL payloads use tenant-bound authenticated encryption, while scheduling/index metadata remains plaintext by design.

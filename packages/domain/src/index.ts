@@ -4,4 +4,5 @@ export * from "./comparisons";
 export * from "./finding-lifecycle";
 export * from "./intelligence";
 export * from "./queries";
+export * from "./rules";
 export * from "./types";

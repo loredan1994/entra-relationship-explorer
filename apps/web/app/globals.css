@@ -494,6 +494,13 @@ button, a, input { -webkit-tap-highlight-color: transparent; }
 .evidence-chip.evidence-configured { color: #275fc6; background: #eaf1ff; }
 .evidence-chip.evidence-inferred { color: #9a4f00; background: #fff3df; }
 .evidence-chip.evidence-missing { color: #a22929; background: #feebeb; }
+.rule-chip { display: inline-flex; align-items: center; min-height: 26px; margin: 0 0 8px 0; padding: 3px 8px; border: 1px solid #b8c8e8; border-radius: 999px; color: #244f9e; background: #eef4ff; font: 700 10px/1.2 var(--font-mono); letter-spacing: .02em; }
+.rule-detail { border-left: 3px solid var(--action); background: #f7faff; }
+.rule-detail h4 { margin: 16px 0 6px; font-size: 13px; }
+.rule-detail ul { margin: 0; padding-left: 20px; color: var(--ink-muted); }
+.rule-detail li + li { margin-top: 5px; }
+.rule-references { margin-top: 16px; font-size: 12px; }
+.rule-feed-label { display: block; margin: 5px 0; color: #244f9e; font: 700 11px/1.3 var(--font-mono); }
 .detail-actions { display: flex; align-items: flex-start; gap: 8px; white-space: nowrap; }
 .finding-columns { display: grid; grid-template-columns: minmax(0, 1fr) 310px; }
 .detail-section { padding: 24px 28px; border-bottom: 1px solid var(--line-light); }

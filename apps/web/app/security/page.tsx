@@ -1,4 +1,4 @@
-import { analyzeFindingLifecycle, analyzeTenantIntelligence } from "@entra-explorer/domain";
+import { analyzeFindingLifecycle, analyzeTenantIntelligenceHistory } from "@entra-explorer/domain";
 import { AppShell } from "@/components/app-shell";
 import { PageHeading } from "@/components/page-heading";
 import { ThreatWorkspace } from "@/components/threat-workspace";
@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 
 export default async function SecurityPage() {
   const { snapshot, history } = await loadSnapshotContext(20);
-  const intelligence = analyzeTenantIntelligence(snapshot);
+  const intelligence = analyzeTenantIntelligenceHistory(history);
   const lifecycle = analyzeFindingLifecycle(history);
   const priorReviews = await loadPriorThreatReviews(snapshot, intelligence.findings.map((finding) => finding.id));
   return <AppShell><div className="page-container threat-page"><PageHeading
