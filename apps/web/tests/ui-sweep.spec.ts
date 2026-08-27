@@ -70,3 +70,28 @@ test("core routes render without UI errors or broken action labels", async ({ pa
 
   expect(errors, `browser errors on ${testInfo.project.name}`).toEqual([]);
 });
+
+test("new collector objects, policy subtypes, and role scope remain inspectable", async ({ page }) => {
+  await page.goto("/map");
+  await expect(page.getByRole("checkbox", { name: /Device Directory device/ })).toBeVisible();
+  await expect(page.getByRole("checkbox", { name: /Administrative unit Directory scope/ })).toBeVisible();
+  await expect(page.getByRole("checkbox", { name: /Federated credential Federated identity credential/ })).toBeVisible();
+  await page.getByRole("button", { name: "Table", exact: true }).click();
+
+  const federationRow = page.getByRole("row").filter({ hasText: "Can federate as" });
+  await federationRow.getByRole("button", { name: "Inspect" }).click();
+  const inspector = page.getByRole("complementary", { name: "Selected relationship evidence" });
+  await expect(inspector).toContainText("https://token.actions.githubusercontent.com");
+  await expect(inspector).toContainText("repo:clean-project/orchestrator:ref:refs/heads/main");
+
+  const roleRow = page.getByRole("row").filter({ hasText: "Active in role" });
+  await roleRow.getByRole("button", { name: "Inspect" }).click();
+  await expect(inspector.getByRole("heading", { name: "Assignment scope" })).toBeVisible();
+  await expect(inspector).toContainText("Finance");
+  await expect(inspector).toContainText("/administrativeUnits/90000000-0000-4000-8000-000000000002");
+
+  const consentRow = page.getByRole("row").filter({ hasText: "Assigns consent policy" });
+  await consentRow.getByRole("button", { name: "Inspect" }).click();
+  await expect(inspector).toContainText("Authorization policy");
+  await expect(inspector).toContainText("Permission grant policy (consent policy)");
+});

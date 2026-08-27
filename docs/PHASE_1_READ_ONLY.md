@@ -10,7 +10,7 @@ The repository is code-complete for this workflow. Running it against a live ten
 
 - Live mode defaults to off and returns no sign-in or scan action until `ENTRA_ENABLE_LIVE=true` is set locally.
 - A concrete tenant UUID is mandatory; `common` and `organizations` are rejected.
-- The default Graph scopes are delegated `Application.Read.All` and `Directory.Read.All`. Optional read-only scopes are fixed to `RoleManagement.Read.Directory`, `Policy.Read.All`, and `AuditLog.Read.All`; unknown and write-capable scopes are rejected.
+- The default Graph scopes are delegated `Application.Read.All` and `Directory.Read.All`. Optional read-only scopes are fixed to `RoleManagement.Read.Directory`, `Policy.Read.All`, `Policy.Read.PermissionGrant`, and `AuditLog.Read.All`; unknown and write-capable scopes are rejected.
 - Authentication uses authorization code with PKCE, one-time state, an exact callback path, short HttpOnly cookies, and server-side token handling.
 - The Graph transport exposes GET only, accepts pagination links only under `https://graph.microsoft.com/v1.0/`, applies bounded retry/backoff, and caps pages and records.
 - Access tokens, refresh tokens, credential secrets, certificate material, and raw response bodies are not written to snapshots or returned to browser code.

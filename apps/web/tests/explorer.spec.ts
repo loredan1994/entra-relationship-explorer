@@ -4,13 +4,13 @@ import { expect, test } from "@playwright/test";
 test("map, table, search, filters, and evidence stay consistent", async ({ page }) => {
   await page.goto("/map");
 
-  await expect(page.getByRole("group", { name: /7 objects and 7 configured connections/ })).toBeVisible();
+  await expect(page.getByRole("group", { name: /13 objects and 11 configured connections/ })).toBeVisible();
   await expect(page.getByRole("complementary", { name: "Selected relationship evidence" })).toContainText(
     "This does not prove recent use",
   );
 
   await page.getByRole("button", { name: "Table", exact: true }).click();
-  await expect(page.getByRole("row")).toHaveCount(8);
+  await expect(page.getByRole("row")).toHaveCount(12);
 
   await page.getByPlaceholder("Name or permission", { exact: true }).fill("Api.Write");
   await expect(page.getByRole("row")).toHaveCount(2);

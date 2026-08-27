@@ -552,6 +552,25 @@ describe("finding wording that carries meaning", () => {
     ]);
   });
 
+  it("keeps a privileged federation path distinct and states the token prerequisite", () => {
+    const credential = node({ id: "federated-credential:app-1:fic-1", kind: "federatedCredential", label: "GitHub main" });
+    const application = node({ id: "app-1", kind: "application", label: "Deployment app", ownerIds: ["user-1"] });
+    const api = node({ id: "sp-api", kind: "servicePrincipal", label: "Microsoft Graph" });
+    const result = analyzeTenantIntelligence(snapshot([credential, application, api], [
+      edge("FEDERATES_AS", credential, application),
+      edge("CAN_CALL_AS_APP", application, api, { permissions: ["Directory.ReadWrite.All"] }),
+    ]));
+    const finding = result.findings.find((item) => item.category === "federated-identity")!;
+    const path = result.paths.find((item) => item.id === finding.attackPathId)!;
+    expect(finding.category).toBe("federated-identity");
+    expect(path.source.id).toBe("federated-credential:app-1:fic-1");
+    expect(path.prerequisites).toEqual([
+      "An attacker can obtain an external token whose issuer and subject exactly match GitHub main.",
+      "Every configured relationship shown in the path remains effective at the time of attempted use.",
+    ]);
+    expect(path.uncertainty).toContain("Configured federation does not prove that a matching external token was issued or used.");
+  });
+
   it("lists every delegated permission in the consent summary", () => {
     const person = node({ id: "user-1", kind: "user", label: "Avery" });
     const api = node({ id: "sp-api", kind: "servicePrincipal", label: "Microsoft Graph" });
@@ -585,5 +604,27 @@ describe("finding wording that carries meaning", () => {
     const impostor = node({ id: "sp-1", kind: "servicePrincipal", label: "Not a policy", metadata: { policyType: "conditionalAccess", state: "disabled" } });
     const categories = analyzeTenantIntelligence(snapshot([impostor], [])).findings.map((finding) => finding.category);
     expect(categories).not.toContain("conditional-access");
+  });
+
+  it("handles absent consent metadata and preserves a legacy finding even when its policy edge is unavailable", () => {
+    const plainPolicy = node({ id: "plain", kind: "policy", label: "Plain policy", metadata: undefined });
+    const authorizationWithoutAssignment = node({ id: "auth-empty", kind: "policy", label: "Authorization", metadata: { policyType: "authorization" } });
+    const legacy = node({ id: "auth-legacy", kind: "policy", label: "Authorization", metadata: { policyType: "authorization", permissionGrantPoliciesAssigned: "ManagePermissionGrantsForSelf.microsoft-user-default-legacy" } });
+    const finding = analyzeTenantIntelligence(snapshot([plainPolicy, authorizationWithoutAssignment, legacy], [])).findings.find((item) => item.category === "consent-policy")!;
+    expect(finding).toMatchObject({
+      title: "Users can consent broadly to applications",
+      severity: "high",
+      evidenceClass: "configured",
+      summary: "The default authorization policy assigns the legacy user-consent policy.",
+      whyItMatters: "The legacy policy can let users consent to permissions that do not require administrator consent for applications without the tighter verified-publisher and low-impact restrictions.",
+      affectedObjectIds: ["auth-legacy", "microsoft-user-default-legacy"],
+      remediation: [
+        "Review the business requirement for user consent and replace the legacy assignment with a restricted permission grant policy or disable user consent through the approved Entra change process.",
+        "Re-scan and confirm the authorization policy no longer assigns the legacy policy.",
+      ],
+      uncertainty: ["This configured policy does not prove that any user granted consent or that an application used delegated access."],
+    });
+    expect(finding.edgeIds).toEqual([]);
+    expect(finding.sourceEndpoints).toEqual(["/policies/authorizationPolicy"]);
   });
 });

@@ -12,6 +12,7 @@ Version 1 is read-only. Its application registration must not contain Microsoft 
 | Delegated consent inventory | `Directory.Read.All` | Read OAuth2 delegated permission grants and directory relationships |
 | Optional roles and PIM | `RoleManagement.Read.Directory` | Read role definitions, active assignments, and eligible schedules |
 | Optional access policy | `Policy.Read.All` | Read Conditional Access and partner-specific cross-tenant settings |
+| Optional consent policy detail | `Policy.Read.PermissionGrant` | Read permission grant policies and their include/exclude conditions |
 | Optional activity overlay | `AuditLog.Read.All` | Read a time-filtered 30-day sign-in activity window |
 
 The default implementation uses the two core delegated permissions above. Optional scopes must be explicitly configured and are rejected unless present in the fixed read-only allowlist. Exact requirements must still be revalidated before real-tenant consent.

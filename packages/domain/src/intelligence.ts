@@ -13,6 +13,8 @@ export interface AttackStep {
   permissions: string[];
   evidenceClass: EvidenceClass;
   sourceEndpoint: string;
+  completeness: "complete" | "partial" | "unresolved";
+  scope?: { directoryScopeId: string; objectId: string | null };
   explanation: string;
 }
 
@@ -88,7 +90,7 @@ function step(view: RelationshipView, index: number): AttackStep {
     : edge.type === "CAN_CALL_DELEGATED"
       ? `${source.label} is configured to call ${target.label} for a signed-in person.`
       : `${source.label} ${edge.plainLabel.toLocaleLowerCase()} ${target.label}.`;
-  return { index, edgeId: edge.id, source: { id: source.id, label: source.label }, target: { id: target.id, label: target.label }, relationship: edge.type, permissions: edge.permissions, evidenceClass: "configured", sourceEndpoint: edge.evidence.sourceEndpoint, explanation };
+  return { index, edgeId: edge.id, source: { id: source.id, label: source.label }, target: { id: target.id, label: target.label }, relationship: edge.type, permissions: edge.permissions, evidenceClass: "configured", sourceEndpoint: edge.evidence.sourceEndpoint, completeness: edge.evidence.completeness, ...(edge.scope ? { scope: edge.scope } : {}), explanation };
 }
 
 function candidateOrigins(snapshot: TenantSnapshot): DirectoryNode[] {

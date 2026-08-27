@@ -23,9 +23,12 @@ const kindLabels: Record<NodeKind, { plain: string; microsoft: string }> = {
   managedIdentity: { plain: "Managed identity", microsoft: "Service principal" },
   user: { plain: "Person", microsoft: "User" },
   group: { plain: "Group", microsoft: "Group" },
+  device: { plain: "Device", microsoft: "Directory device" },
+  administrativeUnit: { plain: "Administrative unit", microsoft: "Directory scope" },
+  federatedCredential: { plain: "Federated credential", microsoft: "Federated identity credential" },
   appRole: { plain: "Application role", microsoft: "App role" },
   directoryRole: { plain: "Administrative role", microsoft: "Directory role" },
-  policy: { plain: "Access policy", microsoft: "Conditional Access policy" },
+  policy: { plain: "Access policy", microsoft: "Microsoft policy" },
   externalTenant: { plain: "External tenant", microsoft: "Partner tenant" },
 };
 
@@ -37,9 +40,12 @@ const relationshipLabels: Record<RelationshipType, string> = {
   EXPOSES_APP_ROLE: "Exposes app role",
   GRANTED_APP_ROLE: "Granted app role",
   MEMBER_OF: "Member of",
+  IN_ADMINISTRATIVE_UNIT: "In administrative unit",
+  FEDERATES_AS: "Can federate as",
   ACTIVE_IN_ROLE: "Active in role",
   ELIGIBLE_FOR_ROLE: "Eligible for role",
   GOVERNED_BY: "Governed by",
+  ASSIGNS_CONSENT_POLICY: "Assigns consent policy",
   CROSS_TENANT_ACCESS: "Cross-tenant setting",
   OWNS: "Owns",
   OBSERVED_CALL: "Called recently",
@@ -451,7 +457,7 @@ export function RelationshipExplorer({ snapshot }: { snapshot: TenantSnapshot })
         )}
       </section>
 
-      <EvidenceInspector view={selectedView} />
+      <EvidenceInspector view={selectedView} snapshot={snapshot} />
     </div>
   );
 }
@@ -494,7 +500,7 @@ function RelationshipTable({
   );
 }
 
-function EvidenceInspector({ view }: { view?: RelationshipView }) {
+function EvidenceInspector({ view, snapshot }: { view?: RelationshipView; snapshot: TenantSnapshot }) {
   if (!view) {
     return (
       <aside className="evidence-inspector">
@@ -524,6 +530,17 @@ function EvidenceInspector({ view }: { view?: RelationshipView }) {
         </section>
       ) : null}
 
+      {edge.scope ? (
+        <section className="inspector-section evidence-facts">
+          <h3>Assignment scope</h3>
+          <dl>
+            <div><dt>Directory scope</dt><dd>{edge.scope.objectId ? snapshot.nodes.find((node) => node.id === edge.scope?.objectId)?.label ?? "Unresolved administrative unit" : edge.scope.directoryScopeId === "/" ? "Tenant-wide" : "Unresolved scope"}</dd></div>
+            <div><dt>Raw scope ID</dt><dd><code>{edge.scope.directoryScopeId}</code></dd></div>
+            <div><dt>Scope object ID</dt><dd><code>{edge.scope.objectId ?? "Not resolved"}</code></dd></div>
+          </dl>
+        </section>
+      ) : null}
+
       <section className="inspector-section entity-pair">
         <h3>Connected objects</h3>
         {[source, target].map((node, index) => (
@@ -531,6 +548,8 @@ function EvidenceInspector({ view }: { view?: RelationshipView }) {
             <small>{index === 0 ? "From" : "To"} · {kindLabels[node.kind].plain}</small>
             <strong>{node.label}</strong>
             <code>{node.id}</code>
+            {node.kind === "policy" ? <small>{policySubtype(node.metadata?.policyType)}</small> : null}
+            {node.kind === "federatedCredential" ? <small>{String(node.metadata?.issuer ?? "Issuer unavailable")} · {String(node.metadata?.subject ?? "Subject unavailable")}</small> : null}
             {(node.kind === "application" || node.kind === "servicePrincipal") ? (
               <Link href={`/applications/${node.id}`}>Open application detail</Link>
             ) : null}
@@ -556,4 +575,12 @@ function EvidenceInspector({ view }: { view?: RelationshipView }) {
       </div>
     </aside>
   );
+}
+
+function policySubtype(value: unknown): string {
+  if (value === "conditionalAccess") return "Conditional Access policy";
+  if (value === "authorization") return "Authorization policy";
+  if (value === "permissionGrant") return "Permission grant policy (consent policy)";
+  if (value === "crossTenantAccess") return "Cross-tenant access policy";
+  return "Microsoft policy";
 }

@@ -333,8 +333,7 @@ function policyEdges(raw: RawTenantScan, nodes: Map<string, DirectoryNode>): Rel
 function consentPolicyEdges(raw: RawTenantScan, nodes: Map<string, DirectoryNode>): RelationshipEdge[] {
   return (raw.authorizationPolicies ?? []).flatMap(({ record, endpoint }) => (record.defaultUserRolePermissions?.permissionGrantPoliciesAssigned ?? []).flatMap((assignment) => {
     const policyId = consentPolicyId(assignment);
-    const target = nodes.get(policyId);
-    if (!target) return [];
+    const target = nodes.get(policyId)!;
     const resolved = target.metadata?.coverage !== "unresolved";
     return [{ id: stableId("consent-policy", `${record.id}:${policyId}`), tenantId: raw.tenantId, type: "ASSIGNS_CONSENT_POLICY" as const, sourceId: record.id, targetId: policyId, plainLabel: "Assigns consent policy", permissions: [], evidence: { configured: true, observed: null, scannedAt: raw.scannedAt, sourceEndpoint: endpoint, sourceRecordIds: [record.id, policyId], sourceObjectId: record.id, targetObjectId: policyId, completeness: resolved ? "complete" as const : "unresolved" as const } }];
   }));
@@ -467,7 +466,7 @@ function administrativeUnitMembershipEdges(raw: RawTenantScan, nodes: Map<string
 function federationEdges(raw: RawTenantScan, nodes: Map<string, DirectoryNode>): RelationshipEdge[] {
   return (raw.federatedIdentityCredentials ?? []).flatMap((credential) => {
     const sourceId = federatedCredentialNodeId(credential.parentId, credential.record.id);
-    if (!nodes.has(sourceId) || !nodes.has(credential.parentId)) return [];
+    if (!nodes.has(credential.parentId)) return [];
     return [{ id: stableId("federates", `${sourceId}:${credential.parentId}`), tenantId: raw.tenantId, type: "FEDERATES_AS" as const, sourceId, targetId: credential.parentId, plainLabel: "Can federate as", permissions: [], evidence: { configured: true, observed: null, scannedAt: raw.scannedAt, sourceEndpoint: credential.endpoint, sourceRecordIds: [credential.parentId, credential.record.id], sourceObjectId: sourceId, targetObjectId: credential.parentId, completeness: "complete" as const } }];
   });
 }

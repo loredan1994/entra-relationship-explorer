@@ -24,7 +24,7 @@ Open `http://localhost:3000/overview`. This runs against a synthetic sample tena
 
 **It does not:** grant permissions, remove assignments, create secrets, or change anything in Entra. The Graph transport is GET-only, and that is enforced in code, not by convention. It sends your tenant data to no third-party service — it talks to Microsoft Graph and to your database, both from your machine.
 
-By default it requests two delegated permissions, `Application.Read.All` and `Directory.Read.All`. Three further read-only scopes are available, each consented separately and only if you want what they add. Write-capable scopes are rejected outright. [SECURITY.md](SECURITY.md) documents the full model.
+By default it requests two delegated permissions, `Application.Read.All` and `Directory.Read.All`. Four further read-only scopes are available, each consented separately and only if you want what they add. Write-capable scopes are rejected outright. [SECURITY.md](SECURITY.md) documents the full model.
 
 ## The simple version
 
@@ -62,7 +62,7 @@ The product is deliberately read-only. It does not grant permissions, remove ass
 
 The product includes fixture-driven exploration, single-tenant Microsoft sign-in, GET-only paginated Graph SDK reads, PostgreSQL-backed encrypted sessions, checkpoints, snapshots, and finding decisions, a durable resumable scan queue, throttling-aware progress and cancellation, snapshot and finding-lifecycle comparison, explicit per-scan decision revalidation, Cytoscape.js graph analysis, attack-path discovery, editable review copies of IAM attack flows, and CSV, standalone HTML, and MITRE Attack Flow exports. The default local registration still requests only `Application.Read.All` and `Directory.Read.All`; optional evidence is explicitly gated.
 
-Optional scopes are configured through `ENTRA_OPTIONAL_GRAPH_SCOPES`: `RoleManagement.Read.Directory` adds active and PIM-eligible administrative roles, `Policy.Read.All` adds Conditional Access and partner cross-tenant settings, and `AuditLog.Read.All` adds a 30-day observed sign-in overlay. Unknown and write-capable scopes are rejected. All Graph transport remains GET-only.
+The core scan also resolves devices, administrative units and scoped roles, plus application and managed-identity federated workload trust. Optional scopes are configured through `ENTRA_OPTIONAL_GRAPH_SCOPES`: `RoleManagement.Read.Directory` adds active and PIM-eligible administrative roles, `Policy.Read.All` adds Conditional Access, authorization, and partner cross-tenant settings, `Policy.Read.PermissionGrant` adds consent-policy conditions, and `AuditLog.Read.All` adds a 30-day observed sign-in overlay. Unknown and write-capable scopes are rejected. All Graph transport remains GET-only.
 
 ## Connect your own tenant
 

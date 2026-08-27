@@ -220,7 +220,7 @@ async function collectFederatedIdentityCredentials(run: ScanRun): Promise<void> 
   const managedIdentityContainers = await read(run, SERVICE_PRINCIPAL_FEDERATION_ENDPOINT, sanitizeServicePrincipalFederation);
   for (const container of managedIdentityContainers) {
     if (container.record.servicePrincipalType?.toLocaleLowerCase() !== "managedidentity") continue;
-    scan.federatedIdentityCredentials!.push(...(container.record.federatedIdentityCredentials ?? []).map((record) => ({ endpoint: container.endpoint, record, parentId: container.record.id, parentType: "managedIdentity" as const })));
+    scan.federatedIdentityCredentials!.push(...container.record.federatedIdentityCredentials!.map((record) => ({ endpoint: container.endpoint, record, parentId: container.record.id, parentType: "managedIdentity" as const })));
   }
   report(run, "federatedIdentityCredentials", scan.federatedIdentityCredentials!.length, "Federated workload trust credentials collected");
 }

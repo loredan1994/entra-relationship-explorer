@@ -5,7 +5,7 @@ export const NODE_WIDTH = 190;
 export const NODE_HEIGHT = 96;
 
 const COLUMN_GAP = 176;
-const ROW_GAP = 28;
+const ROW_GAP = 56;
 const PADDING = 36;
 const NODE_CLEARANCE = 6;
 const LABEL_HEIGHT = 24;
@@ -23,9 +23,12 @@ const shortRelationshipLabel: Record<RelationshipType, string> = {
   EXPOSES_APP_ROLE: "exposes role",
   GRANTED_APP_ROLE: "granted role",
   MEMBER_OF: "member of",
+  IN_ADMINISTRATIVE_UNIT: "in admin unit",
+  FEDERATES_AS: "federates as",
   ACTIVE_IN_ROLE: "active role",
   ELIGIBLE_FOR_ROLE: "eligible role",
   GOVERNED_BY: "governed by",
+  ASSIGNS_CONSENT_POLICY: "assigns consent",
   CROSS_TENANT_ACCESS: "partner setting",
   OWNS: "owns",
   OBSERVED_CALL: "called recently",

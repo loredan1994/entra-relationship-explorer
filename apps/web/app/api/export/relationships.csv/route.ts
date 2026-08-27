@@ -16,8 +16,8 @@ export async function GET(request: NextRequest) {
   const snapshot = (await backend.recentSnapshots(session.tenantId, 1))[0];
   if (!snapshot) return new Response("No tenant snapshot is available.", { status: 404 });
   await backend.recordAccess(session.tenantId, session.id, "export", "snapshot", snapshot.id);
-  const header = ["sourceName", "sourceObjectId", "relationshipType", "targetName", "targetObjectId", "permissions", "sourceEndpoint", "sourceRecordIds", "scannedAt", "completeness"];
-  const rows = relationships(snapshot).map(({ edge, source, target }) => [source.label, source.id, edge.type, target.label, target.id, edge.permissions.join("; "), edge.evidence.sourceEndpoint, edge.evidence.sourceRecordIds.join("; "), edge.evidence.scannedAt, edge.evidence.completeness]);
+  const header = ["sourceName", "sourceObjectId", "relationshipType", "targetName", "targetObjectId", "permissions", "directoryScopeId", "scopeObjectId", "sourceEndpoint", "sourceRecordIds", "scannedAt", "completeness"];
+  const rows = relationships(snapshot).map(({ edge, source, target }) => [source.label, source.id, edge.type, target.label, target.id, edge.permissions.join("; "), edge.scope?.directoryScopeId ?? "", edge.scope?.objectId ?? "", edge.evidence.sourceEndpoint, edge.evidence.sourceRecordIds.join("; "), edge.evidence.scannedAt, edge.evidence.completeness]);
   const csv = [header, ...rows].map(csvRow).join("\r\n");
   return new Response(csv, { headers: { "content-type": "text/csv; charset=utf-8", "content-disposition": `attachment; filename="entra-relationships-${snapshot.scannedAt.slice(0, 10)}.csv"`, "cache-control": "no-store" } });
 }
