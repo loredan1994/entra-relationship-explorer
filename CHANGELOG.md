@@ -13,6 +13,8 @@ Breaking changes are always called out under **Changed** with a migration note.
 
 ### Added
 
+- GET-only collectors for directory devices, administrative units and scoped roles, application and managed-identity federated credentials, tenant authorization policy, and optional consent-policy conditions.
+- Explainable administrative-unit, workload-federation, and consent-policy relationships, with focused inferred federation paths and a configured broad-consent finding.
 - Finding lifecycle across retained scans: newly detected, ongoing, returned, no-longer-detected, and unconfirmed when collection coverage cannot establish absence.
 - Explicit snapshot-scoped review revalidation with prior-decision context, expired-acceptance warnings, and reopening for findings previously marked resolved.
 - Apache-2.0 license, contribution guide, security policy, and code of conduct.

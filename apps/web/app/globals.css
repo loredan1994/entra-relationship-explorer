@@ -223,7 +223,11 @@ button, a, input { -webkit-tap-highlight-color: transparent; }
 .node-servicePrincipal { border-left-color: var(--identity); }
 .node-user { border-left-color: #9aaac0; border-radius: 999px; padding-left: 22px; }
 .node-group { border-left-color: var(--success); clip-path: polygon(8% 0, 92% 0, 100% 50%, 92% 100%, 8% 100%, 0 50%); padding-left: 23px; }
-.connection-label { position: absolute; z-index: 3; height: 24px; overflow: hidden; transform: translate(-50%, -50%); padding: 0 8px; color: #ffe7bc; background: #263143; border: 1px solid #9e7741; border-radius: 999px; font-family: var(--font-mono); font-size: 9px; line-height: 22px; white-space: nowrap; text-align: center; text-overflow: ellipsis; cursor: pointer; box-shadow: 0 3px 8px rgba(0, 0, 0, 0.25); }
+.node-device { border-left-color: #8b5cf6; }
+.node-administrativeUnit { border-left-color: #22c55e; }
+.node-federatedCredential { border-left-color: var(--warning); border-style: dashed; }
+.node-policy { border-left-color: #d69a3d; }
+.connection-label { position: absolute; z-index: 3; min-height: 28px; overflow: hidden; transform: translate(-50%, -50%); padding: 0 8px; color: #ffe7bc; background: #263143; border: 1px solid #9e7741; border-radius: 999px; font-family: var(--font-mono); font-size: 9px; line-height: 26px; white-space: nowrap; text-align: center; text-overflow: ellipsis; cursor: pointer; box-shadow: 0 3px 8px rgba(0, 0, 0, 0.25); }
 .connection-label:hover, .connection-label.selected { color: #fff; background: #744c15; border-color: #ffc46b; }
 .relationship-table-wrap { flex: 1; overflow: auto; background: #fff; }
 .relationship-table, .data-table { width: 100%; border-collapse: collapse; text-align: left; }
@@ -410,6 +414,7 @@ button, a, input { -webkit-tap-highlight-color: transparent; }
   .map-toolbar { align-items: flex-start; height: auto; flex-direction: column; padding-block: 10px; }
   .zoom-control { margin-left: 0; }
   .relationship-canvas { min-height: 580px; }
+  .connection-label { display: none; }
   .evidence-inspector { min-height: 400px; }
   .connection-list { grid-template-columns: 1fr; }
   .empty-state-facts { flex-direction: column; gap: 14px; }

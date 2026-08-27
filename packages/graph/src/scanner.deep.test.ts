@@ -82,6 +82,10 @@ describe("optional-scope stages", () => {
         grantControls: { builtInControls: ["mfa"], operator: "OR" },
       },
     ],
+    "/policies/authorizationPolicy": { id: "authorizationPolicy", displayName: "Authorization policy", defaultUserRolePermissions: { permissionGrantPoliciesAssigned: [] } },
+    "/policies/permissionGrantPolicies?": [{ id: "consent-low", displayName: "Low impact consent" }],
+    "/policies/permissionGrantPolicies/consent-low/includes": [{ id: "include-1", permissionClassification: "low" }],
+    "/policies/permissionGrantPolicies/consent-low/excludes": [],
     "/policies/crossTenantAccessPolicy/partners": [
       { tenantId: "33333333-3333-4333-8333-333333333333", inboundTrust: { isMfaAccepted: true }, isInMultiTenantOrganization: false },
     ],
@@ -112,7 +116,7 @@ describe("optional-scope stages", () => {
     expect(scan.signIns).toEqual([]);
     // The stages are still marked done so a resume does not retry an ungranted read.
     expect(scan.completedStages).toEqual(
-      expect.arrayContaining<ScanStage>(["roles", "conditionalAccess", "crossTenantAccess", "activity"]),
+      expect.arrayContaining<ScanStage>(["roles", "conditionalAccess", "authorizationPolicy", "permissionGrantPolicies", "crossTenantAccess", "activity"]),
     );
   });
 
@@ -402,7 +406,7 @@ describe("progress reporting and checkpoints", () => {
     });
     await scanTenant(clientFor(recorder), TENANT, { now, concurrency: 1, onProgress: (event) => events.push(event) });
     const stages = new Set(events.map((event) => event.stage));
-    expect(stages).toEqual(new Set<ScanStage>(["applications", "servicePrincipals", "usersAndGroups", "groupMemberships", "delegatedPermissionGrants", "appRoleAssignments", "owners"]));
+    expect(stages).toEqual(new Set<ScanStage>(["applications", "servicePrincipals", "federatedIdentityCredentials", "usersAndGroups", "groupMemberships", "devices", "administrativeUnits", "delegatedPermissionGrants", "appRoleAssignments", "owners"]));
     expect(events.find((event) => event.stage === "usersAndGroups")?.collected).toBe(2);
     expect(events.every((event) => event.detail.length > 0)).toBe(true);
   });
@@ -429,7 +433,7 @@ describe("progress reporting and checkpoints", () => {
     });
     await scanTenant(clientFor(recorder), TENANT, { now, resumeFrom: checkpoint });
     expect(recorder.requestedPath("/applications?")).toBe(false);
-    expect(recorder.requestedPath("/servicePrincipals?")).toBe(false);
+    expect(recorder.requestedPath("/servicePrincipals?$select=id,appId")).toBe(false);
     expect(recorder.requestedPath("/users?")).toBe(false);
   });
 
@@ -502,6 +506,8 @@ describe("optional-stage progress reporting", () => {
       { id: "p-1", displayName: "Require MFA", state: "enabled" },
       { id: "p-2", displayName: "Block legacy", state: "disabled" },
     ],
+    "/policies/authorizationPolicy": { id: "authorizationPolicy", displayName: "Authorization policy", defaultUserRolePermissions: { permissionGrantPoliciesAssigned: [] } },
+    "/policies/permissionGrantPolicies?": [],
     "/policies/crossTenantAccessPolicy/partners": [{ tenantId: "33333333-3333-4333-8333-333333333333" }],
     "/auditLogs/signIns": [
       { id: "s-1", createdDateTime: "2026-08-20T09:00:00Z" },
@@ -542,14 +548,14 @@ describe("optional-stage progress reporting", () => {
 
   it("emits no optional-stage progress when the scope is not granted", async () => {
     const events = await progressFor([]);
-    for (const stage of ["roles", "conditionalAccess", "crossTenantAccess", "activity"] as const) {
+    for (const stage of ["roles", "conditionalAccess", "authorizationPolicy", "permissionGrantPolicies", "crossTenantAccess", "activity"] as const) {
       expect(events.some((event) => event.stage === stage), stage).toBe(false);
     }
   });
 
   it("reports every optional stage when every optional scope is granted", async () => {
     const events = await progressFor(ALL_OPTIONAL_SCOPES);
-    for (const stage of ["roles", "conditionalAccess", "crossTenantAccess", "activity"] as const) {
+    for (const stage of ["roles", "conditionalAccess", "authorizationPolicy", "permissionGrantPolicies", "crossTenantAccess", "activity"] as const) {
       expect(events.some((event) => event.stage === stage), stage).toBe(true);
     }
   });
@@ -639,15 +645,20 @@ describe("application permission sanitization", () => {
 describe("stage bookkeeping", () => {
   /** Every endpoint fragment a stage reads, keyed by the stage that owns it. */
   const STAGE_ENDPOINTS: Array<[ScanStage, string[]]> = [
-    ["applications", ["/applications?"]],
-    ["servicePrincipals", ["/servicePrincipals?"]],
+    ["applications", ["/applications?$select=id,appId"]],
+    ["servicePrincipals", ["/servicePrincipals?$select=id,appId"]],
+    ["federatedIdentityCredentials", ["/applications/app-1/federatedIdentityCredentials", "/servicePrincipals?$select=id,servicePrincipalType"]],
     ["usersAndGroups", ["/users?", "/groups?"]],
-    ["groupMemberships", ["/members?"]],
+    ["groupMemberships", ["/groups/group-1/members"]],
+    ["devices", ["/devices?"]],
+    ["administrativeUnits", ["/directory/administrativeUnits?$select", "/directory/administrativeUnits/au-1/members"]],
     ["delegatedPermissionGrants", ["/oauth2PermissionGrants?"]],
     ["appRoleAssignments", ["/appRoleAssignedTo?"]],
     ["owners", ["/owners?"]],
     ["roles", ["/roleManagement/directory/roleDefinitions"]],
     ["conditionalAccess", ["/identity/conditionalAccess/policies"]],
+    ["authorizationPolicy", ["/policies/authorizationPolicy"]],
+    ["permissionGrantPolicies", ["/policies/permissionGrantPolicies?", "/policies/permissionGrantPolicies/consent-1/includes", "/policies/permissionGrantPolicies/consent-1/excludes"]],
     ["crossTenantAccess", ["/policies/crossTenantAccessPolicy/partners"]],
     ["activity", ["/auditLogs/signIns"]],
   ];
@@ -657,6 +668,13 @@ describe("stage bookkeeping", () => {
     "/servicePrincipals?": [{ id: "sp-1", appId: "shared", displayName: "SP" }],
     "/groups?": [{ id: "group-1", displayName: "Finance", securityEnabled: true }],
     "/users?": [{ id: "user-1", displayName: "Avery" }],
+    "/devices?": [{ id: "device-1", deviceId: "device-guid-1", displayName: "Laptop" }],
+    "/directory/administrativeUnits?": [{ id: "au-1", displayName: "Finance" }],
+    "/directory/administrativeUnits/au-1/members": [{ id: "device-1", displayName: "Laptop", "@odata.type": "#microsoft.graph.device" }],
+    "/policies/authorizationPolicy": { id: "authorizationPolicy", displayName: "Authorization policy", defaultUserRolePermissions: { permissionGrantPoliciesAssigned: [] } },
+    "/policies/permissionGrantPolicies?": [{ id: "consent-1", displayName: "Consent policy" }],
+    "/policies/permissionGrantPolicies/consent-1/includes": [{ id: "include-1" }],
+    "/policies/permissionGrantPolicies/consent-1/excludes": [],
   };
 
   it("records every stage it completed, in the order the scan runs them", async () => {
@@ -690,7 +708,7 @@ describe("stage bookkeeping", () => {
     const scan = await scanTenant(clientFor(recorder), TENANT, { now, enabledScopes: ALL_OPTIONAL_SCOPES });
     for (const [, endpoints] of STAGE_ENDPOINTS) {
       for (const endpoint of endpoints) {
-        expect(scan.collectedEndpoints.some((collected) => collected.includes(endpoint.replace("?", ""))), endpoint).toBe(true);
+        expect(scan.collectedEndpoints.some((collected) => collected.includes(endpoint)), endpoint).toBe(true);
       }
     }
     expect(scan.skippedEndpoints).toEqual([]);
@@ -702,8 +720,9 @@ describe("stage bookkeeping", () => {
     expect(scan).toMatchObject({
       tenantId: TENANT, applications: [], servicePrincipals: [], appRoleAssignments: [], oauth2PermissionGrants: [],
       applicationOwners: [], servicePrincipalOwners: [], users: [], groups: [], groupMemberships: [],
+      devices: [], administrativeUnits: [], administrativeUnitMemberships: [], federatedIdentityCredentials: [],
       roleDefinitions: [], roleAssignments: [], roleEligibilities: [], conditionalAccessPolicies: [],
-      signIns: [], crossTenantPartners: [], skippedEndpoints: [], errors: [],
+      signIns: [], crossTenantPartners: [], authorizationPolicies: [], permissionGrantPolicies: [], permissionGrantPolicyIncludes: [], permissionGrantPolicyExcludes: [], skippedEndpoints: [], errors: [],
     });
   });
 
@@ -782,8 +801,8 @@ describe("record sanitization at the edges", () => {
 
 describe("resuming a finished scan", () => {
   const ALL_STAGES: ScanStage[] = [
-    "applications", "servicePrincipals", "usersAndGroups", "groupMemberships", "delegatedPermissionGrants",
-    "appRoleAssignments", "owners", "roles", "conditionalAccess", "crossTenantAccess", "activity",
+    "applications", "servicePrincipals", "federatedIdentityCredentials", "usersAndGroups", "groupMemberships", "devices", "administrativeUnits", "delegatedPermissionGrants",
+    "appRoleAssignments", "owners", "roles", "conditionalAccess", "authorizationPolicy", "permissionGrantPolicies", "crossTenantAccess", "activity",
   ];
 
   it("reads nothing and checkpoints nothing when every stage is already complete", async () => {

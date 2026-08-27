@@ -14,6 +14,10 @@ describe("scanTenant", () => {
       { value: [] },
       { value: [] },
       { value: [] },
+      { value: [] },
+      { value: [] },
+      { value: [] },
+      { value: [] },
     ];
     const fetchImpl = vi.fn<typeof fetch>();
     for (const response of responses) fetchImpl.mockResolvedValueOnce(new Response(JSON.stringify(response), { status: 200, headers: { "content-type": "application/json" } }));
@@ -23,7 +27,7 @@ describe("scanTenant", () => {
     expect(serialized).not.toContain("must-not-survive");
     expect(serialized).not.toContain("private-material");
     expect(serialized).not.toContain("sensitive-token");
-    expect(fetchImpl).toHaveBeenCalledTimes(8);
+    expect(fetchImpl).toHaveBeenCalledTimes(12);
     expect(scan.completedStages).toContain("activity");
   });
 

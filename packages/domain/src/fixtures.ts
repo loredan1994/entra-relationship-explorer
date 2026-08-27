@@ -82,6 +82,12 @@ const nodes: DirectoryNode[] = [
     ownerIds: [],
     risk: { level: "low", reason: "Assignment is scoped to one enterprise application." },
   },
+  { id: "90000000-0000-4000-8000-000000000001", tenantId: fixtureTenantId, kind: "device", label: "Finance laptop", description: "Synthetic managed directory device.", metadata: { deviceId: "91000000-0000-4000-8000-000000000001", accountEnabled: true, compliant: true, managed: true, operatingSystem: "Windows" }, ownerIds: [], risk: { level: "review", reason: "Device posture is synthetic inventory evidence." } },
+  { id: "90000000-0000-4000-8000-000000000002", tenantId: fixtureTenantId, kind: "administrativeUnit", label: "Finance", description: "Synthetic administrative unit used to demonstrate scoped administration.", metadata: { memberManagementRestricted: true, membershipType: "Assigned" }, ownerIds: [], risk: { level: "low", reason: "Administrative unit presence alone is not a finding." } },
+  { id: "federated-credential:10000000-0000-4000-8000-000000000001:92000000-0000-4000-8000-000000000001", tenantId: fixtureTenantId, kind: "federatedCredential", label: "GitHub main", description: "Synthetic federated identity credential (workload trust).", metadata: { credentialId: "92000000-0000-4000-8000-000000000001", parentId: "10000000-0000-4000-8000-000000000001", parentType: "application", issuer: "https://token.actions.githubusercontent.com", subject: "repo:clean-project/orchestrator:ref:refs/heads/main", audiences: "api://AzureADTokenExchange" }, ownerIds: [], risk: { level: "review", reason: "A matching external token can authenticate as the workload identity; this does not prove use." } },
+  { id: "authorizationPolicy", tenantId: fixtureTenantId, kind: "policy", label: "Authorization policy", description: "Synthetic tenant authorization policy.", metadata: { policyType: "authorization", permissionGrantPoliciesAssigned: "ManagePermissionGrantsForSelf.microsoft-user-default-legacy", userConsentState: "configured" }, ownerIds: [], risk: { level: "high", reason: "The synthetic default assigns broad legacy user consent." } },
+  { id: "microsoft-user-default-legacy", tenantId: fixtureTenantId, kind: "policy", label: "Legacy user consent", description: "Synthetic permission grant policy.", metadata: { policyType: "permissionGrant", coverage: "complete", includeCount: 1, excludeCount: 0 }, ownerIds: [], risk: { level: "high", reason: "This built-in policy permits broad user consent when assigned." } },
+  { id: "93000000-0000-4000-8000-000000000001", tenantId: fixtureTenantId, kind: "directoryRole", label: "User Administrator", description: "Synthetic Microsoft Entra administrative role.", ownerIds: [], risk: { level: "review", reason: "Administrative role membership can provide privileged directory access." } },
 ];
 
 const evidence = (
@@ -176,6 +182,10 @@ const edges: RelationshipEdge[] = [
     permissions: [],
     evidence: evidence(nodes[5]!.id, nodes[1]!.id, `/applications/${nodes[1]!.id}/owners`, [nodes[5]!.id]),
   },
+  { id: "70000000-0000-4000-8000-000000000008", tenantId: fixtureTenantId, type: "FEDERATES_AS", sourceId: nodes[9]!.id, targetId: nodes[0]!.id, plainLabel: "Can federate as", permissions: [], evidence: evidence(nodes[9]!.id, nodes[0]!.id, `/applications/${nodes[0]!.id}/federatedIdentityCredentials`, [nodes[0]!.id, "92000000-0000-4000-8000-000000000001"]) },
+  { id: "70000000-0000-4000-8000-000000000009", tenantId: fixtureTenantId, type: "IN_ADMINISTRATIVE_UNIT", sourceId: nodes[7]!.id, targetId: nodes[8]!.id, plainLabel: "In administrative unit", permissions: [], evidence: evidence(nodes[7]!.id, nodes[8]!.id, `/directory/administrativeUnits/${nodes[8]!.id}/members`, [nodes[7]!.id, nodes[8]!.id]) },
+  { id: "70000000-0000-4000-8000-000000000010", tenantId: fixtureTenantId, type: "ASSIGNS_CONSENT_POLICY", sourceId: nodes[10]!.id, targetId: nodes[11]!.id, plainLabel: "Assigns consent policy", permissions: [], evidence: evidence(nodes[10]!.id, nodes[11]!.id, "/policies/authorizationPolicy", [nodes[10]!.id, nodes[11]!.id]) },
+  { id: "70000000-0000-4000-8000-000000000011", tenantId: fixtureTenantId, type: "ACTIVE_IN_ROLE", sourceId: nodes[5]!.id, targetId: nodes[12]!.id, plainLabel: "Active in role", permissions: ["/administrativeUnits/90000000-0000-4000-8000-000000000002"], scope: { directoryScopeId: "/administrativeUnits/90000000-0000-4000-8000-000000000002", objectId: nodes[8]!.id }, evidence: evidence(nodes[5]!.id, nodes[12]!.id, "/roleManagement/directory/roleAssignments", ["94000000-0000-4000-8000-000000000001"]) },
 ];
 
 export const cleanProjectFixture: TenantSnapshot = {
@@ -192,6 +202,12 @@ export const cleanProjectFixture: TenantSnapshot = {
       "/servicePrincipals/{id}/appRoleAssignments",
       "/oauth2PermissionGrants",
       "/applications/{id}/owners",
+      "/devices",
+      "/directory/administrativeUnits",
+      "/directory/administrativeUnits/{id}/members",
+      "/applications/{id}/federatedIdentityCredentials",
+      "/policies/authorizationPolicy",
+      "/policies/permissionGrantPolicies",
     ],
     skippedEndpoints: ["/auditLogs/signIns"],
     errors: [],

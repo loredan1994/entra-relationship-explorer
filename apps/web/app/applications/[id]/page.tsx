@@ -28,6 +28,7 @@ export default async function ApplicationDetailPage({ params }: { params: Promis
   const connections = relationships(snapshot).filter(
     ({ source, target }) => sameApplication.some((node) => node.id === source.id || node.id === target.id),
   );
+  const federatedCredentials = snapshot.nodes.filter((node) => node.kind === "federatedCredential" && sameApplication.some((application) => application.id === node.metadata?.parentId));
 
   return (
     <AppShell>
@@ -44,6 +45,15 @@ export default async function ApplicationDetailPage({ params }: { params: Promis
           <div className="pair-join" aria-label="The blueprint creates the tenant identity"><span>Same application ID</span><i aria-hidden="true">→</i></div>
           <EntityCard title="Tenant identity" microsoftTerm="Enterprise application (service principal)" node={tenantIdentity} />
         </div>
+
+        {federatedCredentials.length > 0 ? (
+          <section className="panel detail-connections">
+            <div className="section-heading"><div><p className="eyebrow">Configured workload trust</p><h2>{federatedCredentials.length} federated identity credential{federatedCredentials.length === 1 ? "" : "s"}</h2></div></div>
+            <div className="connection-list">
+              {federatedCredentials.map((credential) => <article key={credential.id}><div><strong>{credential.label}</strong></div><p><strong>Issuer:</strong> <code>{String(credential.metadata?.issuer ?? "Unavailable")}</code></p><p><strong>Subject:</strong> <code>{String(credential.metadata?.subject ?? "Unavailable")}</code></p><p><strong>Audience:</strong> <code>{String(credential.metadata?.audiences ?? "Unavailable")}</code></p><p className="trust-note">Configured trust does not prove a matching external token was issued or used.</p></article>)}
+            </div>
+          </section>
+        ) : null}
 
         <section className="panel detail-connections">
           <div className="section-heading"><div><p className="eyebrow">Connected facts</p><h2>{connections.length} explainable relationships</h2></div></div>

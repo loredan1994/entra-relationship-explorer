@@ -17,7 +17,7 @@ export function toAttackFlow(snapshot: TenantSnapshot, path: AttackPath): Attack
     created: timestamp,
     modified: timestamp,
     name: item.relationship.replaceAll("_", " ").toLocaleLowerCase(),
-    description: `${item.explanation} Evidence endpoint: ${item.sourceEndpoint}. Source object: ${item.source.id}. Target object: ${item.target.id}. Evidence class: ${item.evidenceClass}.`,
+    description: `${item.explanation} Evidence endpoint: ${item.sourceEndpoint}. Source object: ${item.source.id}. Target object: ${item.target.id}. Evidence class: ${item.evidenceClass}. Completeness: ${item.completeness}.${item.scope ? ` Directory scope: ${item.scope.directoryScopeId}. Scope object: ${item.scope.objectId ?? "unresolved"}.` : ""}`,
     ...(actionIds[index + 1] ? { effect_refs: [actionIds[index + 1]] } : {}),
     extensions,
   }));

@@ -61,10 +61,11 @@ describe("Phase 1 configuration boundary", () => {
   });
 
   it("adds only explicitly requested optional read-only evidence scopes", () => {
-    const config = parseEntraConfig({ ...validEnvironment, ENTRA_OPTIONAL_GRAPH_SCOPES: "RoleManagement.Read.Directory Policy.Read.All AuditLog.Read.All" });
+    const config = parseEntraConfig({ ...validEnvironment, ENTRA_OPTIONAL_GRAPH_SCOPES: "RoleManagement.Read.Directory Policy.Read.All Policy.Read.PermissionGrant AuditLog.Read.All" });
     if (!config.enabled) throw new Error("Expected live config");
     expect(config.graphScopes).toContain("https://graph.microsoft.com/RoleManagement.Read.Directory");
     expect(config.graphScopes).toContain("https://graph.microsoft.com/Policy.Read.All");
+    expect(config.graphScopes).toContain("https://graph.microsoft.com/Policy.Read.PermissionGrant");
     expect(config.graphScopes).toContain("https://graph.microsoft.com/AuditLog.Read.All");
     expect(() => parseEntraConfig({ ...validEnvironment, ENTRA_OPTIONAL_GRAPH_SCOPES: "Sites.Read.All" })).toThrow(/optional|approved/i);
   });

@@ -58,12 +58,14 @@ The current implementation reads:
 - `/servicePrincipals/{id}/owners`
 - optional `/roleManagement/directory/roleDefinitions`, `/roleAssignments`, and `/roleEligibilitySchedules`
 - optional `/identity/conditionalAccess/policies`
+- core `/devices`, `/directory/administrativeUnits`, administrative-unit members, and federated identity credentials
+- optional `/policies/authorizationPolicy` and `/policies/permissionGrantPolicies` with include/exclude conditions
 - optional `/policies/crossTenantAccessPolicy/partners`
 - optional `/auditLogs/signIns` with a 30-day filter
 
 Every request, including a continuation link, is HTTPS GET-only to the exact `graph.microsoft.com` origin and `/v1.0/` path. The transport honors server throttling guidance with bounded retries and also caps pages, items, request time, and scanner concurrency. Failed endpoints are recorded as an explicit partial result. Do not infer a complete edge when source objects are incomplete; mark it unresolved.
 
-The default consent excludes optional evidence. `RoleManagement.Read.Directory`, `Policy.Read.All`, and `AuditLog.Read.All` are separately allowlisted and collected only when explicitly configured. Activity reads include a server-enforced 30-day timestamp filter; cross-tenant partner settings use `Policy.Read.All`, the documented least-privileged read permission.
+The default consent excludes optional evidence. `RoleManagement.Read.Directory`, `Policy.Read.All`, `Policy.Read.PermissionGrant`, and `AuditLog.Read.All` are separately allowlisted and collected only when explicitly configured. Activity reads include a server-enforced 30-day timestamp filter; authorization and cross-tenant partner settings use `Policy.Read.All`, while consent-policy detail uses `Policy.Read.PermissionGrant`.
 
 ## API shape
 

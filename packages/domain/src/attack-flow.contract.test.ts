@@ -18,13 +18,13 @@ function fixedPath(): AttackPath {
     steps: [
       {
         index: 0, edgeId: "edge-owns", source: { id: "user-1", label: "Maya Chen" }, target: { id: "sp-1", label: "Orchestrator" },
-        relationship: "OWNS", permissions: [], evidenceClass: "configured", sourceEndpoint: "/applications/app-1/owners",
+        relationship: "OWNS", permissions: [], evidenceClass: "configured", sourceEndpoint: "/applications/app-1/owners", completeness: "complete",
         explanation: "Maya Chen owns Orchestrator.",
       },
       {
         index: 1, edgeId: "edge-call", source: { id: "sp-1", label: "Orchestrator" }, target: { id: "sp-graph", label: "Microsoft Graph" },
         relationship: "CAN_CALL_AS_APP", permissions: ["Directory.ReadWrite.All"], evidenceClass: "configured",
-        sourceEndpoint: "/servicePrincipals/sp-graph/appRoleAssignedTo",
+        sourceEndpoint: "/servicePrincipals/sp-graph/appRoleAssignedTo", completeness: "complete",
         explanation: "Orchestrator is configured to call Microsoft Graph as the application.",
       },
     ],
@@ -154,8 +154,18 @@ describe("flow narrative", () => {
     expect(actionObjects()[1]!.description).toBe(
       "Orchestrator is configured to call Microsoft Graph as the application. " +
       "Evidence endpoint: /servicePrincipals/sp-graph/appRoleAssignedTo. " +
-      "Source object: sp-1. Target object: sp-graph. Evidence class: configured.",
+      "Source object: sp-1. Target object: sp-graph. Evidence class: configured. Completeness: complete.",
     );
+  });
+
+  it("preserves directory scope in an exported action", () => {
+    const scoped = toAttackFlow(snap(), { ...fixedPath(), steps: [{ ...fixedPath().steps[0]!, scope: { directoryScopeId: "/administrativeUnits/au-1", objectId: "au-1" } }] });
+    expect(scoped.objects[1]?.description).toContain("Directory scope: /administrativeUnits/au-1. Scope object: au-1.");
+  });
+
+  it("labels an unresolved scope explicitly", () => {
+    const scoped = toAttackFlow(snap(), { ...fixedPath(), steps: [{ ...fixedPath().steps[0]!, scope: { directoryScopeId: "/administrativeUnits/missing", objectId: null } }] });
+    expect(scoped.objects[1]?.description).toContain("Scope object: unresolved.");
   });
 
   it("stamps every object with the snapshot scan time", () => {

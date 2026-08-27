@@ -9,6 +9,13 @@ function client(fetchImpl: typeof fetch, options = {}) {
 }
 
 describe("access token handling", () => {
+  it("reads singleton Graph resources through the same GET-only transport", async () => {
+    const fetchImpl = vi.fn<typeof fetch>().mockResolvedValue(jsonResponse({ id: "authorizationPolicy", displayName: "Authorization policy" }));
+    await expect(client(fetchImpl).getOne<{ id: string }>("/policies/authorizationPolicy")).resolves.toEqual({ id: "authorizationPolicy", displayName: "Authorization policy" });
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    expect(fetchImpl.mock.calls[0]?.[1]?.method).toBe("GET");
+  });
+
   it("refuses an empty or whitespace-only static token at construction", () => {
     expect(() => new ReadOnlyGraphClient("")).toThrow(/access token is required/);
     expect(() => new ReadOnlyGraphClient("   ")).toThrow(/access token is required/);

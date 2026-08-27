@@ -1,7 +1,7 @@
 import type { TenantSnapshot } from "@entra-explorer/domain";
 
 export type ScanJobStatus = "queued" | "running" | "complete" | "failed" | "cancel_requested" | "cancelled";
-export type ScanJobStage = "applications" | "servicePrincipals" | "usersAndGroups" | "groupMemberships" | "appRoleAssignments" | "delegatedPermissionGrants" | "owners" | "roles" | "conditionalAccess" | "crossTenantAccess" | "activity" | "normalizing" | "complete";
+export type ScanJobStage = "applications" | "servicePrincipals" | "federatedIdentityCredentials" | "usersAndGroups" | "groupMemberships" | "devices" | "administrativeUnits" | "appRoleAssignments" | "delegatedPermissionGrants" | "owners" | "roles" | "conditionalAccess" | "authorizationPolicy" | "permissionGrantPolicies" | "crossTenantAccess" | "activity" | "normalizing" | "complete";
 
 export interface DurableSession {
   id: string;
