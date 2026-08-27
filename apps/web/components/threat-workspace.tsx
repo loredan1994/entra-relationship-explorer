@@ -7,6 +7,7 @@ import { useEffect, useMemo, useState } from "react";
 type Disposition = "open" | "mitigating" | "accepted" | "resolved";
 interface FlowDraftStep { id: string; title: string; evidenceEdgeId: string | null; }
 interface ReviewRecord { disposition: Disposition; owner: string; expiresAt: string; assumption: string; flowDraft: FlowDraftStep[]; }
+interface SaveState { status: "idle" | "saving" | "saved" | "error"; message?: string; }
 const EMPTY: ReviewRecord = { disposition: "open", owner: "", expiresAt: "", assumption: "", flowDraft: [] };
 const severityOrder = { critical: 0, high: 1, medium: 2, low: 3 } as const;
 const evidenceLabel = { configured: "Configured access", observed: "Observed activity", inferred: "Inferred possibility", missing: "Missing evidence" } as const;
@@ -16,6 +17,7 @@ export function ThreatWorkspace({ intelligence, tenantLabel, snapshotId, complet
   const [selectedId, setSelectedId] = useState(intelligence.findings[0]?.id ?? "");
   const [records, setRecords] = useState<Record<string, ReviewRecord>>({});
   const [pendingReview, setPendingReview] = useState<{ id: string; record: ReviewRecord } | null>(null);
+  const [saveState, setSaveState] = useState<SaveState>({ status: "idle" });
   const [filter, setFilter] = useState<"all" | "critical" | "high" | "medium" | "missing">("all");
   useEffect(() => {
     try { setRecords(JSON.parse(window.localStorage.getItem(storageKey) ?? "{}") as Record<string, ReviewRecord>); } catch { setRecords({}); }
@@ -30,10 +32,22 @@ export function ThreatWorkspace({ intelligence, tenantLabel, snapshotId, complet
       if (payload.review) setRecords((current) => ({ ...current, [selectedId]: { disposition: payload.review!.disposition, owner: payload.review!.owner, expiresAt: payload.review!.expiresAt ?? "", assumption: payload.review!.assumption, flowDraft: payload.review!.flowDraft ?? [] } }));
     });
   }, [persistence, selectedId]);
+  // The panel has no save button: every edit is written to the tenant record
+  // after a short debounce. A rejected write (a disposition the server refuses,
+  // an expired session, an unreachable backend) must never look like a saved
+  // decision, so the outcome of that request is always reported here.
   useEffect(() => {
     if (persistence !== "server" || !pendingReview) return;
-    const timer = window.setTimeout(() => { void fetch(`/api/v1/threat-reviews/${encodeURIComponent(pendingReview.id)}`, { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify(pendingReview.record) }); }, 350);
-    return () => window.clearTimeout(timer);
+    let cancelled = false;
+    const timer = window.setTimeout(() => {
+      void fetch(`/api/v1/threat-reviews/${encodeURIComponent(pendingReview.id)}`, { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify(pendingReview.record) }).then(async (response) => {
+        if (cancelled) return;
+        if (response.ok) { setSaveState({ status: "saved" }); return; }
+        const payload = await response.json().catch(() => null) as { error?: string } | null;
+        setSaveState({ status: "error", message: payload?.error ?? `The tenant record rejected this change (HTTP ${response.status}). It is kept in this browser only.` });
+      }).catch(() => { if (!cancelled) setSaveState({ status: "error", message: "The tenant record is unreachable. This decision is kept in this browser only." }); });
+    }, 350);
+    return () => { cancelled = true; window.clearTimeout(timer); };
   }, [pendingReview, persistence]);
   const visible = useMemo(() => intelligence.findings.filter((finding) => filter === "all" || (filter === "missing" ? finding.evidenceClass === "missing" : finding.severity === filter)).sort((a, b) => severityOrder[a.severity] - severityOrder[b.severity] || a.title.localeCompare(b.title)), [filter, intelligence.findings]);
   const selected = intelligence.findings.find((finding) => finding.id === selectedId) ?? visible[0] ?? intelligence.findings[0];
@@ -47,8 +61,9 @@ export function ThreatWorkspace({ intelligence, tenantLabel, snapshotId, complet
       if (persistence === "server") setPendingReview({ id: selected.id, record: next[selected.id]! });
       return next;
     });
+    setSaveState(persistence === "server" ? { status: "saving" } : { status: "saved" });
   }
-  function selectFinding(id: string) { setSelectedId(id); window.localStorage.setItem(`${storageKey}:selected`, id); }
+  function selectFinding(id: string) { setSelectedId(id); setSaveState({ status: "idle" }); window.localStorage.setItem(`${storageKey}:selected`, id); }
   function beginFlowDraft() { if (!selectedPath) return; updateRecord({ flowDraft: selectedPath.steps.map((item) => ({ id: item.edgeId, title: item.explanation, evidenceEdgeId: item.edgeId })) }); }
   function updateFlowStep(index: number, patch: Partial<FlowDraftStep>) { updateRecord({ flowDraft: record.flowDraft.map((item, itemIndex) => itemIndex === index ? { ...item, ...patch } : item) }); }
   function moveFlowStep(index: number, offset: -1 | 1) { const target = index + offset; if (target < 0 || target >= record.flowDraft.length) return; const next = [...record.flowDraft]; const item = next[index]!; next[index] = next[target]!; next[target] = item; updateRecord({ flowDraft: next }); }
@@ -68,7 +83,7 @@ export function ThreatWorkspace({ intelligence, tenantLabel, snapshotId, complet
         <div className="finding-columns"><div><section className="detail-section"><h3>Why this matters</h3><p>{selected.whyItMatters}</p></section>
           {selectedPath ? <section className="detail-section"><div className="section-heading compact"><div><h3>Multi-stage attack flow</h3><p>{selectedPath.confidence} confidence · {record.flowDraft.length || selectedPath.steps.length} {record.flowDraft.length ? "review" : "configured"} steps</p></div>{record.flowDraft.length === 0 ? <button type="button" className="text-button" onClick={beginFlowDraft}>Edit a review copy</button> : <button type="button" className="text-button" onClick={() => updateRecord({ flowDraft: [] })}>Reset to evidence</button>}</div>{record.flowDraft.length > 0 ? <ol className="attack-flow flow-editor">{record.flowDraft.map((item, index) => <li key={item.id}><span>{index + 1}</span><div><label>Step narrative<input value={item.title} onChange={(event) => updateFlowStep(index, { title: event.target.value })} /></label><small>{item.evidenceEdgeId ? `Evidence edge: ${item.evidenceEdgeId}` : "Analyst-authored step; no evidence edge"}</small><div className="flow-controls"><button type="button" onClick={() => moveFlowStep(index, -1)} disabled={index === 0}>Move up</button><button type="button" onClick={() => moveFlowStep(index, 1)} disabled={index === record.flowDraft.length - 1}>Move down</button><button type="button" onClick={() => updateRecord({ flowDraft: record.flowDraft.filter((_, itemIndex) => itemIndex !== index) })}>Remove</button></div></div></li>)}</ol> : <ol className="attack-flow">{selectedPath.steps.map((item) => <li key={item.edgeId}><span>{item.index + 1}</span><div><strong>{item.explanation}</strong>{item.permissions.length ? <p className="mono">{item.permissions.join(" · ")}</p> : null}<small>{item.source.id} → {item.target.id}</small><code>{item.sourceEndpoint}</code></div></li>)}</ol>}{record.flowDraft.length > 0 ? <button type="button" className="button button-secondary" onClick={() => updateRecord({ flowDraft: [...record.flowDraft, { id: `analyst-${Date.now()}`, title: "Describe the analyst-authored step", evidenceEdgeId: null }] })}>Add analyst step</button> : null}<div className="attack-tags">{selectedPath.attackMappings.map((mapping) => <span key={mapping.id}>{mapping.id} · {mapping.name}</span>)}</div></section> : null}
           <section className="detail-section"><h3>Recommended action</h3><ol className="remediation-list">{selected.remediation.map((item) => <li key={item}>{item}</li>)}</ol></section><section className="detail-section uncertainty"><h3>Residual uncertainty</h3>{selected.uncertainty.map((item) => <p key={item}>{item}</p>)}</section></div>
-          <aside className="review-panel" aria-label="Finding decision"><p className="eyebrow">Decision record</p><h3>Review this risk</h3><label>Status<select value={record.disposition} onChange={(event) => updateRecord({ disposition: event.target.value as Disposition })}><option value="open">Open</option><option value="mitigating">Mitigating</option><option value="accepted">Accepted</option><option value="resolved">Resolved</option></select></label><label>Owner<input value={record.owner} onChange={(event) => updateRecord({ owner: event.target.value })} placeholder="Team or person" /></label><label>Review / acceptance expiry<input type="date" value={record.expiresAt} onChange={(event) => updateRecord({ expiresAt: event.target.value })} /></label><label>Assumptions and notes<textarea rows={6} value={record.assumption} onChange={(event) => updateRecord({ assumption: event.target.value })} placeholder="What must remain true? Why is this accepted or mitigated?" /></label><p className="local-record-note"><strong>{persistence === "server" ? "Encrypted and tenant-scoped." : "Saved in this browser only."}</strong> Review decisions never modify Microsoft Entra.{persistence === "server" ? " Authenticated team members in this tenant share the PostgreSQL record." : " Connect a tenant to share decision records with your team."}</p><dl><div><dt>Tenant</dt><dd>{tenantLabel}</dd></div><div><dt>Snapshot</dt><dd><code>{snapshotId}</code></dd></div><div><dt>Finding ID</dt><dd><code>{selected.id}</code></dd></div></dl></aside>
+          <aside className="review-panel" aria-label="Finding decision"><p className="eyebrow">Decision record</p><h3>Review this risk</h3><label>Status<select value={record.disposition} onChange={(event) => updateRecord({ disposition: event.target.value as Disposition })}><option value="open">Open</option><option value="mitigating">Mitigating</option><option value="accepted">Accepted</option><option value="resolved">Resolved</option></select></label><label>Owner<input value={record.owner} onChange={(event) => updateRecord({ owner: event.target.value })} placeholder="Team or person" /></label><label>Review / acceptance expiry<input type="date" value={record.expiresAt} onChange={(event) => updateRecord({ expiresAt: event.target.value })} /></label><label>Assumptions and notes<textarea rows={6} value={record.assumption} onChange={(event) => updateRecord({ assumption: event.target.value })} placeholder="What must remain true? Why is this accepted or mitigated?" /></label><p className={`record-save-state ${saveState.status}`} role="status" aria-live="polite">{saveState.status === "saving" ? "Saving the decision…" : saveState.status === "saved" ? (persistence === "server" ? "Decision registered in the tenant record." : "Decision saved in this browser.") : saveState.status === "error" ? saveState.message : "There is no save button: every change is registered as you make it. Accepting a risk requires an owner, an expiry date, and a rationale."}</p><p className="local-record-note"><strong>{persistence === "server" ? "Encrypted and tenant-scoped." : "Saved in this browser only."}</strong> Review decisions never modify Microsoft Entra.{persistence === "server" ? " Authenticated team members in this tenant share the PostgreSQL record." : " Connect a tenant to share decision records with your team."}</p><dl><div><dt>Tenant</dt><dd>{tenantLabel}</dd></div><div><dt>Snapshot</dt><dd><code>{snapshotId}</code></dd></div><div><dt>Finding ID</dt><dd><code>{selected.id}</code></dd></div></dl></aside>
         </div>
       </> : <div className="map-empty compact"><h2>No findings match</h2><p>Clear the current filter to return to the prioritized queue.</p></div>}</section>
     </div>

@@ -492,6 +492,10 @@ button, a, input { -webkit-tap-highlight-color: transparent; }
 .review-panel input, .review-panel select, .review-panel textarea { width: 100%; margin-top: 6px; padding: 9px 10px; color: var(--ink-strong); background: #fff; border: 1px solid #cbd5e1; border-radius: 4px; font: inherit; font-weight: 400; }
 .review-panel textarea { resize: vertical; }
 .local-record-note { padding: 10px; color: #536175; background: #eaf1ff; border-radius: 4px; font-size: 10px; }
+.record-save-state { margin: 4px 0 10px; padding: 8px 10px; border-radius: 4px; font-size: 10px; font-weight: 700; color: #536175; background: #eef1f5; }
+.record-save-state.saving { color: #435168; background: #edf3ff; }
+.record-save-state.saved { color: var(--success); background: #e6f5f0; }
+.record-save-state.error { color: #a22929; background: #feebeb; }
 .review-panel dl { margin-top: 22px; padding-top: 12px; border-top: 1px solid var(--line-light); }
 .review-panel dl > div { margin: 9px 0; }
 .review-panel dt { color: var(--ink-muted); font-size: 10px; }
