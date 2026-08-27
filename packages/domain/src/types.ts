@@ -1,4 +1,4 @@
-export type NodeKind = "application" | "servicePrincipal" | "managedIdentity" | "user" | "group" | "appRole" | "directoryRole" | "policy" | "externalTenant";
+export type NodeKind = "application" | "servicePrincipal" | "managedIdentity" | "user" | "group" | "device" | "administrativeUnit" | "federatedCredential" | "appRole" | "directoryRole" | "policy" | "externalTenant";
 
 export type RelationshipType =
   | "INSTANTIATES_AS"
@@ -8,9 +8,12 @@ export type RelationshipType =
   | "EXPOSES_APP_ROLE"
   | "GRANTED_APP_ROLE"
   | "MEMBER_OF"
+  | "IN_ADMINISTRATIVE_UNIT"
+  | "FEDERATES_AS"
   | "ACTIVE_IN_ROLE"
   | "ELIGIBLE_FOR_ROLE"
   | "GOVERNED_BY"
+  | "ASSIGNS_CONSENT_POLICY"
   | "CROSS_TENANT_ACCESS"
   | "OWNS"
   | "OBSERVED_CALL";
@@ -65,6 +68,10 @@ export interface RelationshipEdge {
   targetId: string;
   plainLabel: string;
   permissions: string[];
+  scope?: {
+    directoryScopeId: string;
+    objectId: string | null;
+  };
   evidence: RelationshipEvidence;
 }
 

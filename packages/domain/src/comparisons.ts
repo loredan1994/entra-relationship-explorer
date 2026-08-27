@@ -76,7 +76,7 @@ function nodeLabel(node: DirectoryNode): string {
 }
 
 function nodeFingerprint(node: DirectoryNode): string {
-  return JSON.stringify({ kind: node.kind, label: node.label, description: node.description, appId: node.appId, publisher: node.publisher, ownerIds: [...node.ownerIds].sort(), credential: node.credential, risk: node.risk });
+  return JSON.stringify({ kind: node.kind, label: node.label, description: node.description, appId: node.appId, publisher: node.publisher, metadata: node.metadata, ownerIds: [...node.ownerIds].sort(), credential: node.credential, risk: node.risk });
 }
 
 function edgeLabel(edge: RelationshipEdge): string {
@@ -84,5 +84,5 @@ function edgeLabel(edge: RelationshipEdge): string {
 }
 
 function edgeFingerprint(edge: RelationshipEdge): string {
-  return JSON.stringify({ type: edge.type, sourceId: edge.sourceId, targetId: edge.targetId, permissions: [...edge.permissions].sort(), configured: edge.evidence.configured, sourceEndpoint: edge.evidence.sourceEndpoint, sourceRecordIds: [...edge.evidence.sourceRecordIds].sort(), completeness: edge.evidence.completeness });
+  return JSON.stringify({ type: edge.type, sourceId: edge.sourceId, targetId: edge.targetId, permissions: [...edge.permissions].sort(), scope: edge.scope, configured: edge.evidence.configured, sourceEndpoint: edge.evidence.sourceEndpoint, sourceRecordIds: [...edge.evidence.sourceRecordIds].sort(), completeness: edge.evidence.completeness });
 }

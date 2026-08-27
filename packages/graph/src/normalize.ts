@@ -10,11 +10,16 @@ import {
 import type {
   GraphAppRole,
   GraphAppRoleAssignment,
+  GraphAdministrativeUnit,
   GraphApplication,
+  GraphAuthorizationPolicy,
   GraphConditionalAccessPolicy,
   GraphCredentialMetadata,
   GraphCrossTenantPartner,
   GraphDirectoryObject,
+  GraphDevice,
+  GraphFederatedIdentityCredential,
+  GraphPermissionGrantPolicy,
   GraphRoleDefinition,
   GraphServicePrincipal,
   RawTenantScan,
@@ -76,19 +81,34 @@ function addApplicationNodes(nodes: Map<string, DirectoryNode>, raw: RawTenantSc
       nodes.set(node.id, node);
     }
   }
+  for (const credential of raw.federatedIdentityCredentials ?? []) {
+    const node = federatedCredentialNode(credential.record, credential.parentId, credential.parentType, raw.tenantId);
+    nodes.set(node.id, node);
+  }
 }
 
 /** The people and groups the scan listed, including members it met only through a group. */
 function addDirectoryNodes(nodes: Map<string, DirectoryNode>, raw: RawTenantScan): void {
   for (const { record } of raw.users ?? []) ensureDirectoryObjectNode(nodes, record, raw.tenantId);
   for (const { record } of raw.groups ?? []) ensureDirectoryObjectNode(nodes, record, raw.tenantId);
+  for (const { record } of raw.devices ?? []) nodes.set(record.id, deviceNode(record, raw.tenantId));
   for (const membership of raw.groupMemberships ?? []) ensureDirectoryObjectNode(nodes, membership.record, raw.tenantId);
+  for (const membership of raw.administrativeUnitMemberships ?? []) ensureDirectoryObjectNode(nodes, membership.record, raw.tenantId);
 }
 
 /** Administrative roles, Conditional Access policies, and partner tenants with their policies. */
 function addGovernanceNodes(nodes: Map<string, DirectoryNode>, raw: RawTenantScan): void {
   for (const { record } of raw.roleDefinitions ?? []) nodes.set(record.id, directoryRoleNode(record, raw.tenantId));
+  for (const { record } of raw.administrativeUnits ?? []) nodes.set(record.id, administrativeUnitNode(record, raw.tenantId));
   for (const { record } of raw.conditionalAccessPolicies ?? []) nodes.set(record.id, conditionalAccessPolicyNode(record, raw.tenantId));
+  for (const { record } of raw.authorizationPolicies ?? []) nodes.set(record.id, authorizationPolicyNode(record, raw.tenantId));
+  for (const { record } of raw.permissionGrantPolicies ?? []) nodes.set(record.id, permissionGrantPolicyNode(record, raw));
+  for (const { record } of raw.authorizationPolicies ?? []) {
+    for (const assignment of record.defaultUserRolePermissions?.permissionGrantPoliciesAssigned ?? []) {
+      const policyId = consentPolicyId(assignment);
+      if (!nodes.has(policyId)) nodes.set(policyId, unresolvedPermissionGrantPolicyNode(policyId, raw.tenantId));
+    }
+  }
   for (const { record } of raw.crossTenantPartners ?? []) {
     for (const node of partnerNodes(record, raw.tenantId)) nodes.set(node.id, node);
   }
@@ -113,8 +133,11 @@ function collectEdges(raw: RawTenantScan, nodes: Map<string, DirectoryNode>): Re
     ...delegatedGrantEdges(raw, nodes),
     ...ownershipEdges(raw, nodes),
     ...membershipEdges(raw, nodes),
+    ...administrativeUnitMembershipEdges(raw, nodes),
+    ...federationEdges(raw, nodes),
     ...roleEdges(raw, nodes),
     ...policyEdges(raw, nodes),
+    ...consentPolicyEdges(raw, nodes),
     ...activityEdges(raw, nodes),
     ...crossTenantEdges(raw),
   ];
@@ -163,6 +186,34 @@ function directoryRoleNode(record: GraphRoleDefinition, tenantId: string): Direc
     metadata: { templateId: record.templateId ?? null, isBuiltIn: record.isBuiltIn ?? false },
     risk: { level: "review", reason: "Administrative role membership can provide privileged directory access." },
   };
+}
+
+function deviceNode(record: GraphDevice, tenantId: string): DirectoryNode {
+  const disabled = record.accountEnabled === false;
+  return { id: record.id, tenantId, kind: "device", label: record.displayName?.trim() || `Device ${record.deviceId.slice(0, 8)}`, description: "Directory device collected from Microsoft Graph.", ownerIds: [], metadata: { deviceId: record.deviceId, accountEnabled: record.accountEnabled ?? null, compliant: record.isCompliant ?? null, managed: record.isManaged ?? null, managementRestricted: record.isManagementRestricted ?? null, operatingSystem: record.operatingSystem ?? null, operatingSystemVersion: record.operatingSystemVersion ?? null, profileType: record.profileType ?? null, registrationDateTime: record.registrationDateTime ?? null, trustType: record.trustType ?? null }, risk: { level: disabled ? "low" : "review", reason: disabled ? "The directory device is disabled." : "Device posture is inventory evidence and must be interpreted with management and compliance context." } };
+}
+
+function administrativeUnitNode(record: GraphAdministrativeUnit, tenantId: string): DirectoryNode {
+  return { id: record.id, tenantId, kind: "administrativeUnit", label: record.displayName?.trim() || `Administrative unit ${record.id.slice(0, 8)}`, description: record.description?.trim() || "Administrative unit (directory scope) collected from Microsoft Graph.", ownerIds: [], metadata: { memberManagementRestricted: record.isMemberManagementRestricted ?? null, membershipType: record.membershipType ?? null, membershipRuleProcessingState: record.membershipRuleProcessingState ?? null, visibility: record.visibility ?? null }, risk: { level: "low", reason: "Administrative units scope directory membership and role assignments; presence alone is not a risk finding." } };
+}
+
+function federatedCredentialNode(record: GraphFederatedIdentityCredential, parentId: string, parentType: "application" | "managedIdentity", tenantId: string): DirectoryNode {
+  return { id: federatedCredentialNodeId(parentId, record.id), tenantId, kind: "federatedCredential", label: record.name, description: "Federated identity credential (workload trust) collected from Microsoft Graph.", ownerIds: [], metadata: { credentialId: record.id, parentId, parentType, issuer: record.issuer, subject: record.subject, audiences: record.audiences.join(", "), description: record.description ?? null }, risk: { level: "review", reason: "A matching external token can authenticate as the configured workload identity; configured trust does not prove token issuance or use." } };
+}
+
+function authorizationPolicyNode(record: GraphAuthorizationPolicy, tenantId: string): DirectoryNode {
+  const assignments = record.defaultUserRolePermissions?.permissionGrantPoliciesAssigned ?? [];
+  return { id: record.id, tenantId, kind: "policy", label: record.displayName, description: "Tenant authorization policy collected from Microsoft Graph.", ownerIds: [], metadata: { policyType: "authorization", allowInvitesFrom: record.allowInvitesFrom ?? null, emailVerifiedUsersCanJoin: record.allowEmailVerifiedUsersToJoinOrganization ?? null, blockMsolPowerShell: record.blockMsolPowerShell ?? null, allowedToCreateApps: record.defaultUserRolePermissions?.allowedToCreateApps ?? null, allowedToCreateSecurityGroups: record.defaultUserRolePermissions?.allowedToCreateSecurityGroups ?? null, allowedToCreateTenants: record.defaultUserRolePermissions?.allowedToCreateTenants ?? null, allowedToReadBitlockerKeysForOwnedDevice: record.defaultUserRolePermissions?.allowedToReadBitlockerKeysForOwnedDevice ?? null, allowedToReadOtherUsers: record.defaultUserRolePermissions?.allowedToReadOtherUsers ?? null, permissionGrantPoliciesAssigned: assignments.join(", "), userConsentState: assignments.length === 0 ? "disabled" : "configured" }, risk: { level: assignments.some((item) => item === "ManagePermissionGrantsForSelf.microsoft-user-default-legacy") ? "high" : "low", reason: assignments.length === 0 ? "User consent is disabled by the default authorization policy." : "User consent policy assignments require review in context." } };
+}
+
+function permissionGrantPolicyNode(record: GraphPermissionGrantPolicy, raw: RawTenantScan): DirectoryNode {
+  const includes = (raw.permissionGrantPolicyIncludes ?? []).filter((item) => item.policyId === record.id);
+  const excludes = (raw.permissionGrantPolicyExcludes ?? []).filter((item) => item.policyId === record.id);
+  return { id: record.id, tenantId: raw.tenantId, kind: "policy", label: record.displayName, description: record.description?.trim() || "Permission grant policy (consent policy) collected from Microsoft Graph.", ownerIds: [], metadata: { policyType: "permissionGrant", includeCount: includes.length, excludeCount: excludes.length, permissionClassifications: unique(includes.map((item) => item.record.permissionClassification).filter((item): item is string => Boolean(item))).join(", ") || "none", permissionTypes: unique(includes.map((item) => item.record.permissionType).filter((item): item is string => Boolean(item))).join(", ") || "none", verifiedPublishersOnly: includes.length > 0 && includes.every((item) => item.record.clientApplicationsFromVerifiedPublisherOnly === true), coverage: "complete" }, risk: { level: record.id === "microsoft-user-default-legacy" ? "high" : "low", reason: record.id === "microsoft-user-default-legacy" ? "This built-in policy permits broad user consent when assigned." : "Consent policy conditions require contextual review." } };
+}
+
+function unresolvedPermissionGrantPolicyNode(id: string, tenantId: string): DirectoryNode {
+  return { id, tenantId, kind: "policy", label: id, description: "Assigned permission grant policy whose detail was not collected.", ownerIds: [], metadata: { policyType: "permissionGrant", coverage: "unresolved" }, risk: { level: "review", reason: "The policy assignment is known, but its include and exclude conditions are unavailable." } };
 }
 
 function conditionalAccessPolicyNode(record: GraphConditionalAccessPolicy, tenantId: string): DirectoryNode {
@@ -228,6 +279,7 @@ function partnerNodes(record: GraphCrossTenantPartner, tenantId: string): [Direc
 }
 
 function appRoleNodeId(resourceId: string, roleId: string): string { return `app-role:${resourceId}:${roleId}`; }
+function federatedCredentialNodeId(parentId: string, credentialId: string): string { return `federated-credential:${parentId}:${credentialId}`; }
 
 function appRoleEdges(raw: RawTenantScan): RelationshipEdge[] {
   const exposed = raw.servicePrincipals.flatMap(({ record, endpoint }) => record.appRoles.map((role) => { const roleId = appRoleNodeId(record.id, role.id); return { id: stableId("exposes-role", roleId), tenantId: raw.tenantId, type: "EXPOSES_APP_ROLE" as const, sourceId: record.id, targetId: roleId, plainLabel: "Exposes app role", permissions: [role.value || role.displayName || role.id], evidence: { configured: true, observed: null, scannedAt: raw.scannedAt, sourceEndpoint: endpoint, sourceRecordIds: [record.id, role.id], sourceObjectId: record.id, targetObjectId: roleId, completeness: "complete" as const } }; }));
@@ -256,8 +308,17 @@ function roleEdges(raw: RawTenantScan, nodes: Map<string, DirectoryNode>): Relat
     // Stryker disable next-line ConditionalExpression: ensureDirectoryObjectNode returns an existing node untouched, so the guard only avoids the call.
     if (!nodes.has(item.record.principalId)) ensureDirectoryObjectNode(nodes, { id: item.record.principalId }, raw.tenantId);
     if (!nodes.has(item.record.roleDefinitionId)) return [];
-    return [{ id: stableId("role", item.record.id), tenantId: raw.tenantId, type: item.type, sourceId: item.record.principalId, targetId: item.record.roleDefinitionId, plainLabel: item.label, permissions: item.record.directoryScopeId ? [item.record.directoryScopeId] : [], evidence: { configured: true, observed: null, scannedAt: raw.scannedAt, sourceEndpoint: item.endpoint, sourceRecordIds: [item.record.id], sourceObjectId: item.record.principalId, targetObjectId: item.record.roleDefinitionId, completeness: "complete" as const } }];
+    const directoryScopeId = item.record.directoryScopeId || "/";
+    const scopedUnitId = administrativeUnitScopeId(directoryScopeId);
+    const objectId = scopedUnitId && nodes.get(scopedUnitId)?.kind === "administrativeUnit" ? scopedUnitId : null;
+    const completeness = directoryScopeId === "/" || objectId ? "complete" as const : "unresolved" as const;
+    return [{ id: stableId("role", item.record.id), tenantId: raw.tenantId, type: item.type, sourceId: item.record.principalId, targetId: item.record.roleDefinitionId, plainLabel: item.label, permissions: item.record.directoryScopeId ? [directoryScopeId] : [], scope: { directoryScopeId, objectId }, evidence: { configured: true, observed: null, scannedAt: raw.scannedAt, sourceEndpoint: item.endpoint, sourceRecordIds: [item.record.id], sourceObjectId: item.record.principalId, targetObjectId: item.record.roleDefinitionId, completeness } }];
   });
+}
+
+function administrativeUnitScopeId(directoryScopeId: string): string | null {
+  const match = /^\/administrativeUnits\/([^/]+)$/i.exec(directoryScopeId);
+  return match?.[1] ?? null;
 }
 
 function policyEdges(raw: RawTenantScan, nodes: Map<string, DirectoryNode>): RelationshipEdge[] {
@@ -267,6 +328,21 @@ function policyEdges(raw: RawTenantScan, nodes: Map<string, DirectoryNode>): Rel
     const ids = [...(record.conditions?.users?.includeUsers ?? []), ...(record.conditions?.users?.includeGroups ?? []), ...(record.conditions?.applications?.includeApplications ?? []).map((id) => appObjectByAppId.get(id) ?? id)].filter((id) => !["All", "None", "GuestsOrExternalUsers", "Office365"].includes(id));
     return unique(ids).flatMap((id) => nodes.has(id) ? [{ id: stableId("policy", `${id}:${record.id}`), tenantId: raw.tenantId, type: "GOVERNED_BY" as const, sourceId: id, targetId: record.id, plainLabel: "Governed by", permissions: record.grantControls?.builtInControls ?? [], evidence: { configured: true, observed: null, scannedAt: raw.scannedAt, sourceEndpoint: endpoint, sourceRecordIds: [record.id], sourceObjectId: id, targetObjectId: record.id, completeness: "complete" as const } }] : []);
   });
+}
+
+function consentPolicyEdges(raw: RawTenantScan, nodes: Map<string, DirectoryNode>): RelationshipEdge[] {
+  return (raw.authorizationPolicies ?? []).flatMap(({ record, endpoint }) => (record.defaultUserRolePermissions?.permissionGrantPoliciesAssigned ?? []).flatMap((assignment) => {
+    const policyId = consentPolicyId(assignment);
+    const target = nodes.get(policyId);
+    if (!target) return [];
+    const resolved = target.metadata?.coverage !== "unresolved";
+    return [{ id: stableId("consent-policy", `${record.id}:${policyId}`), tenantId: raw.tenantId, type: "ASSIGNS_CONSENT_POLICY" as const, sourceId: record.id, targetId: policyId, plainLabel: "Assigns consent policy", permissions: [], evidence: { configured: true, observed: null, scannedAt: raw.scannedAt, sourceEndpoint: endpoint, sourceRecordIds: [record.id, policyId], sourceObjectId: record.id, targetObjectId: policyId, completeness: resolved ? "complete" as const : "unresolved" as const } }];
+  }));
+}
+
+function consentPolicyId(assignment: string): string {
+  const prefix = "ManagePermissionGrantsForSelf.";
+  return assignment.startsWith(prefix) ? assignment.slice(prefix.length) : assignment;
 }
 
 function activityEdges(raw: RawTenantScan, nodes: Map<string, DirectoryNode>): RelationshipEdge[] {
@@ -376,6 +452,23 @@ function membershipEdges(raw: RawTenantScan, nodes: Map<string, DirectoryNode>):
       sourceId: source.id, targetId: target.id, plainLabel: "Member of", permissions: [],
       evidence: { configured: true, observed: null, scannedAt: raw.scannedAt, sourceEndpoint: membership.endpoint, sourceRecordIds: [source.id, target.id], sourceObjectId: source.id, targetObjectId: target.id, completeness: membership.record.displayName ? "complete" as const : "partial" as const },
     }];
+  });
+}
+
+function administrativeUnitMembershipEdges(raw: RawTenantScan, nodes: Map<string, DirectoryNode>): RelationshipEdge[] {
+  return (raw.administrativeUnitMemberships ?? []).flatMap((membership) => {
+    const source = ensureDirectoryObjectNode(nodes, membership.record, raw.tenantId);
+    const target = nodes.get(membership.administrativeUnitId);
+    if (!target || target.kind !== "administrativeUnit") return [];
+    return [{ id: stableId("administrative-unit-member", `${source.id}:${target.id}`), tenantId: raw.tenantId, type: "IN_ADMINISTRATIVE_UNIT" as const, sourceId: source.id, targetId: target.id, plainLabel: "In administrative unit", permissions: [], evidence: { configured: true, observed: null, scannedAt: raw.scannedAt, sourceEndpoint: membership.endpoint, sourceRecordIds: [source.id, target.id], sourceObjectId: source.id, targetObjectId: target.id, completeness: membership.record.displayName ? "complete" as const : "partial" as const } }];
+  });
+}
+
+function federationEdges(raw: RawTenantScan, nodes: Map<string, DirectoryNode>): RelationshipEdge[] {
+  return (raw.federatedIdentityCredentials ?? []).flatMap((credential) => {
+    const sourceId = federatedCredentialNodeId(credential.parentId, credential.record.id);
+    if (!nodes.has(sourceId) || !nodes.has(credential.parentId)) return [];
+    return [{ id: stableId("federates", `${sourceId}:${credential.parentId}`), tenantId: raw.tenantId, type: "FEDERATES_AS" as const, sourceId, targetId: credential.parentId, plainLabel: "Can federate as", permissions: [], evidence: { configured: true, observed: null, scannedAt: raw.scannedAt, sourceEndpoint: credential.endpoint, sourceRecordIds: [credential.parentId, credential.record.id], sourceObjectId: sourceId, targetObjectId: credential.parentId, completeness: "complete" as const } }];
   });
 }
 
@@ -536,6 +629,8 @@ function ensureMissingTarget(nodes: Map<string, DirectoryNode>, id: string, labe
 function directoryKind(odataType: string | undefined): NodeKind {
   if (odataType?.endsWith("group")) return "group";
   if (odataType?.endsWith("servicePrincipal")) return "servicePrincipal";
+  if (odataType?.endsWith("device")) return "device";
+  if (odataType?.endsWith("administrativeUnit")) return "administrativeUnit";
   return "user";
 }
 

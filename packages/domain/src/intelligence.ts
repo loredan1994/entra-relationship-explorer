@@ -33,7 +33,7 @@ export interface AttackPath {
 export interface IamFinding {
   id: string;
   title: string;
-  category: "privilege-path" | "oauth-consent" | "application-credential" | "ownership" | "dormant-access" | "guest-exposure" | "managed-identity" | "conditional-access" | "cross-tenant" | "coverage";
+  category: "privilege-path" | "federated-identity" | "consent-policy" | "oauth-consent" | "application-credential" | "ownership" | "dormant-access" | "guest-exposure" | "managed-identity" | "conditional-access" | "cross-tenant" | "coverage";
   severity: FindingSeverity;
   evidenceClass: EvidenceClass;
   summary: string;
@@ -92,7 +92,7 @@ function step(view: RelationshipView, index: number): AttackStep {
 }
 
 function candidateOrigins(snapshot: TenantSnapshot): DirectoryNode[] {
-  return snapshot.nodes.filter((node) => node.kind === "user" || node.kind === "group" || ((node.kind === "servicePrincipal" || node.kind === "managedIdentity") && (node.ownerIds.length === 0 || node.credential?.status === "expired")));
+  return snapshot.nodes.filter((node) => node.kind === "user" || node.kind === "group" || node.kind === "federatedCredential" || ((node.kind === "servicePrincipal" || node.kind === "managedIdentity") && (node.ownerIds.length === 0 || node.credential?.status === "expired")));
 }
 
 /** One hop of the walk: where it can go next, and whether arriving there is worth reporting. */
@@ -146,12 +146,13 @@ function attackPath(
   const permissions = view.edge.permissions.join(", ") || "configured access";
   const uncertainty = ["This is an inferred possibility built from configured relationships; it is not evidence that exploitation occurred."];
   if (!view.edge.evidence.observed) uncertainty.push("No activity evidence was collected for the final permission.");
+  if (origin.kind === "federatedCredential") uncertainty.push("Configured federation does not prove that a matching external token was issued or used.");
   if (snapshot.completion.status === "partial") uncertainty.push("The source snapshot is partial, so shorter or additional paths may be missing.");
   return {
     id: stableId("path", traversed.map(({ edge }) => edge.id)), title: `${origin.label} can reach ${view.target.label}`, severity,
     confidence: snapshot.completion.status === "complete" ? "medium" : "low", source: { id: origin.id, label: origin.label }, target: { id: view.target.id, label: view.target.label },
     steps: traversed.map(step),
-    prerequisites: [`An attacker first controls ${origin.label} or a session/credential able to act as it.`, "Every configured relationship shown in the path remains effective at the time of attempted use."],
+    prerequisites: [origin.kind === "federatedCredential" ? `An attacker can obtain an external token whose issuer and subject exactly match ${origin.label}.` : `An attacker first controls ${origin.label} or a session/credential able to act as it.`, "Every configured relationship shown in the path remains effective at the time of attempted use."],
     attackMappings: [{ id: "T1098", name: "Account Manipulation" }, { id: "T1078.004", name: "Valid Accounts: Cloud Accounts" }],
     mitigations: [`Review and remove unnecessary ${permissions} access to ${view.target.label}.`, `Reduce control of ${origin.label} and ensure an accountable owner reviews the relationship.`, "Re-scan after remediation and verify that the configured path no longer exists."], uncertainty,
   };
@@ -173,6 +174,7 @@ function findingsFor(snapshot: TenantSnapshot, paths: AttackPath[]): IamFinding[
     ...guestFindings(snapshot),
     ...managedIdentityFindings(snapshot),
     ...conditionalAccessFindings(snapshot),
+    ...consentPolicyFindings(snapshot),
     ...crossTenantFindings(snapshot),
     ...coverageFindings(snapshot),
   ];
@@ -181,11 +183,19 @@ function findingsFor(snapshot: TenantSnapshot, paths: AttackPath[]): IamFinding[
 /** Each walked path is also reported as a finding, so one list carries the whole review. */
 function pathFindings(paths: AttackPath[]): IamFinding[] {
   return paths.map((path) => ({
-    id: `finding-${path.id}`, title: path.title, category: "privilege-path", severity: path.severity, evidenceClass: "inferred",
+    id: `finding-${path.id}`, title: path.title, category: path.source.id.startsWith("federated-credential:") ? "federated-identity" : "privilege-path", severity: path.severity, evidenceClass: "inferred",
     summary: `${path.steps.length}-stage path from ${path.source.label} to ${path.target.label}.`, whyItMatters: "Control of the starting identity could make each configured step available and end in powerful access.",
     remediation: path.mitigations, affectedObjectIds: Array.from(new Set(path.steps.flatMap((item) => [item.source.id, item.target.id]))), edgeIds: path.steps.map((item) => item.edgeId), attackPathId: path.id,
     sourceEndpoints: Array.from(new Set(path.steps.map((item) => item.sourceEndpoint))), uncertainty: path.uncertainty,
   }));
+}
+
+function consentPolicyFindings(snapshot: TenantSnapshot): IamFinding[] {
+  const legacyPolicyId = "microsoft-user-default-legacy";
+  return snapshot.nodes.filter((node) => node.kind === "policy" && node.metadata?.policyType === "authorization" && String(node.metadata.permissionGrantPoliciesAssigned ?? "").split(/,\s*/).includes(`ManagePermissionGrantsForSelf.${legacyPolicyId}`)).map((node) => {
+    const edge = snapshot.edges.find((item) => item.type === "ASSIGNS_CONSENT_POLICY" && item.sourceId === node.id && item.targetId === legacyPolicyId);
+    return { id: stableId("finding-consent-policy", [node.id, legacyPolicyId]), title: "Users can consent broadly to applications", category: "consent-policy" as const, severity: "high" as const, evidenceClass: "configured" as const, summary: "The default authorization policy assigns the legacy user-consent policy.", whyItMatters: "The legacy policy can let users consent to permissions that do not require administrator consent for applications without the tighter verified-publisher and low-impact restrictions.", remediation: ["Review the business requirement for user consent and replace the legacy assignment with a restricted permission grant policy or disable user consent through the approved Entra change process.", "Re-scan and confirm the authorization policy no longer assigns the legacy policy."], affectedObjectIds: [node.id, legacyPolicyId], edgeIds: edge ? [edge.id] : [], attackPathId: null, sourceEndpoints: edge ? [edge.evidence.sourceEndpoint] : ["/policies/authorizationPolicy"], uncertainty: ["This configured policy does not prove that any user granted consent or that an application used delegated access."] };
+  });
 }
 
 /** Findings a single configured relationship raises on its own, in the order they are met. */
