@@ -99,12 +99,12 @@ describe("tenant scoping", () => {
     await expect(backend.getSession(live.id, TENANT)).rejects.toThrow();
   });
 
-  it("requires the auth flow's own tenant in the consuming delete", async () => {
+  it("requires the auth flow's own tenant before consuming it", async () => {
     const { backend, pool } = backendUnderTest();
     pool.responder = () => ({ rows: [], rowCount: 0 });
     expect(await backend.consumeAuthFlow("flow-1", TENANT, "state")).toBeNull();
-    expect(pool.only("DELETE FROM auth_flows").sql).toContain("tenant_id=$2");
-    expect(pool.only("DELETE FROM auth_flows").sql).toContain("expires_at>now()");
+    expect(pool.only("SELECT * FROM auth_flows").sql).toContain("tenant_id=$2");
+    expect(pool.only("SELECT * FROM auth_flows").sql).toContain("expires_at>now()");
   });
 });
 
@@ -132,11 +132,23 @@ describe("encrypted round trips", () => {
   it("accepts an auth flow only when the returned state matches in constant time", async () => {
     const { backend, pool } = backendUnderTest();
     const flow = { id: "flow-1", tenantId: TENANT, state: "expected-state", verifier: "verifier", expiresAt: Date.parse("2026-08-26T12:00:00.000Z") };
-    pool.responder = respondTo("DELETE FROM auth_flows", { rows: [encryptedRow(flow, `auth-flow:${flow.id}:${TENANT}`)] });
+    pool.responder = (sql) => sql.includes("SELECT * FROM auth_flows")
+      ? rows(encryptedRow(flow, `auth-flow:${flow.id}:${TENANT}`))
+      : sql.includes("DELETE FROM auth_flows") ? { rows: [], rowCount: 1 } : { rows: [], rowCount: 0 };
     expect(await backend.consumeAuthFlow(flow.id, TENANT, "expected-state")).toEqual(flow);
+    expect(pool.only("DELETE FROM auth_flows WHERE id=$1").params).toEqual([flow.id, TENANT]);
     expect(await backend.consumeAuthFlow(flow.id, TENANT, "wrong-state-x")).toBeNull();
     // A different length must be rejected before the constant-time compare.
     expect(await backend.consumeAuthFlow(flow.id, TENANT, "short")).toBeNull();
+  });
+
+  it("returns no auth flow when another callback already consumed the matching row", async () => {
+    const { backend, pool } = backendUnderTest();
+    const flow = { id: "flow-race", tenantId: TENANT, state: "expected-state", verifier: "verifier", expiresAt: Date.now() + 60_000 };
+    pool.responder = (sql) => sql.includes("SELECT * FROM auth_flows")
+      ? rows(encryptedRow(flow, `auth-flow:${flow.id}:${TENANT}`))
+      : { rows: [], rowCount: 0 };
+    expect(await backend.consumeAuthFlow(flow.id, TENANT, flow.state)).toBeNull();
   });
 
   it("encrypts the auth flow with its own identifier in the context", async () => {
@@ -242,8 +254,18 @@ describe("job ownership guards", () => {
 
   it("truncates an over-long failure message", async () => {
     const { backend, pool } = backendUnderTest();
+    pool.responder = () => ({ rows: [], rowCount: 1 });
     await backend.failJob("job-1", "worker-1", "y".repeat(900));
     expect(String(pool.only("status='failed'").params[2])).toHaveLength(500);
+    expect(pool.only("DELETE FROM scan_checkpoints WHERE job_id=$1").params).toEqual(["job-1"]);
+  });
+
+  it("rolls back a failed-job transition the worker does not own", async () => {
+    const { backend, pool } = backendUnderTest();
+    pool.responder = () => ({ rows: [], rowCount: 0 });
+    await expect(backend.failJob("job-1", "worker-1", "failure")).rejects.toThrow(/not owned/);
+    expect(pool.matching("DELETE FROM scan_checkpoints")).toHaveLength(0);
+    expect(pool.matching("ROLLBACK")).toHaveLength(1);
   });
 
   it("rejects a session update that matched no row in this tenant", async () => {
@@ -284,6 +306,25 @@ describe("job ownership guards", () => {
     expect(await backend.isScanCancellationRequested("job-1", "worker-1")).toBe(true);
     expect(pool.queries.at(-1)!.sql).toContain("status='cancel_requested'");
   });
+
+  it("cleans a queued job's checkpoint in the same cancellation transaction", async () => {
+    const { backend, pool } = backendUnderTest();
+    pool.responder = (sql) => sql.includes("cancel_requested' END")
+      ? rows(jobRow({ status: "cancelled" }))
+      : { rows: [], rowCount: 1 };
+    expect(await backend.requestScanCancellation("job-1", TENANT)).toMatchObject({ status: "cancelled" });
+    expect(pool.only("DELETE FROM scan_checkpoints WHERE job_id=$1 AND tenant_id=$2").params).toEqual(["job-1", TENANT]);
+    expect(pool.matching("COMMIT")).toHaveLength(1);
+  });
+
+  it("keeps the checkpoint while a running job is only asked to stop", async () => {
+    const { backend, pool } = backendUnderTest();
+    pool.responder = (sql) => sql.includes("cancel_requested' END")
+      ? rows(jobRow({ status: "cancel_requested" }))
+      : { rows: [], rowCount: 1 };
+    expect(await backend.requestScanCancellation("job-1", TENANT)).toMatchObject({ status: "cancel_requested" });
+    expect(pool.matching("DELETE FROM scan_checkpoints")).toHaveLength(0);
+  });
 });
 
 describe("queueing and claiming", () => {
@@ -310,17 +351,18 @@ describe("queueing and claiming", () => {
   it("claims one queued job at a time and skips rows another worker locked", async () => {
     const { backend, pool } = backendUnderTest();
     pool.responder = () => rows(jobRow({ status: "running", worker_id: "worker-1", attempt: 1 }));
-    const claimed = await backend.claimNextJob("worker-1");
+    const claimed = await backend.claimNextJob("worker-1", TENANT);
     expect(claimed).toMatchObject({ status: "running", workerId: "worker-1", attempt: 1 });
     const sql = pool.queries.at(-1)!.sql;
     expect(sql).toContain("FOR UPDATE SKIP LOCKED");
     expect(sql).toContain("LIMIT 1");
     expect(sql).toContain("available_at<=now()");
+    expect(sql).toContain("tenant_id=$2");
   });
 
   it("returns nothing when the queue is empty", async () => {
     const { backend } = backendUnderTest();
-    expect(await backend.claimNextJob("worker-1")).toBeNull();
+    expect(await backend.claimNextJob("worker-1", TENANT)).toBeNull();
     expect(await backend.getJob("job-1", TENANT)).toBeNull();
     expect(await backend.getLatestJob(TENANT)).toBeNull();
     expect(await backend.requestScanCancellation("job-1", TENANT)).toBeNull();
@@ -352,26 +394,26 @@ describe("stale job recovery", () => {
   it("sums requeued and cancelled jobs and clears checkpoints for the cancelled ones", async () => {
     const { backend, pool } = backendUnderTest();
     pool.responder = (sql) => ({ rows: [], rowCount: sql.includes("status='cancel_requested'") ? 2 : 3 });
-    expect(await backend.recoverStaleJobs(new Date("2026-08-26T09:00:00.000Z"))).toBe(5);
-    expect(pool.matching("DELETE FROM scan_checkpoints c USING scan_jobs j")).toHaveLength(1);
+    expect(await backend.recoverStaleJobs(TENANT, new Date("2026-08-26T09:00:00.000Z"))).toBe(5);
+    expect(pool.only("DELETE FROM scan_checkpoints c USING scan_jobs j").params).toEqual([TENANT]);
   });
 
   it("skips the checkpoint sweep when no cancellation was completed", async () => {
     const { backend, pool } = backendUnderTest();
     pool.responder = (sql) => ({ rows: [], rowCount: sql.includes("status='cancel_requested'") ? 0 : 1 });
-    expect(await backend.recoverStaleJobs(new Date())).toBe(1);
+    expect(await backend.recoverStaleJobs(TENANT, new Date())).toBe(1);
     expect(pool.matching("DELETE FROM scan_checkpoints c USING scan_jobs j")).toHaveLength(0);
   });
 
   it("treats an unreported row count as zero recovered jobs", async () => {
     const { backend } = backendUnderTest();
-    expect(await backend.recoverStaleJobs(new Date())).toBe(0);
+    expect(await backend.recoverStaleJobs(TENANT, new Date())).toBe(0);
   });
 
   it("counts a driver that reports no row count as no recovered jobs", async () => {
     const { backend, pool } = backendUnderTest();
     pool.responder = () => ({ rows: [], rowCount: null });
-    expect(await backend.recoverStaleJobs(new Date("2026-08-26T09:00:00.000Z"))).toBe(0);
+    expect(await backend.recoverStaleJobs(TENANT, new Date("2026-08-26T09:00:00.000Z"))).toBe(0);
     // A null count must not be read as "rows were cancelled", which would orphan checkpoints.
     expect(pool.matching("DELETE FROM scan_checkpoints c USING scan_jobs j")).toHaveLength(0);
   });
@@ -379,8 +421,10 @@ describe("stale job recovery", () => {
   it("compares staleness against the supplied cutoff", async () => {
     const { backend, pool } = backendUnderTest();
     const cutoff = new Date("2026-08-26T09:00:00.000Z");
-    await backend.recoverStaleJobs(cutoff);
-    for (const query of pool.matching("updated_at<$1")) expect(query.params[0]).toBe(cutoff);
+    await backend.recoverStaleJobs(TENANT, cutoff);
+    const recoveryQueries = pool.matching("updated_at<$2");
+    expect(recoveryQueries).toHaveLength(2);
+    for (const query of recoveryQueries) expect(query.params).toEqual([TENANT, cutoff]);
   });
 });
 
@@ -494,7 +538,7 @@ describe("statement parameters", () => {
   it("binds the id and tenant when consuming a flow, so another tenant cannot claim it", async () => {
     const { backend, pool } = acceptingBackend();
     await backend.consumeAuthFlow("flow-1", TENANT, "state");
-    expect(pool.only("DELETE FROM auth_flows WHERE id=$1").params).toEqual(["flow-1", TENANT]);
+    expect(pool.only("SELECT * FROM auth_flows WHERE id=$1").params).toEqual(["flow-1", TENANT]);
   });
 
   it("binds session identity and expiry on create, update, read, and delete", async () => {
@@ -533,8 +577,8 @@ describe("statement parameters", () => {
     expect(pool.only("SELECT * FROM scan_jobs WHERE id=$1 AND tenant_id=$2").params).toEqual(["job-1", TENANT]);
     await backend.getLatestJob(TENANT);
     expect(pool.only("SELECT * FROM scan_jobs WHERE tenant_id=$1 ORDER BY").params).toEqual([TENANT]);
-    await backend.claimNextJob("worker-1");
-    expect(pool.only("FOR UPDATE SKIP LOCKED").params).toEqual(["worker-1"]);
+    await backend.claimNextJob("worker-1", TENANT);
+    expect(pool.only("FOR UPDATE SKIP LOCKED").params).toEqual(["worker-1", TENANT]);
     await backend.isScanCancellationRequested("job-1", "worker-1");
     expect(pool.only("SELECT 1 FROM scan_jobs").params).toEqual(["job-1", "worker-1"]);
   });
@@ -548,9 +592,9 @@ describe("statement parameters", () => {
   it("binds the recovery cutoff to both recovery statements", async () => {
     const { backend, pool } = acceptingBackend();
     const cutoff = new Date("2026-08-26T09:00:00.000Z");
-    await backend.recoverStaleJobs(cutoff);
-    expect(pool.only("status='cancel_requested' AND updated_at<$1").params).toEqual([cutoff]);
-    expect(pool.only("status='running' AND updated_at<$1").params).toEqual([cutoff]);
+    await backend.recoverStaleJobs(TENANT, cutoff);
+    expect(pool.only("status='cancel_requested' AND updated_at<$2").params).toEqual([TENANT, cutoff]);
+    expect(pool.only("status='running' AND updated_at<$2").params).toEqual([TENANT, cutoff]);
   });
 
   it("binds the failure reason to the failing job and its worker", async () => {

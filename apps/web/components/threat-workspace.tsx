@@ -20,10 +20,17 @@ export function ThreatWorkspace({ intelligence, tenantLabel, snapshotId, complet
   const [saveState, setSaveState] = useState<SaveState>({ status: "idle" });
   const [filter, setFilter] = useState<"all" | "critical" | "high" | "medium" | "missing">("all");
   useEffect(() => {
+    if (persistence !== "browser") {
+      for (const key of Object.keys(window.localStorage)) {
+        if (key.startsWith("entra-threat-workspace:")) window.localStorage.removeItem(key);
+      }
+      setRecords({});
+      return;
+    }
     try { setRecords(JSON.parse(window.localStorage.getItem(storageKey) ?? "{}") as Record<string, ReviewRecord>); } catch { setRecords({}); }
     const restored = window.localStorage.getItem(`${storageKey}:selected`);
     if (restored && intelligence.findings.some((finding) => finding.id === restored)) setSelectedId(restored);
-  }, [intelligence.findings, storageKey]);
+  }, [intelligence.findings, persistence, storageKey]);
   useEffect(() => {
     if (persistence !== "server" || !selectedId) return;
     void fetch(`/api/v1/threat-reviews/${encodeURIComponent(selectedId)}`, { cache: "no-store" }).then(async (response) => {
@@ -44,8 +51,8 @@ export function ThreatWorkspace({ intelligence, tenantLabel, snapshotId, complet
         if (cancelled) return;
         if (response.ok) { setSaveState({ status: "saved" }); return; }
         const payload = await response.json().catch(() => null) as { error?: string } | null;
-        setSaveState({ status: "error", message: payload?.error ?? `The tenant record rejected this change (HTTP ${response.status}). It is kept in this browser only.` });
-      }).catch(() => { if (!cancelled) setSaveState({ status: "error", message: "The tenant record is unreachable. This decision is kept in this browser only." }); });
+        setSaveState({ status: "error", message: payload?.error ?? `The tenant record rejected this change (HTTP ${response.status}). It remains only in this open page until you retry.` });
+      }).catch(() => { if (!cancelled) setSaveState({ status: "error", message: "The tenant record is unreachable. This decision remains only in this open page until you retry." }); });
     }, 350);
     return () => { cancelled = true; window.clearTimeout(timer); };
   }, [pendingReview, persistence]);
@@ -57,13 +64,13 @@ export function ThreatWorkspace({ intelligence, tenantLabel, snapshotId, complet
     if (!selected) return;
     setRecords((current) => {
       const next = { ...current, [selected.id]: { ...(current[selected.id] ?? EMPTY), ...patch } };
-      window.localStorage.setItem(storageKey, JSON.stringify(next));
+      if (persistence === "browser") window.localStorage.setItem(storageKey, JSON.stringify(next));
       if (persistence === "server") setPendingReview({ id: selected.id, record: next[selected.id]! });
       return next;
     });
     setSaveState(persistence === "server" ? { status: "saving" } : { status: "saved" });
   }
-  function selectFinding(id: string) { setSelectedId(id); setSaveState({ status: "idle" }); window.localStorage.setItem(`${storageKey}:selected`, id); }
+  function selectFinding(id: string) { setSelectedId(id); setSaveState({ status: "idle" }); if (persistence === "browser") window.localStorage.setItem(`${storageKey}:selected`, id); }
   function beginFlowDraft() { if (!selectedPath) return; updateRecord({ flowDraft: selectedPath.steps.map((item) => ({ id: item.edgeId, title: item.explanation, evidenceEdgeId: item.edgeId })) }); }
   function updateFlowStep(index: number, patch: Partial<FlowDraftStep>) { updateRecord({ flowDraft: record.flowDraft.map((item, itemIndex) => itemIndex === index ? { ...item, ...patch } : item) }); }
   function moveFlowStep(index: number, offset: -1 | 1) { const target = index + offset; if (target < 0 || target >= record.flowDraft.length) return; const next = [...record.flowDraft]; const item = next[index]!; next[index] = next[target]!; next[target] = item; updateRecord({ flowDraft: next }); }
@@ -75,7 +82,7 @@ export function ThreatWorkspace({ intelligence, tenantLabel, snapshotId, complet
       <button type="button" onClick={() => setFilter("medium")} aria-pressed={filter === "medium"}><strong>{intelligence.counts.medium}</strong><span>Review</span><small>Consent and ownership</small></button>
       <button type="button" onClick={() => setFilter("missing")} aria-pressed={filter === "missing"}><strong>{intelligence.evidence.missing}</strong><span>Evidence gaps</span><small>Prevent false reassurance</small></button>
     </section>
-    <div className="evidence-separation" role="note"><span className="evidence-configured"><i />{intelligence.evidence.configured} configured</span><span className="evidence-observed"><i />{intelligence.evidence.observed} observed</span><span className="evidence-inferred"><i />{intelligence.evidence.inferred} inferred</span><span className="evidence-missing"><i />{intelligence.evidence.missing} missing</span><p>{completion === "partial" ? "Partial snapshot: missing data may hide additional paths." : "Complete for the granted core scope; optional activity remains unavailable."}</p></div>
+    <div className="evidence-separation" role="note"><span className="evidence-configured"><i />{intelligence.evidence.configured} configured</span><span className="evidence-observed"><i />{intelligence.evidence.observed} observed</span><span className="evidence-inferred"><i />{intelligence.evidence.inferred} inferred</span><span className="evidence-missing"><i />{intelligence.evidence.missing} missing</span><p>{intelligence.pathAnalysis.truncated ? "Attack-path analysis reached its safety limit; review the displayed highest-priority paths as a partial result." : completion === "partial" ? "Partial snapshot: missing data may hide additional paths." : "Complete for the granted core scope; optional activity remains unavailable."}</p></div>
     <div className="threat-workspace">
       <aside className="finding-queue" aria-label="Prioritized findings"><div className="queue-heading"><div><p className="eyebrow">Prioritized queue</p><h2>{visible.length} findings</h2></div>{filter !== "all" ? <button type="button" className="text-button" onClick={() => setFilter("all")}>Show all</button> : null}</div>{visible.map((finding) => <FindingButton key={finding.id} finding={finding} active={selected?.id === finding.id} disposition={(records[finding.id] ?? EMPTY).disposition} onClick={() => selectFinding(finding.id)} />)}</aside>
       <section className="finding-detail" aria-live="polite">{selected ? <>

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { csvCell, csvRow } from "./csv";
 
 describe("CSV export neutralization", () => {
-  it.each(["=SUM(1,1)", "+cmd", "-1+1", "@formula", "\tformula", "\0formula"])("neutralizes formula prefix %j", (value) => {
+  it.each(["=SUM(1,1)", "+cmd", "-1+1", "@formula", "\tformula", "\0formula", "\r=FORMULA", "\n=FORMULA"])("neutralizes formula prefix %j", (value) => {
     expect(csvCell(value)).toBe(`"'${value}"`);
   });
 

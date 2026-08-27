@@ -596,6 +596,16 @@ describe("observed activity edges", () => {
     expect(edgesOfType(snapshot, "OBSERVED_CALL")).toHaveLength(0);
   });
 
+  it("does not promote failed or status-incomplete sign-ins to observed calls", () => {
+    const snapshot = normalizeTenantScan(rawScan({
+      signIns: [
+        sourced(signIn({ id: "s-failed", createdDateTime: "2026-08-20T09:00:00Z", servicePrincipalId: "sp-1", resourceServicePrincipalId: "sp-2", status: { errorCode: 50126 } })),
+        sourced(signIn({ id: "s-unknown", createdDateTime: "2026-08-20T09:00:00Z", servicePrincipalId: "sp-1", resourceServicePrincipalId: "sp-2", status: null })),
+      ],
+    }));
+    expect(edgesOfType(snapshot, "OBSERVED_CALL")).toHaveLength(0);
+  });
+
   it("does not overwrite a collected identity with an activity placeholder", () => {
     const snapshot = normalizeTenantScan(rawScan({
       servicePrincipals: [sourced(servicePrincipal({ id: "sp-1", appId: "a", displayName: "Known Caller" }))],

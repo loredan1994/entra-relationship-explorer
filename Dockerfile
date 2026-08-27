@@ -11,7 +11,7 @@ RUN CI=true pnpm prune --prod \
     && rm -f /app/scripts/prepare-runtime.mjs \
     && rm -f /app/pnpm-lock.yaml /app/pnpm-workspace.yaml
 
-FROM gcr.io/distroless/nodejs24-debian13:nonroot@sha256:ffab599740d4aaa66029d02b9e6d3de4f622fefb7410081c5ef69c86430f364d AS runtime
+FROM gcr.io/distroless/nodejs24-debian13:nonroot@sha256:4ac45c93b6c4b2304876569196e5962e55e8ba4ba095e7dde7bf6d7e00efc3b8 AS runtime
 WORKDIR /app
 ENV NODE_ENV=production
 COPY --from=production --chown=65532:65532 /app /app

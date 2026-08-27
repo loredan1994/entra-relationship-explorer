@@ -32,7 +32,7 @@ async function runningJob(workerId = "worker-1"): Promise<ScanJob> {
   const live = session();
   await backend.createSession(live);
   await backend.enqueueScan(TENANT, live.id);
-  return (await backend.claimNextJob(workerId))!;
+  return (await backend.claimNextJob(workerId, TENANT))!;
 }
 
 describe("backend health and lifecycle", () => {
@@ -61,6 +61,7 @@ describe("authorization flows", () => {
     await backend.createAuthFlow(pending);
     expect("state-valve").toHaveLength("state-value".length);
     expect(await backend.consumeAuthFlow(pending.id, TENANT, "state-valve")).toBeNull();
+    expect(await backend.consumeAuthFlow(pending.id, TENANT, "state-value")).toEqual(pending);
   });
 
   it("hands back a copy so a caller cannot mutate the stored flow", async () => {
@@ -79,6 +80,7 @@ describe("authorization flows", () => {
     const crossTenant = flow();
     await backend.createAuthFlow(crossTenant);
     expect(await backend.consumeAuthFlow(crossTenant.id, OTHER_TENANT, "state-value")).toBeNull();
+    expect(await backend.consumeAuthFlow(crossTenant.id, TENANT, "state-value")).toEqual(crossTenant);
     const expired = flow({ expiresAt: Date.now() - 1 });
     await backend.createAuthFlow(expired);
     expect(await backend.consumeAuthFlow(expired.id, TENANT, "state-value")).toBeNull();
@@ -159,7 +161,7 @@ describe("scan queue", () => {
   });
 
   it("claims nothing when no job is queued", async () => {
-    expect(await backend.claimNextJob("worker-1")).toBeNull();
+    expect(await backend.claimNextJob("worker-1", TENANT)).toBeNull();
   });
 
   it("counts each claim as an attempt and records the owning worker", async () => {
@@ -169,7 +171,7 @@ describe("scan queue", () => {
 
   it("does not re-claim a job that is already running", async () => {
     await runningJob("worker-1");
-    expect(await backend.claimNextJob("worker-2")).toBeNull();
+    expect(await backend.claimNextJob("worker-2", TENANT)).toBeNull();
   });
 
   it("refuses progress, completion, and failure from a worker that does not own the job", async () => {
@@ -187,12 +189,14 @@ describe("scan queue", () => {
 
   it("marks a failed scan without publishing a snapshot", async () => {
     const job = await runningJob();
+    await backend.saveScanCheckpoint({ jobId: job.id, tenantId: TENANT, payload: { completedStages: ["applications"] }, updatedAt: "" }, "worker-1");
     await backend.failJob(job.id, "worker-1", "Graph returned 503");
     const failed = (await backend.getJob(job.id, TENANT))!;
     expect(failed).toMatchObject({ status: "failed", error: "Graph returned 503", workerId: null });
     expect(failed.detail).toBe("The read-only scan stopped before a snapshot could be saved");
     expect(failed.finishedAt).not.toBeNull();
     expect(await backend.recentSnapshots(TENANT)).toEqual([]);
+    expect(await backend.getScanCheckpoint(job.id, TENANT)).toBeNull();
   });
 });
 
@@ -202,16 +206,25 @@ describe("stale job recovery", () => {
 
   it("returns a running job to the queue when its worker went silent", async () => {
     const job = await runningJob("worker-gone");
-    expect(await backend.recoverStaleJobs(future())).toBe(1);
+    expect(await backend.recoverStaleJobs(TENANT, future())).toBe(1);
     const recovered = (await backend.getJob(job.id, TENANT))!;
     expect(recovered).toMatchObject({ status: "queued", workerId: null, detail: "Recovered after the previous worker stopped" });
-    expect(await backend.claimNextJob("worker-new")).toMatchObject({ id: job.id, attempt: 2 });
+    expect(await backend.claimNextJob("worker-new", TENANT)).toMatchObject({ id: job.id, attempt: 2 });
+  });
+
+  it("never recovers another tenant's stale job", async () => {
+    const live = session({ tenantId: OTHER_TENANT });
+    await backend.createSession(live);
+    const job = await backend.enqueueScan(OTHER_TENANT, live.id);
+    await backend.claimNextJob("other-worker", OTHER_TENANT);
+    expect(await backend.recoverStaleJobs(TENANT, future())).toBe(0);
+    expect(await backend.getJob(job.id, OTHER_TENANT)).toMatchObject({ status: "running", workerId: "other-worker" });
   });
 
   it("finishes a cancellation whose worker never acknowledged it", async () => {
     const job = await runningJob("worker-gone");
     await backend.requestScanCancellation(job.id, TENANT);
-    expect(await backend.recoverStaleJobs(future())).toBe(1);
+    expect(await backend.recoverStaleJobs(TENANT, future())).toBe(1);
     const recovered = (await backend.getJob(job.id, TENANT))!;
     expect(recovered).toMatchObject({ status: "cancelled", workerId: null, detail: "Cancellation completed after the previous worker stopped" });
     expect(recovered.finishedAt).toBe(recovered.updatedAt);
@@ -221,36 +234,36 @@ describe("stale job recovery", () => {
     const job = await runningJob("worker-gone");
     await backend.saveScanCheckpoint({ jobId: job.id, tenantId: TENANT, payload: { completedStages: ["applications"] }, updatedAt: "" }, "worker-gone");
     await backend.requestScanCancellation(job.id, TENANT);
-    await backend.recoverStaleJobs(future());
+    await backend.recoverStaleJobs(TENANT, future());
     expect(await backend.getScanCheckpoint(job.id, TENANT)).toBeNull();
   });
 
   it("keeps the checkpoint of a job it merely requeues, so the retry can resume", async () => {
     const job = await runningJob("worker-gone");
     await backend.saveScanCheckpoint({ jobId: job.id, tenantId: TENANT, payload: { completedStages: ["applications"] }, updatedAt: "" }, "worker-gone");
-    await backend.recoverStaleJobs(future());
+    await backend.recoverStaleJobs(TENANT, future());
     expect(await backend.getScanCheckpoint(job.id, TENANT)).toMatchObject({ payload: { completedStages: ["applications"] } });
   });
 
   it("leaves a job alone while its worker is still within the stale window", async () => {
     const job = await runningJob("worker-live");
-    expect(await backend.recoverStaleJobs(new Date(Date.now() - 60_000))).toBe(0);
+    expect(await backend.recoverStaleJobs(TENANT, new Date(Date.now() - 60_000))).toBe(0);
     expect((await backend.getJob(job.id, TENANT))?.status).toBe("running");
   });
 
   it("never recovers a job that already reached a terminal state", async () => {
     const job = await runningJob();
     await backend.failJob(job.id, "worker-1", "boom");
-    expect(await backend.recoverStaleJobs(future())).toBe(0);
+    expect(await backend.recoverStaleJobs(TENANT, future())).toBe(0);
     expect((await backend.getJob(job.id, TENANT))?.status).toBe("failed");
   });
 
   it("counts every stale job it recovers", async () => {
     const first = await runningJob("worker-a");
-    await backend.recoverStaleJobs(future());
-    await backend.claimNextJob("worker-b");
+    await backend.recoverStaleJobs(TENANT, future());
+    await backend.claimNextJob("worker-b", TENANT);
     await backend.requestScanCancellation(first.id, TENANT);
-    expect(await backend.recoverStaleJobs(future())).toBe(1);
+    expect(await backend.recoverStaleJobs(TENANT, future())).toBe(1);
   });
 });
 
@@ -259,9 +272,13 @@ describe("scan cancellation", () => {
     const live = session();
     await backend.createSession(live);
     const job = await backend.enqueueScan(TENANT, live.id);
+    await backend.claimNextJob("worker-1", TENANT);
+    await backend.saveScanCheckpoint({ jobId: job.id, tenantId: TENANT, payload: {}, updatedAt: "" }, "worker-1");
+    await backend.recoverStaleJobs(TENANT, new Date(Date.now() + 60_000));
     const cancelled = (await backend.requestScanCancellation(job.id, TENANT))!;
     expect(cancelled).toMatchObject({ status: "cancelled", detail: "Cancelled before Microsoft Graph collection began" });
     expect(cancelled.finishedAt).not.toBeNull();
+    expect(await backend.getScanCheckpoint(job.id, TENANT)).toBeNull();
   });
 
   it("asks a running scan to stop rather than cutting it off mid-read", async () => {
@@ -331,7 +348,7 @@ describe("snapshot retention", () => {
     const live = session();
     await backend.createSession(live);
     await backend.enqueueScan(TENANT, live.id);
-    return (await backend.claimNextJob("worker-2"))!;
+    return (await backend.claimNextJob("worker-2", TENANT))!;
   }
 
   it("returns snapshots newest first", async () => {
@@ -473,16 +490,16 @@ describe("time boundaries and ordering", () => {
   it("leaves a job whose heartbeat lands exactly on the cutoff alone", async () => {
     const running = await runningJob("worker-quiet");
     const cutoff = new Date(Date.now());
-    expect(await backend.recoverStaleJobs(cutoff)).toBe(0);
+    expect(await backend.recoverStaleJobs(TENANT, cutoff)).toBe(0);
     expect((await backend.getJob(running.id, TENANT))?.status).toBe("running");
     await backend.requestScanCancellation(running.id, TENANT);
-    expect(await backend.recoverStaleJobs(new Date(Date.now()))).toBe(0);
+    expect(await backend.recoverStaleJobs(TENANT, new Date(Date.now()))).toBe(0);
     expect((await backend.getJob(running.id, TENANT))?.status).toBe("cancel_requested");
   });
 
   it("recovers a job whose heartbeat is a millisecond older than the cutoff", async () => {
     const running = await runningJob("worker-quiet");
-    expect(await backend.recoverStaleJobs(new Date(Date.now() + 1))).toBe(1);
+    expect(await backend.recoverStaleJobs(TENANT, new Date(Date.now() + 1))).toBe(1);
     expect((await backend.getJob(running.id, TENANT))?.status).toBe("queued");
   });
 
@@ -499,7 +516,7 @@ describe("time boundaries and ordering", () => {
       const live = session();
       await backend.createSession(live);
       await backend.enqueueScan(TENANT, live.id);
-      const claimed = (await backend.claimNextJob("worker-page"))!;
+      const claimed = (await backend.claimNextJob("worker-page", TENANT))!;
       const snapshot = snapshotFor(TENANT, scannedAt);
       ids.unshift(snapshot.id);
       await backend.completeJob(claimed.id, "worker-page", snapshot, new Date(0));
@@ -525,14 +542,14 @@ describe("one active scan per tenant", () => {
 
   it("returns the running job rather than queuing a second one", async () => {
     const queued = await queue(TENANT);
-    const claimed = (await backend.claimNextJob("worker-1"))!;
+    const claimed = (await backend.claimNextJob("worker-1", TENANT))!;
     expect(claimed.id).toBe(queued.id);
     expect((await queue(TENANT)).id).toBe(queued.id);
   });
 
   it("returns the job awaiting cancellation rather than queuing alongside it", async () => {
     const queued = await queue(TENANT);
-    await backend.claimNextJob("worker-1");
+    await backend.claimNextJob("worker-1", TENANT);
     await backend.requestScanCancellation(queued.id, TENANT);
     const again = await queue(TENANT);
     expect(again).toMatchObject({ id: queued.id, status: "cancel_requested" });
@@ -540,7 +557,7 @@ describe("one active scan per tenant", () => {
 
   it("queues afresh once the previous scan reached a terminal state", async () => {
     const queued = await queue(TENANT);
-    await backend.claimNextJob("worker-1");
+    await backend.claimNextJob("worker-1", TENANT);
     await backend.failJob(queued.id, "worker-1", "boom");
     expect((await queue(TENANT)).id).not.toBe(queued.id);
   });

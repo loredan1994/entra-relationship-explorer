@@ -54,6 +54,10 @@ for (const serviceName of ["migrate", "worker"]) {
   }
 }
 
+for (const variable of ["ENTRA_CLIENT_SECRET", "ENTRA_CLIENT_ID", "ENTRA_TENANT_ID", "ENTRA_OPTIONAL_GRAPH_SCOPES"]) {
+  if (variable in (config.services?.migrate?.environment ?? {})) errors.push(`migrate must not receive ${variable}`);
+}
+
 for (const [serviceName, expectedPort] of [["web", 3200], ["postgres", 54320]]) {
   const published = config.services?.[serviceName]?.ports ?? [];
   if (published.length !== 1) {

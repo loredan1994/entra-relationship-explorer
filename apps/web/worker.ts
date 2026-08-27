@@ -18,9 +18,10 @@ process.on("SIGINT", () => { stopping = true; });
 
 async function main() {
   await backend.migrate();
-  await backend.recoverStaleJobs(new Date(Date.now() - 10 * 60 * 1_000));
+  await backend.recoverStaleJobs(liveConfig.tenantId, new Date(Date.now() - 10 * 60 * 1_000));
   while (!stopping) {
-    const job = await backend.claimNextJob(workerId);
+    const job = await backend.claimNextJob(workerId, liveConfig.tenantId);
+    if (job && job.tenantId !== liveConfig.tenantId) throw new Error("The claimed scan job crossed the configured tenant boundary.");
     if (!job) { await delay(1_000); continue; }
     await run(job);
   }

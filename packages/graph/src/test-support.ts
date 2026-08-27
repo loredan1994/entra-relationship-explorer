@@ -105,7 +105,7 @@ export function conditionalAccessPolicy(
 export function signIn(
   partial: Partial<GraphSignIn> & Pick<GraphSignIn, "id" | "createdDateTime">,
 ): GraphSignIn {
-  return { ...partial };
+  return { status: { errorCode: 0 }, ...partial };
 }
 
 export function crossTenantPartner(

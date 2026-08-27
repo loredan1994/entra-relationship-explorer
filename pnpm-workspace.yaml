@@ -1,6 +1,8 @@
 packages:
   - "apps/*"
   - "packages/*"
+overrides:
+  qs: 6.15.2
 allowBuilds:
   esbuild: true
 minimumReleaseAgeExclude:
