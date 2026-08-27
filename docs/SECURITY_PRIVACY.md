@@ -45,6 +45,7 @@ The default implementation uses the two core delegated permissions above. Option
 - Input validation on filters and exports; parameterized database access.
 - Rate limits and bounded traversal for graph queries. Completed collection stages are saved as encrypted checkpoints and resumed after a stale worker is recovered; cancellation deletes unpublished checkpoint data.
 - Keep tenant-scoped access controls around stored snapshots and explicit exports. Durable metadata-only access events currently record enqueue, snapshot creation, and export. Complete denied-authorization and snapshot-read coverage is still required before claiming a full authorization audit.
+- Focused finding and path packets project only referenced objects, relationships, coverage, lifecycle, interpretation, and optional current review context. They never serialize the complete snapshot or arbitrary node metadata by default; JSON is versioned and Markdown escapes tenant-controlled text.
 - Local PostgreSQL and web ports bind only to loopback; worker and migration remain private to the Compose network. Containers run without added privileges and with `no-new-privileges`; the application image uses a pinned non-root distroless runtime and production-only dependency manifests.
 - Dependency scanning, secret scanning, and no tenant exports in Git or build artifacts.
 

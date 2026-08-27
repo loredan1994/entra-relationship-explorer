@@ -65,12 +65,18 @@ Exit: production pilot with representative tenant scale.
 - History-aware lifecycle, review, CSV and HTML export integration without carrying analyst decisions forward automatically.
 - Fixture-based rule contracts, deterministic tenant isolation, and conservative partial-evidence language.
 
+## Focused evidence packets — complete
+
+- One current finding or attack path exported as sanitized Markdown or versioned `ere-evidence-packet/1.0` JSON.
+- Snapshot identity, lifecycle, evidence class, rule version, prerequisites, uncertainty, collection coverage, exact source endpoints, focused object/relationship IDs, and optional current review context.
+- Explicit authenticated exports with tenant revalidation and access-event recording; full snapshots, arbitrary metadata, credentials, and tokens are excluded by construction.
+- Clear Threat workspace controls plus domain, route, and browser contracts.
+
 ## Next product modules
 
 - Scheduled scans using managed identity or certificate authentication, with an explicit deployment and secret-handling design.
 - Notifications and hosted multi-tenancy only after the local recurring-review workflow is proven.
 - Additional contributor-authored control-path rules through the trusted catalog and fixture contract, without runtime third-party plugin loading.
-- Focused Markdown and versioned JSON evidence packets for one finding or attack path.
 - Deeper condition evaluation for custom permission-grant policies before generalized risk findings are emitted.
 
 ## Decisions requiring explicit approval later

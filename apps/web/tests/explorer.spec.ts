@@ -149,6 +149,35 @@ test("fixture findings export is sanitized and evidence-labelled", async ({ requ
   expect(body).not.toContain("accessToken");
 });
 
+test("focused evidence packets export one finding or path without the tenant snapshot", async ({ page, request }) => {
+  await page.goto("/security");
+  await page.getByRole("button", { name: /Maya Chen can control privileged access through Clean Project Orchestrator/ }).click();
+  const findingJson = page.getByRole("link", { name: "Finding packet · JSON" });
+  const findingMarkdown = page.getByRole("link", { name: "Finding packet · Markdown" });
+  await expect(findingJson).toBeVisible();
+  await expect(findingMarkdown).toBeVisible();
+  await expect(page.getByLabel("Focused attack path exports").getByRole("link", { name: "Versioned JSON" })).toBeVisible();
+
+  const jsonResponse = await request.get((await findingJson.getAttribute("href"))!);
+  expect(jsonResponse.ok()).toBeTruthy();
+  expect(jsonResponse.headers()["content-type"]).toContain("application/vnd.entra-explorer.evidence+json");
+  const packet = await jsonResponse.json() as { schemaVersion: string; packetType: string; snapshot: { id: string }; evidence: { objects: unknown[]; relationships: unknown[] }; finding: { evidenceClass: string; rule?: { id: string } } };
+  expect(packet.schemaVersion).toBe("ere-evidence-packet/1.0");
+  expect(packet.packetType).toBe("finding");
+  expect(packet.finding).toMatchObject({ evidenceClass: "inferred", rule: { id: "ERE-IAM-001" } });
+  expect(packet.evidence.objects.length).toBeLessThan(13);
+  expect(JSON.stringify(packet)).not.toContain('"nodes"');
+  expect(JSON.stringify(packet)).not.toContain('"metadata"');
+
+  const markdownResponse = await request.get((await findingMarkdown.getAttribute("href"))!);
+  expect(markdownResponse.ok()).toBeTruthy();
+  expect(markdownResponse.headers()["content-type"]).toContain("text/markdown");
+  const markdown = await markdownResponse.text();
+  expect(markdown).toContain("## Focused evidence");
+  expect(markdown).toContain("## Interpretation boundary");
+  expect(markdown).not.toContain("accessToken");
+});
+
 test("live access is disabled by default and responses are hardened", async ({ request }) => {
   const session = await request.get("/api/v1/session");
   expect(session.ok()).toBeTruthy();

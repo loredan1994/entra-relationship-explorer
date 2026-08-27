@@ -87,3 +87,26 @@ paths:
         "200": { description: CSV export }
         "401": { description: Authentication required }
         "404": { description: No tenant snapshot }
+  /exports/evidence-packet.json:
+    get:
+      summary: Export one current finding or attack path as versioned focused JSON
+      description: Returns schema ere-evidence-packet/1.0 with only the selected subject and referenced evidence. The full tenant snapshot is not included.
+      parameters:
+        - { name: kind, in: query, required: true, schema: { type: string, enum: [finding, path] } }
+        - { name: id, in: query, required: true, schema: { type: string } }
+      responses:
+        "200": { description: Focused versioned JSON evidence packet }
+        "400": { description: Missing or invalid subject selector }
+        "401": { description: Authentication required }
+        "404": { description: Subject absent from the current snapshot }
+  /exports/evidence-packet.md:
+    get:
+      summary: Export one current finding or attack path as sanitized Markdown
+      parameters:
+        - { name: kind, in: query, required: true, schema: { type: string, enum: [finding, path] } }
+        - { name: id, in: query, required: true, schema: { type: string } }
+      responses:
+        "200": { description: Focused Markdown evidence packet }
+        "400": { description: Missing or invalid subject selector }
+        "401": { description: Authentication required }
+        "404": { description: Subject absent from the current snapshot }
