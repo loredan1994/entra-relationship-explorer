@@ -1,20 +1,30 @@
 flowchart LR
-  AR["App registration<br/>BLUEPRINT<br/>Defines roles: Api.Read, Api.Write"]
-  RSP["Enterprise application<br/>RESOURCE service principal<br/>Tenant-local API identity"]
-  CAR["App registration<br/>BLUEPRINT<br/>Orchestrator settings"]
-  CSP["Enterprise application<br/>CLIENT service principal<br/>Orchestrator identity"]
-  USER(("User"))
-  GROUP{{"Group"}}
+  FIC["Federated credential<br/>issuer + subject + audience"]
+  APP["App registration<br/>Blueprint"]
+  CLIENT["Enterprise application<br/>Tenant identity"]
+  RESOURCE["Resource enterprise app<br/>API identity"]
+  HUMAN["User or group"]
+  MEMBER["User, group, or device"]
+  AU["Administrative unit<br/>Directory scope"]
+  PRINCIPAL["User, group, or workload"]
+  ROLE["Administrative role"]
+  AUTH["Authorization policy"]
+  CONSENT["Permission-grant policy<br/>Includes + excludes"]
 
-  AR -. "same appId creates local identity" .-> RSP
-  CAR -. "same appId creates local identity" .-> CSP
-  CSP == "CAN CALL<br/>Api.Read + Api.Write" ==> RSP
-  USER -. "assigned to use" .-> RSP
-  GROUP -. "assigned to use" .-> RSP
+  FIC == "FEDERATES AS<br/>inferred prerequisite" ==> APP
+  APP -. "same appId" .-> CLIENT
+  CLIENT == "CAN CALL AS APP<br/>configured permissions" ==> RESOURCE
+  HUMAN -. "delegated or assigned access" .-> RESOURCE
+  MEMBER -->|"IN ADMINISTRATIVE UNIT"| AU
+  PRINCIPAL -->|"ACTIVE / ELIGIBLE<br/>raw scope retained"| ROLE
+  ROLE -. "scope resolves to" .-> AU
+  AUTH -->|"ASSIGNS CONSENT POLICY<br/>configuration, not consent use"| CONSENT
 
   classDef blueprint fill:#EAF0FF,stroke:#2F6FED,color:#172033,stroke-width:2px;
   classDef identity fill:#DDF8F8,stroke:#16B8C4,color:#172033,stroke-width:2px;
   classDef person fill:#F5F7FA,stroke:#667085,color:#172033;
-  class AR,CAR blueprint;
-  class RSP,CSP identity;
-  class USER,GROUP person;
+  classDef data fill:#FFF4DC,stroke:#D97706,color:#172033;
+  class APP blueprint;
+  class CLIENT,RESOURCE identity;
+  class HUMAN,MEMBER,PRINCIPAL person;
+  class FIC,AU,ROLE,AUTH,CONSENT data;

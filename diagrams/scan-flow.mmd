@@ -1,22 +1,26 @@
 flowchart LR
-  START(["Administrator starts scan"])
-  AUTH["Sign in<br/>Approve read-only access"]
-  APPS["Read app registrations<br/>Blueprints + roles"]
-  SPS["Read service principals<br/>Tenant identities"]
-  GRANTS["Read role assignments<br/>and delegated grants"]
-  GOV["Read owners and<br/>credential metadata"]
-  NORM["Normalize nodes, edges,<br/>and source evidence"]
-  STORE[("Save tenant-isolated<br/>snapshot")]
-  SHOW["Show completeness report<br/>and relationship map"]
+  START(["Administrator starts<br/>a local scan"])
+  AUTH["Sign in with PKCE<br/>Core + chosen optional reads"]
+  IDENT["Applications, enterprise apps,<br/>users, groups, devices"]
+  ACCESS["Assignments, grants, owners,<br/>membership, administrative units"]
+  TRUST["Roles, policies, federation,<br/>cross-tenant and optional activity"]
+  NORM["Normalize evidence<br/>nodes, edges, scope, completeness"]
+  FIND["Analyze bounded paths<br/>and stable findings"]
+  STORE[("Encrypt tenant snapshot<br/>Prune retention")]
+  SHOW["Explore, compare, review,<br/>revalidate, export"]
 
-  START --> AUTH --> APPS --> SPS --> GRANTS --> GOV --> NORM --> STORE --> SHOW
-  GUARD["READ ONLY<br/>No Entra object is created, edited, or deleted"]
-  GUARD -. "applies to every step" .-> AUTH
-  GUARD -.-> GOV
+  START --> AUTH --> IDENT --> ACCESS --> TRUST --> NORM --> FIND --> STORE --> SHOW
+  CHECKPOINT["Checkpoint after each stage<br/>Resume without repeating completed reads"]
+  IDENT -.-> CHECKPOINT
+  ACCESS -.-> CHECKPOINT
+  TRUST -.-> CHECKPOINT
+  GUARD["GET ONLY<br/>Bounded pagination, retry, fan-out,<br/>cancellation and partial evidence"]
+  GUARD -. "applies to every Graph stage" .-> IDENT
+  GUARD -.-> TRUST
 
   classDef action fill:#EAF0FF,stroke:#2F6FED,color:#172033,stroke-width:2px;
   classDef data fill:#DDF8F8,stroke:#16B8C4,color:#172033,stroke-width:2px;
   classDef guard fill:#FFF4DC,stroke:#D97706,color:#172033;
-  class AUTH,APPS,SPS,GRANTS,GOV,NORM,SHOW action;
-  class STORE data;
+  class AUTH,IDENT,ACCESS,TRUST,NORM,FIND,SHOW action;
+  class STORE,CHECKPOINT data;
   class GUARD guard;

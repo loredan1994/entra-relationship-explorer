@@ -3,11 +3,17 @@
 [![Product verification](https://github.com/loredan1994/entra-relationship-explorer/actions/workflows/ci.yml/badge.svg)](https://github.com/loredan1994/entra-relationship-explorer/actions/workflows/ci.yml)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 
-Understand an Entra tenant in ten seconds.
+Understand who can reach what in a Microsoft Entra tenant, and why.
 
-Entra Relationship Explorer is a client-ready, read-only IAM intelligence workspace that scans Microsoft Entra ID, explains identity relationships, discovers privilege paths, and produces evidence-backed remediation guidance.
+Entra Relationship Explorer is a local-first, read-only IAM investigation workspace. It collects a tenant snapshot through Microsoft Graph, preserves the evidence behind each relationship, explains reachable privilege paths, and gives reviewers a place to record decisions without changing Microsoft Entra.
 
-![The threat workspace and design system](previews/design-system-preview.png)
+![Fixture-mode tenant overview showing attack paths, configured permissions, and the review queue](previews/product-overview.png)
+
+The screenshots use the repository's synthetic **Clean Project** fixture. They show the real application in sample-data mode; no customer or live tenant data is included.
+
+| Relationship map and evidence | Threat workspace |
+|---|---|
+| ![Relationship map with a selected federated credential relationship, connected objects, and exact source evidence](previews/relationship-map.png) | ![Threat workspace with finding lifecycle, inferred attack path, evidence class, and decision record](previews/threat-workspace.png) |
 
 ## Try it without a tenant
 
@@ -20,9 +26,9 @@ Open `http://localhost:3000/overview`. This runs against a synthetic sample tena
 
 ## What it does and does not do
 
-**It does:** read a tenant you administer over Microsoft Graph, encrypt a snapshot into your own PostgreSQL, draw the relationships as a searchable map, find transitive privilege paths, map relevant scenarios to MITRE ATT&CK®, and export findings as CSV, a standalone HTML report, or MITRE Attack Flow.
+**It does:** read one tenant you administer over Microsoft Graph, encrypt live snapshots and review decisions in your own PostgreSQL, draw evidence-backed relationships as a searchable map and table, compare findings across retained scans, find bounded privilege paths, map relevant scenarios to MITRE ATT&CK®, and export sanitized findings, reports, relationships, and MITRE Attack Flow.
 
-**It does not:** grant permissions, remove assignments, create secrets, or change anything in Entra. The Graph transport is GET-only, and that is enforced in code, not by convention. It sends your tenant data to no third-party service — it talks to Microsoft Graph and to your database, both from your machine.
+**It does not:** grant permissions, remove assignments, create secrets, remediate findings, schedule unattended scans, send notifications, or provide hosted multi-tenancy. The Graph transport is GET-only, and that is enforced in code, not by convention. Microsoft Graph is the only external API used for tenant evidence, and stored tenant data remains in the PostgreSQL instance you run.
 
 By default it requests two delegated permissions, `Application.Read.All` and `Directory.Read.All`. Four further read-only scopes are available, each consented separately and only if you want what they add. Write-capable scopes are rejected outright. [SECURITY.md](SECURITY.md) documents the full model.
 
@@ -48,19 +54,18 @@ The product is deliberately read-only. It does not grant permissions, remove ass
 - [Research notes and primary references](docs/RESEARCH_NOTES.md)
 - [Design system](DESIGN.md)
 - [Third-party notices](THIRD_PARTY_NOTICES.md)
-- [Interactive visual preview](previews/design-system-preview.html)
 
 ## Diagrams
 
 | Diagram | PNG | Editable source |
 |---|---|---|
-| What the Entra objects mean | [PNG](diagrams/entra-object-model.png) | [Mermaid](diagrams/entra-object-model.mmd) · [Excalidraw](diagrams/entra-object-model.excalidraw) |
-| Proposed system | [PNG](diagrams/system-architecture.png) | [Mermaid](diagrams/system-architecture.mmd) · [Excalidraw](diagrams/system-architecture.excalidraw) |
-| Read-only scan flow | [PNG](diagrams/scan-flow.png) | [Mermaid](diagrams/scan-flow.mmd) · [Excalidraw](diagrams/scan-flow.excalidraw) |
+| Evidence and relationship model | [PNG](diagrams/entra-object-model.png) | [Mermaid](diagrams/entra-object-model.mmd) |
+| Current local architecture | [PNG](diagrams/system-architecture.png) | [Mermaid](diagrams/system-architecture.mmd) |
+| Resumable GET-only scan flow | [PNG](diagrams/scan-flow.png) | [Mermaid](diagrams/scan-flow.mmd) |
 
 ## Current status
 
-The product includes fixture-driven exploration, single-tenant Microsoft sign-in, GET-only paginated Graph SDK reads, PostgreSQL-backed encrypted sessions, checkpoints, snapshots, and finding decisions, a durable resumable scan queue, throttling-aware progress and cancellation, snapshot and finding-lifecycle comparison, explicit per-scan decision revalidation, Cytoscape.js graph analysis, attack-path discovery, editable review copies of IAM attack flows, and CSV, standalone HTML, and MITRE Attack Flow exports. The default local registration still requests only `Application.Read.All` and `Directory.Read.All`; optional evidence is explicitly gated.
+The product includes fixture-driven exploration, single-tenant Microsoft sign-in, GET-only paginated Graph reads, PostgreSQL-backed encrypted sessions, checkpoints, snapshots, and finding decisions, a durable resumable scan queue, throttling-aware progress and cancellation, snapshot and finding-lifecycle comparison, explicit per-scan decision revalidation, bounded graph analysis, attack-path discovery, editable review copies of IAM attack flows, and CSV, standalone HTML, relationship, and MITRE Attack Flow exports. The default local registration requests only `Application.Read.All` and `Directory.Read.All`; optional evidence is explicitly gated.
 
 The core scan also resolves devices, administrative units and scoped roles, plus application and managed-identity federated workload trust. Optional scopes are configured through `ENTRA_OPTIONAL_GRAPH_SCOPES`: `RoleManagement.Read.Directory` adds active and PIM-eligible administrative roles, `Policy.Read.All` adds Conditional Access, authorization, and partner cross-tenant settings, `Policy.Read.PermissionGrant` adds consent-policy conditions, and `AuditLog.Read.All` adds a 30-day observed sign-in overlay. Unknown and write-capable scopes are rejected. All Graph transport remains GET-only.
 
