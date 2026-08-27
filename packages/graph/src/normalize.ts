@@ -53,10 +53,19 @@ export function normalizeTenantScan(raw: RawTenantScan, options: NormalizeOption
 
 /** Every object the scan inventoried, keyed by id; later records never displace earlier ones. */
 function collectNodes(raw: RawTenantScan): Map<string, DirectoryNode> {
+  const nodes = new Map<string, DirectoryNode>();
+  addApplicationNodes(nodes, raw);
+  addDirectoryNodes(nodes, raw);
+  addGovernanceNodes(nodes, raw);
+  // Last, because an object named only by a relationship must not displace the inventory record.
+  addReferencedNodes(nodes, raw);
+  return nodes;
+}
+
+/** The application registrations, their tenant identities, and the roles those identities publish. */
+function addApplicationNodes(nodes: Map<string, DirectoryNode>, raw: RawTenantScan): void {
   const applicationOwners = ownerIndex(raw.applicationOwners);
   const servicePrincipalOwners = ownerIndex(raw.servicePrincipalOwners);
-  const nodes = new Map<string, DirectoryNode>();
-
   for (const { record } of raw.applications) {
     nodes.set(record.id, applicationNode(record, raw, applicationOwners.get(record.id) ?? []));
   }
@@ -67,21 +76,32 @@ function collectNodes(raw: RawTenantScan): Map<string, DirectoryNode> {
       nodes.set(node.id, node);
     }
   }
+}
+
+/** The people and groups the scan listed, including members it met only through a group. */
+function addDirectoryNodes(nodes: Map<string, DirectoryNode>, raw: RawTenantScan): void {
   for (const { record } of raw.users ?? []) ensureDirectoryObjectNode(nodes, record, raw.tenantId);
   for (const { record } of raw.groups ?? []) ensureDirectoryObjectNode(nodes, record, raw.tenantId);
   for (const membership of raw.groupMemberships ?? []) ensureDirectoryObjectNode(nodes, membership.record, raw.tenantId);
+}
+
+/** Administrative roles, Conditional Access policies, and partner tenants with their policies. */
+function addGovernanceNodes(nodes: Map<string, DirectoryNode>, raw: RawTenantScan): void {
   for (const { record } of raw.roleDefinitions ?? []) nodes.set(record.id, directoryRoleNode(record, raw.tenantId));
   for (const { record } of raw.conditionalAccessPolicies ?? []) nodes.set(record.id, conditionalAccessPolicyNode(record, raw.tenantId));
   for (const { record } of raw.crossTenantPartners ?? []) {
     for (const node of partnerNodes(record, raw.tenantId)) nodes.set(node.id, node);
   }
+}
+
+/** Objects the scan met only as the far end of a relationship: owners and assignment principals. */
+function addReferencedNodes(nodes: Map<string, DirectoryNode>, raw: RawTenantScan): void {
   for (const owner of [...raw.applicationOwners, ...raw.servicePrincipalOwners]) {
     ensureDirectoryObjectNode(nodes, owner.record, raw.tenantId);
   }
   for (const { record } of raw.appRoleAssignments) {
     ensureAssignmentPrincipalNode(nodes, record, raw.tenantId);
   }
-  return nodes;
 }
 
 /** Every relationship the scan can justify, with each relationship appearing once. */

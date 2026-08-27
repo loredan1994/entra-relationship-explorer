@@ -140,12 +140,12 @@ function attackPath(
   if (!view.edge.evidence.observed) uncertainty.push("No activity evidence was collected for the final permission.");
   if (snapshot.completion.status === "partial") uncertainty.push("The source snapshot is partial, so shorter or additional paths may be missing.");
   return {
-  id: stableId("path", traversed.map(({ edge }) => edge.id)), title: `${origin.label} can reach ${view.target.label}`, severity,
-  confidence: snapshot.completion.status === "complete" ? "medium" : "low", source: { id: origin.id, label: origin.label }, target: { id: view.target.id, label: view.target.label },
-  steps: traversed.map(step),
-  prerequisites: [`An attacker first controls ${origin.label} or a session/credential able to act as it.`, "Every configured relationship shown in the path remains effective at the time of attempted use."],
-  attackMappings: [{ id: "T1098", name: "Account Manipulation" }, { id: "T1078.004", name: "Valid Accounts: Cloud Accounts" }],
-  mitigations: [`Review and remove unnecessary ${permissions} access to ${view.target.label}.`, `Reduce control of ${origin.label} and ensure an accountable owner reviews the relationship.`, "Re-scan after remediation and verify that the configured path no longer exists."], uncertainty,
+    id: stableId("path", traversed.map(({ edge }) => edge.id)), title: `${origin.label} can reach ${view.target.label}`, severity,
+    confidence: snapshot.completion.status === "complete" ? "medium" : "low", source: { id: origin.id, label: origin.label }, target: { id: view.target.id, label: view.target.label },
+    steps: traversed.map(step),
+    prerequisites: [`An attacker first controls ${origin.label} or a session/credential able to act as it.`, "Every configured relationship shown in the path remains effective at the time of attempted use."],
+    attackMappings: [{ id: "T1098", name: "Account Manipulation" }, { id: "T1078.004", name: "Valid Accounts: Cloud Accounts" }],
+    mitigations: [`Review and remove unnecessary ${permissions} access to ${view.target.label}.`, `Reduce control of ${origin.label} and ensure an accountable owner reviews the relationship.`, "Re-scan after remediation and verify that the configured path no longer exists."], uncertainty,
   };
 }
 

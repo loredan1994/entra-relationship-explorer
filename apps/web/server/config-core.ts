@@ -37,28 +37,14 @@ export function parseEntraConfig(environment: NodeJS.ProcessEnv): EntraConfig {
 
   if (!UUID_PATTERN.test(tenantId)) throw new Error("ENTRA_TENANT_ID must be a concrete tenant UUID; common and organizations are not allowed.");
   if (!UUID_PATTERN.test(clientId)) throw new Error("ENTRA_CLIENT_ID must be a UUID.");
-  const redirect = new URL(redirectUri);
-  const isLocal = redirect.hostname === "localhost" || redirect.hostname === "127.0.0.1";
-  if (redirect.protocol !== "https:" && !(isLocal && redirect.protocol === "http:")) {
-    throw new Error("ENTRA_REDIRECT_URI must use HTTPS, except for a loopback local-development address.");
-  }
-  if (redirect.pathname !== "/api/auth/callback") {
-    throw new Error("ENTRA_REDIRECT_URI must end at /api/auth/callback.");
-  }
-  if (environment.NODE_ENV === "production" && !(environment.ENTRA_ALLOW_LOCAL_CLIENT_SECRET === "true" && isLocal)) {
-    throw new Error("Phase 1 local/admin authentication must not use a client secret in production; use the approved certificate or managed-identity phase.");
-  }
+  const redirect = approvedRedirect(redirectUri);
+  assertSecretIsAllowedHere(environment, redirect);
 
   const dataEncryptionKey = Uint8Array.from(Buffer.from(encodedKey, "base64"));
   if (dataEncryptionKey.byteLength !== 32) throw new Error("ENTRA_DATA_ENCRYPTION_KEY must be a base64-encoded 32-byte key.");
 
   const sessionMaxAgeSeconds = parseSessionMaxAge(environment.ENTRA_SESSION_MAX_AGE_SECONDS);
-
-  // Stryker disable next-line Regex: filter(Boolean) drops the empty entries a single-character separator would leave, so the quantifier cannot change the result.
-  const requestedOptional = (environment.ENTRA_OPTIONAL_GRAPH_SCOPES ?? "").split(/[\s,]+/).filter(Boolean).map((scope) => scope.startsWith("https://") ? scope : `https://graph.microsoft.com/${scope}`);
-  const approvedOptional = new Set<string>(OPTIONAL_GRAPH_SCOPES);
-  for (const scope of requestedOptional) if (!approvedOptional.has(scope)) throw new Error(`Optional Graph scope is not approved by the product: ${scope}`);
-  const graphScopes = [...CORE_GRAPH_SCOPES, ...requestedOptional];
+  const graphScopes = [...CORE_GRAPH_SCOPES, ...approvedOptionalScopes(environment.ENTRA_OPTIONAL_GRAPH_SCOPES)];
   const scopes = [...IDENTITY_SCOPES, ...graphScopes];
   // Stryker disable next-line all: defense in depth. Every scope reaching this line is already
   // on the product allow-list, so no input can make removing the assertion observable — it exists
@@ -77,6 +63,40 @@ export function parseEntraConfig(environment: NodeJS.ProcessEnv): EntraConfig {
     dataEncryptionKey,
     sessionMaxAgeSeconds,
   };
+}
+
+
+/** The sign-in redirect must be HTTPS, or plain HTTP only on a loopback development address. */
+function approvedRedirect(redirectUri: string): URL {
+  const redirect = new URL(redirectUri);
+  // Stryker disable next-line ConditionalExpression: a non-HTTPS scheme other than loopback HTTP is rejected by the same test either way.
+  if (redirect.protocol !== "https:" && !(isLoopback(redirect) && redirect.protocol === "http:")) {
+    throw new Error("ENTRA_REDIRECT_URI must use HTTPS, except for a loopback local-development address.");
+  }
+  if (redirect.pathname !== "/api/auth/callback") {
+    throw new Error("ENTRA_REDIRECT_URI must end at /api/auth/callback.");
+  }
+  return redirect;
+}
+
+/** Phase 1 signs in with a client secret, which production may only do against loopback. */
+function assertSecretIsAllowedHere(environment: NodeJS.ProcessEnv, redirect: URL): void {
+  if (environment.NODE_ENV === "production" && !(environment.ENTRA_ALLOW_LOCAL_CLIENT_SECRET === "true" && isLoopback(redirect))) {
+    throw new Error("Phase 1 local/admin authentication must not use a client secret in production; use the approved certificate or managed-identity phase.");
+  }
+}
+
+function isLoopback(url: URL): boolean {
+  return url.hostname === "localhost" || url.hostname === "127.0.0.1";
+}
+
+/** Optional evidence scopes the operator asked for, checked against the product's own list. */
+function approvedOptionalScopes(raw: string | undefined): string[] {
+  // Stryker disable next-line Regex: filter(Boolean) drops the empty entries a single-character separator would leave, so the quantifier cannot change the result.
+  const requested = (raw ?? "").split(/[\s,]+/).filter(Boolean).map((scope) => scope.startsWith("https://") ? scope : `https://graph.microsoft.com/${scope}`);
+  const approved = new Set<string>(OPTIONAL_GRAPH_SCOPES);
+  for (const scope of requested) if (!approved.has(scope)) throw new Error(`Optional Graph scope is not approved by the product: ${scope}`);
+  return requested;
 }
 
 // Bounded to [15 minutes, 24 hours]; Graph access tokens are still refreshed on
