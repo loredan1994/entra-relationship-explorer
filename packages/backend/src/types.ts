@@ -99,6 +99,7 @@ export interface Backend {
   recordAccess(tenantId: string, sessionId: string | null, action: string, resourceType: string, resourceId?: string): Promise<void>;
   recentAccessEvents(tenantId: string, limit?: number): Promise<AccessEvent[]>;
   getThreatReview(tenantId: string, snapshotId: string, findingId: string): Promise<ThreatReview | null>;
+  priorThreatReviews(tenantId: string, currentSnapshotId: string, findingIds: string[]): Promise<ThreatReview[]>;
   upsertThreatReview(review: ThreatReview, sessionId: string | null): Promise<ThreatReview>;
   close(): Promise<void>;
 }

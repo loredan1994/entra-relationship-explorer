@@ -4,6 +4,7 @@ import { cookies } from "next/headers";
 import { getServerSession, SESSION_COOKIE } from "./auth/session-store";
 import { getEntraConfig } from "./config";
 import { getBackend } from "./backend";
+import type { ThreatReview } from "@entra-explorer/backend";
 
 /**
  * Why the workspace is showing the data it shows.
@@ -49,4 +50,13 @@ export async function loadCurrentSnapshot(): Promise<TenantSnapshot> {
 
 export async function loadSnapshotHistory(limit = 10): Promise<TenantSnapshot[]> {
   return (await loadSnapshotContext(limit)).history;
+}
+
+export async function loadPriorThreatReviews(snapshot: TenantSnapshot, findingIds: string[]): Promise<ThreatReview[]> {
+  const config = getEntraConfig();
+  if (!config.enabled || snapshot.mode !== "tenant" || findingIds.length === 0) return [];
+  const cookieStore = await cookies();
+  const session = await getServerSession(cookieStore.get(SESSION_COOKIE)?.value, config);
+  if (!session || session.tenantId !== config.tenantId || session.tenantId !== snapshot.tenant.tenantId) return [];
+  return (await getBackend(config)).priorThreatReviews(session.tenantId, snapshot.id, findingIds);
 }

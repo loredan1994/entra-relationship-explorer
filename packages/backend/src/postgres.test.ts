@@ -85,6 +85,7 @@ describe("tenant scoping", () => {
     await backend.recentSnapshots(TENANT).catch(() => {});
     await backend.recentAccessEvents(TENANT);
     await backend.getThreatReview(TENANT, "snap-1", "finding-1").catch(() => {});
+    await backend.priorThreatReviews(TENANT, "snap-2", ["finding-1"]).catch(() => {});
     const tenantScoped = pool.queries.filter((query) => /FROM (sessions|scan_jobs|snapshots|access_events|threat_reviews|scan_checkpoints)/.test(query.sql));
     expect(tenantScoped.length).toBeGreaterThan(0);
     for (const query of tenantScoped) expect(query.sql, query.sql).toMatch(/tenant_id\s*=\s*\$\d/);
@@ -683,5 +684,14 @@ describe("statement parameters", () => {
     };
     await backend.upsertThreatReview(review, "session-1");
     expect(pool.only("INSERT INTO threat_reviews").params).toEqual([TENANT, "snap-1", "finding-1", ...ANY_PAYLOAD]);
+  });
+
+  it("decrypts the latest prior review for each requested finding", async () => {
+    const { backend, pool } = backendUnderTest();
+    const review: ThreatReview = { findingId: "finding-1", snapshotId: "snap-prior", tenantId: TENANT, disposition: "mitigating", owner: "IAM", expiresAt: null, assumption: "Working", updatedAt: "2026-08-26T00:00:00.000Z" };
+    pool.responder = respondTo("WITH current_snapshot", { rows: [encryptedRow(review, `threat-review:${TENANT}:snap-prior:finding-1`, { tenant_id: TENANT, id: "snap-prior", snapshot_id: "snap-prior", finding_id: "finding-1" })] });
+    expect(await backend.priorThreatReviews(TENANT, "snap-current", ["finding-1", "finding-1"])).toEqual([review]);
+    expect(pool.only("WITH current_snapshot").params).toEqual([TENANT, "snap-current", ["finding-1"]]);
+    expect(await backend.priorThreatReviews(TENANT, "snap-current", [])).toEqual([]);
   });
 });

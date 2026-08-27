@@ -95,4 +95,30 @@ describe("Backend contract", () => {
     expect(await backend.getThreatReview(tenantId, review.snapshotId, review.findingId)).toMatchObject({ owner: "IAM", flowDraft: review.flowDraft });
     expect(await backend.getThreatReview(randomUUID(), review.snapshotId, review.findingId)).toBeNull();
   });
+
+  it("returns only the most recent prior review for each requested finding", async () => {
+    const backend = new MemoryBackend(); const valid = session(); await backend.createSession(valid);
+    const saveSnapshot = async (id: string, scannedAt: string) => {
+      const queued = await backend.enqueueScan(tenantId, valid.id); await backend.claimNextJob(id, tenantId);
+      await backend.completeJob(queued.id, id, { ...cleanProjectFixture, id, scannedAt, tenant: { ...cleanProjectFixture.tenant, tenantId } }, new Date(0));
+    };
+    await saveSnapshot("snap-old", "2026-08-25T00:00:00.000Z");
+    await backend.upsertThreatReview({ findingId: "finding-1", snapshotId: "snap-old", tenantId, disposition: "open", owner: "Old", expiresAt: null, assumption: "", updatedAt: "" }, null);
+    await saveSnapshot("snap-prior", "2026-08-26T00:00:00.000Z");
+    await backend.upsertThreatReview({ findingId: "finding-1", snapshotId: "snap-prior", tenantId, disposition: "mitigating", owner: "Current", expiresAt: null, assumption: "", updatedAt: "" }, null);
+    await saveSnapshot("snap-current", "2026-08-27T00:00:00.000Z");
+    expect(await backend.priorThreatReviews(tenantId, "snap-current", ["finding-1", "missing"])).toEqual([expect.objectContaining({ snapshotId: "snap-prior", owner: "Current" })]);
+    expect(await backend.priorThreatReviews(randomUUID(), "snap-current", ["finding-1"])).toEqual([]);
+  });
+
+  it("removes reviews when their snapshots age out of retention", async () => {
+    const backend = new MemoryBackend(); const valid = session(); await backend.createSession(valid);
+    const queued = await backend.enqueueScan(tenantId, valid.id); await backend.claimNextJob("old-worker", tenantId);
+    const old = { ...cleanProjectFixture, id: "snap-old", scannedAt: "2026-07-01T00:00:00.000Z", tenant: { ...cleanProjectFixture.tenant, tenantId } };
+    await backend.completeJob(queued.id, "old-worker", old, new Date(0));
+    await backend.upsertThreatReview({ findingId: "finding-1", snapshotId: old.id, tenantId, disposition: "open", owner: "IAM", expiresAt: null, assumption: "", updatedAt: "" }, null);
+    const next = await backend.enqueueScan(tenantId, valid.id); await backend.claimNextJob("new-worker", tenantId);
+    await backend.completeJob(next.id, "new-worker", { ...old, id: "snap-new", scannedAt: "2026-08-27T00:00:00.000Z" }, new Date("2026-08-01T00:00:00.000Z"));
+    expect(await backend.getThreatReview(tenantId, old.id, "finding-1")).toBeNull();
+  });
 });

@@ -4,6 +4,7 @@ import { getServerSession, SESSION_COOKIE } from "@/server/auth/session-store";
 import { getBackend } from "@/server/backend";
 import { getEntraConfig } from "@/server/config";
 import { noStoreJson, requireSameOrigin } from "@/server/http";
+import { revalidateThreatReview } from "@/server/review-revalidation";
 
 export const dynamic = "force-dynamic";
 const DISPOSITIONS = new Set(["open", "mitigating", "accepted", "resolved"]);
@@ -24,7 +25,11 @@ export async function GET(request: NextRequest, route: { params: Promise<{ id: s
   const { id } = await route.params;
   const context = await contextFor(request, id);
   if ("error" in context) return context.error;
-  return noStoreJson({ review: await context.backend.getThreatReview(context.session.tenantId, context.snapshot.id, id) });
+  const [review, priorReview] = await Promise.all([
+    context.backend.getThreatReview(context.session.tenantId, context.snapshot.id, id),
+    context.backend.priorThreatReviews(context.session.tenantId, context.snapshot.id, [id]).then((items) => items[0] ?? null),
+  ]);
+  return noStoreJson({ review, priorReview });
 }
 
 export async function PUT(request: NextRequest, route: { params: Promise<{ id: string }> }) {
@@ -46,5 +51,19 @@ export async function PUT(request: NextRequest, route: { params: Promise<{ id: s
   }) : [];
   if (body.disposition === "accepted" && (!owner || !expiresAt || !assumption)) return noStoreJson({ error: "Accepted risk requires an owner, expiry date, and rationale." }, { status: 400 });
   const review = await context.backend.upsertThreatReview({ findingId: id, snapshotId: context.snapshot.id, tenantId: context.session.tenantId, disposition: body.disposition as "open" | "mitigating" | "accepted" | "resolved", owner, expiresAt, assumption, flowDraft, updatedAt: new Date().toISOString() }, context.session.id);
+  return noStoreJson({ review });
+}
+
+export async function POST(request: NextRequest, route: { params: Promise<{ id: string }> }) {
+  const { id } = await route.params;
+  const context = await contextFor(request, id);
+  if ("error" in context) return context.error;
+  try { requireSameOrigin(request, context.config.redirectUri); } catch { return noStoreJson({ error: "Cross-origin request rejected." }, { status: 403 }); }
+  const body = await request.json().catch(() => null) as Record<string, unknown> | null;
+  if (!body || typeof body.sourceSnapshotId !== "string") return noStoreJson({ error: "A prior source snapshot is required." }, { status: 400 });
+  const prior = (await context.backend.priorThreatReviews(context.session.tenantId, context.snapshot.id, [id]))[0];
+  if (!prior || prior.snapshotId !== body.sourceSnapshotId) return noStoreJson({ error: "The prior review is stale or unavailable." }, { status: 409 });
+  const review = await context.backend.upsertThreatReview(revalidateThreatReview(prior, context.snapshot.id), context.session.id);
+  await context.backend.recordAccess(context.session.tenantId, context.session.id, "revalidate", "threat_review", id);
   return noStoreJson({ review });
 }

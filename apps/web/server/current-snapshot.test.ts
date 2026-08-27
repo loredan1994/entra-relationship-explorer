@@ -7,17 +7,18 @@ const OTHER_TENANT = "22222222-2222-4222-8222-222222222222";
 const getEntraConfig = vi.fn();
 const getServerSession = vi.fn();
 const recentSnapshots = vi.fn();
+const priorThreatReviews = vi.fn();
 const cookieGet = vi.fn();
 
 vi.mock("./config", () => ({ getEntraConfig: () => getEntraConfig() }));
-vi.mock("./backend", () => ({ getBackend: async () => ({ recentSnapshots }) }));
+vi.mock("./backend", () => ({ getBackend: async () => ({ recentSnapshots, priorThreatReviews }) }));
 vi.mock("./auth/session-store", () => ({
   SESSION_COOKIE: "entra_explorer_session",
   getServerSession: (...args: unknown[]) => getServerSession(...args),
 }));
 vi.mock("next/headers", () => ({ cookies: async () => ({ get: cookieGet }) }));
 
-const { loadCurrentSnapshot, loadSnapshotContext, loadSnapshotHistory } = await import("./current-snapshot");
+const { loadCurrentSnapshot, loadPriorThreatReviews, loadSnapshotContext, loadSnapshotHistory } = await import("./current-snapshot");
 
 const liveConfig = { enabled: true, tenantId: TENANT };
 
@@ -32,6 +33,7 @@ beforeEach(() => {
   cookieGet.mockReturnValue({ value: "session-cookie" });
   getServerSession.mockResolvedValue({ id: "session-1", tenantId: TENANT });
   recentSnapshots.mockResolvedValue([]);
+  priorThreatReviews.mockResolvedValue([]);
 });
 
 describe("demo mode", () => {
@@ -147,5 +149,48 @@ describe("convenience readers", () => {
     getServerSession.mockResolvedValue(null);
     expect(await loadCurrentSnapshot()).toBe(cleanProjectFixture);
     expect(await loadSnapshotHistory()).toEqual([cleanProjectFixture]);
+  });
+});
+
+describe("prior review context", () => {
+  it("batch-loads only reviews for the authenticated snapshot tenant", async () => {
+    const snapshot = tenantSnapshot("snap-current");
+    priorThreatReviews.mockResolvedValue([{ findingId: "finding-1" }]);
+    expect(await loadPriorThreatReviews(snapshot, ["finding-1"])).toEqual([{ findingId: "finding-1" }]);
+    expect(priorThreatReviews).toHaveBeenCalledWith(TENANT, snapshot.id, ["finding-1"]);
+  });
+
+  it("does not query reviews for fixtures, empty input, signed-out sessions, or a mismatched tenant", async () => {
+    expect(await loadPriorThreatReviews(cleanProjectFixture, ["finding-1"])).toEqual([]);
+    expect(await loadPriorThreatReviews(tenantSnapshot("snap"), [])).toEqual([]);
+    getServerSession.mockResolvedValue(null);
+    expect(await loadPriorThreatReviews(tenantSnapshot("snap"), ["finding-1"])).toEqual([]);
+    getServerSession.mockResolvedValue({ id: "session-1", tenantId: OTHER_TENANT });
+    expect(await loadPriorThreatReviews(tenantSnapshot("snap"), ["finding-1"])).toEqual([]);
+    expect(priorThreatReviews).not.toHaveBeenCalled();
+  });
+
+  it("keeps every independent live-mode and tenant guard effective", async () => {
+    const tenant = tenantSnapshot("snap");
+    getEntraConfig.mockReturnValue({ enabled: false, reason: "off" });
+    expect(await loadPriorThreatReviews(tenant, ["finding-1"])).toEqual([]);
+
+    getEntraConfig.mockReturnValue(liveConfig);
+    expect(await loadPriorThreatReviews({ ...tenant, mode: "fixture" }, ["finding-1"])).toEqual([]);
+
+    const otherSnapshot = { ...tenant, tenant: { tenantId: OTHER_TENANT, tenantLabel: "Other" }, nodes: tenant.nodes.map((item) => ({ ...item, tenantId: OTHER_TENANT })), edges: tenant.edges.map((item) => ({ ...item, tenantId: OTHER_TENANT })) };
+    getServerSession.mockResolvedValue({ id: "session-1", tenantId: OTHER_TENANT });
+    expect(await loadPriorThreatReviews(otherSnapshot, ["finding-1"])).toEqual([]);
+
+    getServerSession.mockResolvedValue({ id: "session-1", tenantId: TENANT });
+    expect(await loadPriorThreatReviews(otherSnapshot, ["finding-1"])).toEqual([]);
+    expect(priorThreatReviews).not.toHaveBeenCalled();
+  });
+
+  it("handles an absent session cookie without dereferencing it", async () => {
+    cookieGet.mockReturnValue(undefined);
+    getServerSession.mockResolvedValue(null);
+    expect(await loadPriorThreatReviews(tenantSnapshot("snap"), ["finding-1"])).toEqual([]);
+    expect(getServerSession).toHaveBeenCalledWith(undefined, liveConfig);
   });
 });

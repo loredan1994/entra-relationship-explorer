@@ -13,6 +13,8 @@ Breaking changes are always called out under **Changed** with a migration note.
 
 ### Added
 
+- Finding lifecycle across retained scans: newly detected, ongoing, returned, no-longer-detected, and unconfirmed when collection coverage cannot establish absence.
+- Explicit snapshot-scoped review revalidation with prior-decision context, expired-acceptance warnings, and reopening for findings previously marked resolved.
 - Apache-2.0 license, contribution guide, security policy, and code of conduct.
 - CodeQL analysis, dependency review, and Dependabot in CI.
 - An explicit save state in the threat workspace decision record, so a rejected

@@ -21,6 +21,7 @@ Microsoft Entra stores application identity across several related object types 
 - Compare two scans without changing the tenant.
 - Find transitive paths to powerful application and directory access.
 - Review IAM threats with evidence, remediation, ownership, assumptions, and expiry.
+- Distinguish newly detected, ongoing, returned, and no-longer-detected findings across retained scans without silently carrying forward old decisions.
 
 ## MVP
 
@@ -34,6 +35,7 @@ The MVP signs an administrator in, requests read-only consent, scans one tenant,
 - Search, filters, Cytoscape-assisted graph layout, table view, evidence inspector, and CSV export
 - Evidence-backed IAM findings and multi-stage attack flows
 - A threat workspace with encrypted tenant decision records, editable analyst flow copies, and sanitized CSV, HTML, and Attack Flow exports
+- A recurring investigation lifecycle with explicit per-scan review revalidation and acceptance-expiry warnings
 
 Optional evidence is implemented behind separately approved read-only scopes: sign-in activity, active and PIM-eligible roles, Conditional Access, and partner cross-tenant settings. Maester is not embedded: an isolated posture worker remains appropriate only after a concrete, license-verified test pack produces evidence that the native Graph collector does not already provide.
 

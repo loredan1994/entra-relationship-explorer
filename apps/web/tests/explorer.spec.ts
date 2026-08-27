@@ -81,6 +81,15 @@ test("the threat workspace explains transitive paths and keeps evidence classes 
   await expect(page.getByLabel("Status")).toHaveValue("mitigating");
 });
 
+test("the threat workspace filters current findings by retained-scan lifecycle", async ({ page }) => {
+  await page.goto("/security");
+  const lifecycle = page.getByLabel("Finding lifecycle filters");
+  await expect(lifecycle.getByRole("button", { name: /new/i })).toBeVisible();
+  await lifecycle.getByRole("button", { name: /new/i }).click();
+  await expect(lifecycle.getByRole("button", { name: /new/i })).toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator(".lifecycle-chip")).toContainText("new");
+});
+
 test("standalone report and MITRE Attack Flow exports are sanitized and interoperable", async ({ request }) => {
   const report = await request.get("/api/export/report.html");
   expect(report.ok()).toBeTruthy();

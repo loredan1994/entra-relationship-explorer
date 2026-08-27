@@ -62,6 +62,24 @@ paths:
         "400": { description: Invalid decision or accepted-risk fields }
         "401": { description: Authentication required }
         "403": { description: Same-origin check failed }
+    post:
+      summary: Revalidate the latest prior decision against the current snapshot
+      description: Copies prior encrypted review context only after explicit user action. Resolved findings and expired acceptances reopen instead of silently carrying assurance forward.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [sourceSnapshotId]
+              properties:
+                sourceSnapshotId: { type: string, format: uuid }
+      responses:
+        "200": { description: Current snapshot review created from validated prior context }
+        "400": { description: Prior source snapshot is missing }
+        "401": { description: Authentication required }
+        "403": { description: Same-origin check failed }
+        "409": { description: Prior review is stale or unavailable }
   /exports/relationships.csv:
     get:
       summary: Export the latest tenant snapshot as CSV

@@ -124,7 +124,10 @@ export class MemoryBackend implements Backend {
     // Stryker disable next-line ArrayDeclaration: the retention filter below drops any seeded entry, which has no scannedAt.
     const items = this.snapshots.get(job.tenantId) ?? [];
     items.push(copy(snapshot));
-    this.snapshots.set(job.tenantId, items.filter((item) => new Date(item.scannedAt) >= retainAfter).sort((a, b) => b.scannedAt.localeCompare(a.scannedAt)));
+    const retained = items.filter((item) => new Date(item.scannedAt) >= retainAfter).sort((a, b) => b.scannedAt.localeCompare(a.scannedAt));
+    this.snapshots.set(job.tenantId, retained);
+    const retainedIds = new Set(retained.map((item) => item.id));
+    for (const [key, review] of this.threatReviews) if (review.tenantId === job.tenantId && !retainedIds.has(review.snapshotId)) this.threatReviews.delete(key);
     job.status = "complete";
     job.stage = "complete";
     job.snapshotId = snapshot.id;
@@ -175,6 +178,21 @@ export class MemoryBackend implements Backend {
     return copy(this.accessEvents.filter((event) => event.tenantId === tenantId).sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, bounded));
   }
   async getThreatReview(tenantId: string, snapshotId: string, findingId: string): Promise<ThreatReview | null> { const value = this.threatReviews.get(`${tenantId}:${snapshotId}:${findingId}`); return value ? copy(value) : null; }
+  async priorThreatReviews(tenantId: string, currentSnapshotId: string, findingIds: string[]): Promise<ThreatReview[]> {
+    const history = this.snapshots.get(tenantId) ?? [];
+    const currentIndex = history.findIndex((snapshot) => snapshot.id === currentSnapshotId);
+    if (currentIndex < 0 || findingIds.length === 0) return [];
+    const wanted = new Set(findingIds);
+    const found = new Map<string, ThreatReview>();
+    for (const snapshot of history.slice(currentIndex + 1)) {
+      for (const findingId of wanted) {
+        if (found.has(findingId)) continue;
+        const review = this.threatReviews.get(`${tenantId}:${snapshot.id}:${findingId}`);
+        if (review) found.set(findingId, review);
+      }
+    }
+    return copy([...found.values()]);
+  }
   async upsertThreatReview(review: ThreatReview, sessionId: string | null): Promise<ThreatReview> { const value = { ...copy(review), updatedAt: new Date().toISOString() }; this.threatReviews.set(`${value.tenantId}:${value.snapshotId}:${value.findingId}`, value); await this.recordAccess(value.tenantId, sessionId, "update", "threat_review", value.findingId); return copy(value); }
   async close(): Promise<void> {}
 
