@@ -117,7 +117,7 @@ export function PermissionsTable({ grants }: { grants: PermissionGrant[] }) {
             <th aria-sort={sortDirection("type")}>{header("type", "Access type")}</th>
             <th aria-sort={sortDirection("resource")}>{header("resource", "Resource")}</th>
             <th>Permissions</th>
-            <th>Evidence</th>
+            <th className="table-action-cell">Evidence</th>
           </tr></thead>
           <tbody>
             {visible.map((grant) => (
@@ -132,7 +132,7 @@ export function PermissionsTable({ grants }: { grants: PermissionGrant[] }) {
                 <td className="permissions-cell">
                   <PermissionPills permissions={grant.permissions} limit={4} />
                 </td>
-                <td><Link className="text-link" href={`/map?edge=${grant.edgeId}`}>Inspect</Link></td>
+                <td className="table-action-cell"><Link className="text-link" href={`/map?edge=${grant.edgeId}`}>Inspect</Link></td>
               </tr>
             ))}
           </tbody>

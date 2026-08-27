@@ -63,7 +63,7 @@ button, a, input { -webkit-tap-highlight-color: transparent; }
 .global-search input::placeholder { color: #8fa1b8; }
 .read-only-badge { display: inline-flex; align-items: center; white-space: nowrap; color: #aeeaf0; background: rgba(22, 184, 196, 0.12); border: 1px solid rgba(22, 184, 196, 0.28); border-radius: 999px; padding: 5px 10px; font-size: 11px; font-weight: 700; letter-spacing: 0.03em; }
 .primary-nav { height: 45px; display: flex; gap: 26px; align-items: stretch; padding: 0 28px; background: #fff; border-bottom: 1px solid var(--line-light); }
-.primary-nav a { position: relative; display: flex; align-items: center; color: var(--ink-muted); text-decoration: none; font-weight: 600; font-size: 13px; }
+.primary-nav a { position: relative; display: flex; align-items: center; overflow-wrap: normal; word-break: normal; white-space: nowrap; color: var(--ink-muted); text-decoration: none; font-weight: 600; font-size: 13px; }
 .primary-nav a:hover { color: var(--ink-strong); }
 .primary-nav a[aria-current="page"] { color: var(--action-text); }
 .primary-nav a[aria-current="page"]::after { content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 3px; background: var(--action); border-radius: 3px 3px 0 0; }
@@ -87,16 +87,16 @@ button, a, input { -webkit-tap-highlight-color: transparent; }
 .page-heading > div:first-child > p:last-child { max-width: 730px; margin: 0; color: var(--ink-muted); font-size: 15px; }
 .eyebrow { margin: 0; color: var(--action-text); font-size: 11px; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; }
 .page-actions { display: flex; align-items: center; gap: 8px; }
-.button { min-height: 40px; display: inline-flex; align-items: center; justify-content: center; border: 1px solid transparent; border-radius: 5px; padding: 9px 15px; font-weight: 700; text-decoration: none; cursor: pointer; transition: background 120ms ease-out, border-color 120ms ease-out, transform 120ms ease-out; }
+.button { min-height: 40px; display: inline-flex; align-items: center; justify-content: center; overflow-wrap: normal; word-break: normal; white-space: nowrap; border: 1px solid transparent; border-radius: 5px; padding: 9px 15px; font-weight: 700; text-decoration: none; cursor: pointer; transition: background 120ms ease-out, border-color 120ms ease-out, transform 120ms ease-out; }
 .button:hover { transform: translateY(-1px); }
 .button-primary { color: white; background: var(--action); }
 .button-primary:hover { background: #245dcc; }
 .button-secondary { color: var(--ink-strong); background: #fff; border-color: #cbd5e1; }
 .button-secondary:hover { border-color: #9eabc0; }
 .button-full { width: 100%; }
-.text-link, .text-button { color: var(--action-text); font-weight: 700; text-decoration: none; }
+.text-link, .text-button { overflow-wrap: normal; word-break: normal; color: var(--action-text); font-weight: 700; text-decoration: none; }
 .text-link:hover, .text-button:hover { text-decoration: underline; }
-.text-button { padding: 2px; background: none; border: 0; cursor: pointer; }
+.text-button { padding: 2px; white-space: nowrap; background: none; border: 0; cursor: pointer; }
 .mono, code { font-family: var(--font-mono); }
 
 .summary-strip { display: grid; grid-template-columns: repeat(4, 1fr); margin-bottom: 24px; background: #fff; border: 1px solid var(--line-light); border-radius: 8px; }
@@ -279,6 +279,8 @@ button, a, input { -webkit-tap-highlight-color: transparent; }
 .data-table td { padding: 16px; }
 .data-table td > strong { display: block; }
 .data-table td > code { display: block; margin: 1px 0; color: #536175; font-size: 10px; overflow-wrap: anywhere; }
+.table-action-cell { width: 1%; min-width: 88px; white-space: nowrap; }
+.table-action-cell .text-link, .table-action-cell .text-button { min-height: 44px; display: inline-flex; align-items: center; }
 .identity-pair-grid { display: grid; grid-template-columns: minmax(0, 1fr) 100px minmax(0, 1fr); align-items: center; margin-bottom: 24px; }
 .entity-detail-card { min-height: 325px; padding: 24px; background: #fff; border: 1px solid var(--line-light); border-top: 4px solid var(--action); border-radius: 8px; }
 .entity-detail-card.detail-servicePrincipal { border-top-color: var(--identity); }

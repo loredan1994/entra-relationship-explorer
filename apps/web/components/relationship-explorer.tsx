@@ -475,7 +475,7 @@ function RelationshipTable({
             <th>Relationship</th>
             <th>Target</th>
             <th>Permission</th>
-            <th>Evidence</th>
+            <th className="table-action-cell">Evidence</th>
           </tr>
         </thead>
         <tbody>
@@ -485,7 +485,7 @@ function RelationshipTable({
               <td>{relationshipLabels[edge.type]}<small>Configured</small></td>
               <td><strong>{target.label}</strong><small>{kindLabels[target.kind].plain}</small></td>
               <td className="mono">{edge.permissions.length > 4 ? `${edge.permissions.slice(0, 4).join(", ")} +${edge.permissions.length - 4} more` : edge.permissions.join(", ") || "—"}</td>
-              <td><button className="text-button" onClick={() => onSelect(edge.id)}>Inspect</button></td>
+              <td className="table-action-cell"><button className="text-button" onClick={() => onSelect(edge.id)}>Inspect</button></td>
             </tr>
           ))}
         </tbody>
