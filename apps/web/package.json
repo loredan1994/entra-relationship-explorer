@@ -15,7 +15,7 @@
     "test:mutation": "stryker run"
   },
   "dependencies": {
-    "@azure/msal-node": "5.4.3",
+    "@azure/msal-node": "5.6.0",
     "@entra-explorer/backend": "workspace:*",
     "@entra-explorer/domain": "workspace:*",
     "@entra-explorer/graph": "workspace:*",
