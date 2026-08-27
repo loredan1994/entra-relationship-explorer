@@ -24,3 +24,5 @@ Add intelligence through the small `EntraRule` interface. A proposed rule must:
 7. Add fixture-based contract tests for the positive case, adjacent non-finding cases, deterministic output, partial evidence, and tenant isolation.
 
 Runtime rule plugins remain intentionally out of scope. Executable rules are trusted code and receive the same review, coverage, mutation, and GET-only verification as the rest of the product.
+
+Start with the bounded [rule fixture template](RULE_TEMPLATE.md). It keeps collection, detection, negative controls, partial evidence, history ordering, and tenant isolation visible in one reviewable fixture before UI or storage work is considered.

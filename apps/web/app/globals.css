@@ -500,6 +500,9 @@ button, a, input { -webkit-tap-highlight-color: transparent; }
 .rule-detail ul { margin: 0; padding-left: 20px; color: var(--ink-muted); }
 .rule-detail li + li { margin-top: 5px; }
 .rule-references { margin-top: 16px; font-size: 12px; }
+.packet-actions { align-items: center; border-top: 1px solid var(--line-light); display: flex; flex-wrap: wrap; gap: 8px 14px; margin-top: 16px; padding-top: 14px; }
+.packet-actions span { color: var(--ink-muted); font-size: 12px; }
+.packet-actions a { color: var(--action); font-size: 13px; font-weight: 750; }
 .rule-feed-label { display: block; margin: 5px 0; color: #244f9e; font: 700 11px/1.3 var(--font-mono); }
 .detail-actions { display: flex; align-items: flex-start; gap: 8px; white-space: nowrap; }
 .finding-columns { display: grid; grid-template-columns: minmax(0, 1fr) 310px; }

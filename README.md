@@ -26,7 +26,7 @@ Open `http://localhost:3000/overview`. This runs against a synthetic sample tena
 
 ## What it does and does not do
 
-**It does:** read one tenant you administer over Microsoft Graph, encrypt live snapshots and review decisions in your own PostgreSQL, draw evidence-backed relationships as a searchable map and table, compare findings across retained scans, find bounded privilege paths, map relevant scenarios to MITRE ATT&CK®, and export sanitized findings, reports, relationships, and MITRE Attack Flow.
+**It does:** read one tenant you administer over Microsoft Graph, encrypt live snapshots and review decisions in your own PostgreSQL, draw evidence-backed relationships as a searchable map and table, compare findings across retained scans, find bounded privilege paths, map relevant scenarios to MITRE ATT&CK®, and export sanitized findings, focused evidence packets, reports, relationships, and MITRE Attack Flow.
 
 **It does not:** grant permissions, remove assignments, create secrets, remediate findings, schedule unattended scans, send notifications, or provide hosted multi-tenancy. The Graph transport is GET-only, and that is enforced in code, not by convention. Microsoft Graph is the only external API used for tenant evidence, and stored tenant data remains in the PostgreSQL instance you run.
 
@@ -53,6 +53,7 @@ The product is deliberately read-only. It does not grant permissions, remove ass
 - [Version 1 API contract](docs/openapi.yaml)
 - [Research notes and primary references](docs/RESEARCH_NOTES.md)
 - [Entra control-path rule catalog](docs/RULE_CATALOG.md)
+- [Rule contribution fixture template](docs/RULE_TEMPLATE.md)
 - [Design system](DESIGN.md)
 - [Third-party notices](THIRD_PARTY_NOTICES.md)
 
@@ -66,7 +67,7 @@ The product is deliberately read-only. It does not grant permissions, remove ass
 
 ## Current status
 
-The product includes fixture-driven exploration, single-tenant Microsoft sign-in, GET-only paginated Graph reads, PostgreSQL-backed encrypted sessions, checkpoints, snapshots, and finding decisions, a durable resumable scan queue, throttling-aware progress and cancellation, snapshot and finding-lifecycle comparison, explicit per-scan decision revalidation, bounded graph analysis, attack-path discovery, a versioned Entra control-path rule catalog, editable review copies of IAM attack flows, and CSV, standalone HTML, relationship, and MITRE Attack Flow exports. The default local registration requests only `Application.Read.All` and `Directory.Read.All`; optional evidence is explicitly gated.
+The product includes fixture-driven exploration, single-tenant Microsoft sign-in, GET-only paginated Graph reads, PostgreSQL-backed encrypted sessions, checkpoints, snapshots, and finding decisions, a durable resumable scan queue, throttling-aware progress and cancellation, snapshot and finding-lifecycle comparison, explicit per-scan decision revalidation, bounded graph analysis, attack-path discovery, a versioned Entra control-path rule catalog, editable review copies of IAM attack flows, focused Markdown and versioned JSON evidence packets, and CSV, standalone HTML, relationship, and MITRE Attack Flow exports. Focused packets include only one selected finding or path and its referenced evidence—not the full tenant snapshot. The default local registration requests only `Application.Read.All` and `Directory.Read.All`; optional evidence is explicitly gated.
 
 The core scan also resolves devices, administrative units and scoped roles, plus application and managed-identity federated workload trust. Optional scopes are configured through `ENTRA_OPTIONAL_GRAPH_SCOPES`: `RoleManagement.Read.Directory` adds active and PIM-eligible administrative roles, `Policy.Read.All` adds Conditional Access, authorization, and partner cross-tenant settings, `Policy.Read.PermissionGrant` adds consent-policy conditions, and `AuditLog.Read.All` adds a 30-day observed sign-in overlay. Unknown and write-capable scopes are rejected. All Graph transport remains GET-only.
 
