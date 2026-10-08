@@ -2,6 +2,7 @@ import { expect, test } from "@playwright/test";
 
 const coreRoutes = [
   "/overview",
+  "/guide",
   "/map",
   "/permissions",
   "/changes",
@@ -14,6 +15,22 @@ const coreRoutes = [
   "/investigations?view=rules",
   "/applications/30000000-0000-4000-8000-000000000001",
 ];
+
+test("the overview and guide lead an analyst to the matching investigation", async ({ page }) => {
+  await page.goto("/overview");
+  await page.getByRole("link", { name: /Who has access to this application/ }).click();
+  await expect(page).toHaveURL(/\/investigations\?view=applications$/);
+  await expect(page.getByRole("heading", { name: "Application access review", exact: true })).toBeVisible();
+  await page.getByRole("navigation", { name: "Product sections" }).getByRole("link", { name: "Guide", exact: true }).click();
+  await expect(page.getByRole("region", { name: "Four kinds of evidence" })).toBeVisible();
+  await page.getByRole("link", { name: /What did this scan actually collect/ }).click();
+  await expect(page).toHaveURL(/\/investigations\?view=coverage$/);
+  await expect(page.getByRole("heading", { name: "Collection readiness and evidence coverage" })).toBeVisible();
+  await page.getByRole("link", { name: "Choose an investigation", exact: true }).click();
+  await page.getByRole("link", { name: /What changed between scans/ }).click();
+  await expect(page).toHaveURL(/\/changes$/);
+  await expect(page.getByLabel("Earlier snapshot")).toBeVisible();
+});
 
 test("evidence actions stay readable and open the matching evidence", async ({ page }) => {
   await page.goto("/permissions");

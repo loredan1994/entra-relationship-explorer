@@ -13,6 +13,8 @@ Breaking changes are always called out under **Changed** with a migration note.
 
 ### Added
 
+- Question-based overview shortcuts and an in-app Guide covering investigation workflows, evidence meaning, local data handling and contributor tools; reorganized README and a dedicated operator user guide.
+
 - Investigation workspace with collector coverage, permission reconciliation, credential and federation review, local access scenarios, and a synthetic rule laboratory.
 - Application access review showing sign-in controls, publisher context, assignments, consent audiences, accountable owners, and separately labelled observed activity.
 - Local scenario export/import bound to the tenant and snapshot, with recomputed results and bounded candidate ranking.
@@ -41,6 +43,8 @@ Breaking changes are always called out under **Changed** with a migration note.
   or from a git-ignored `.env.local`, instead of a hard-coded vault.
 
 ### Fixed
+
+- Keep future CodeQL action updates together to avoid incompatible `init`/`analyze` versions, and prevent repeated mutation-test summaries from exceeding GitHub's upload limit.
 
 - Prevent group membership and API access from being mistaken for control of application credentials; disclose bounded or incomplete path analysis.
 - Preserve missing inventory as uncertainty when comparing permissions, owners, credentials, consent and application controls; missing authorization-policy assignments no longer imply disabled user consent.

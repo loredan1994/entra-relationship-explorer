@@ -2,7 +2,11 @@
 
 Open **Investigations** in the navigation. Every tool uses the current, tenant-scoped snapshot. Old encrypted snapshots remain readable: missing new metadata is displayed as unknown and is populated by a subsequent scan.
 
+Start with the in-app **Guide** or [user guide](USER_GUIDE.md) for an end-to-end walkthrough. The overview’s question shortcuts open Application access, Permission ledger, Credentials and federation, and Changes directly; the coverage link should be checked before drawing conclusions.
+
 ## Application access review
+
+![Application access review in the synthetic sample workspace](../previews/application-access.png)
 
 **Application access** combines each enterprise application (service principal) or managed identity with its matching local registration, identified by application ID rather than display name. Search by name, object/client ID, home tenant or publisher. The view records sign-in audience, enabled state, assignment requirement, preferred SSO mode, home tenant and the publisher verification ID/name. A publisher record is not a safety assessment. Missing or malformed fields remain unknown, including historical snapshots; a newly collected field is not a confirmed configuration change.
 

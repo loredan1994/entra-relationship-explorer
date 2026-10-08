@@ -101,6 +101,10 @@ Color never carries meaning alone. Every state also has a label, icon, shape, or
 4. **Permissions** — sortable configured-access inventory.
 5. **Changes** — differences between read-only snapshots.
 6. **Settings** — tenant connection, scan scope, retention, permissions.
+7. **Investigations** — application access, coverage, permission reconciliation, credentials, local scenarios and synthetic rule replay.
+8. **Guide** — question-based entry points, four evidence classes, first investigation and local data handling.
+
+The overview keeps the relationship map as its primary action and exposes four common investigation questions beside a coverage link. The Guide uses compact linked rows rather than a second dashboard. Both reuse the same workflow labels and destinations. On narrow screens, rows and evidence panels stack; the product navigation keeps every destination reachable.
 
 ## Accessibility
 

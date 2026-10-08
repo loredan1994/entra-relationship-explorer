@@ -12,6 +12,8 @@ Source: `REPOSITORY_REVIEW_2026-10-08.md`. Scope approved by the owner on 8 Octo
 - [x] Ship local what-if planner and credential/federation workbench.
 - [x] Ship synthetic rule laboratory and contributor workflow.
 - [x] Run regression, contract, browser, build and isolated database checks; document evidence and remaining external validation limits.
+- [x] Align the overview, in-app Guide, Settings, README, operator guide, product specification and synthetic screenshots with the current capabilities and evidence limits.
+- [x] Review all 15 open pull requests and document per-PR findings, overlaps and next steps in `PULL_REQUEST_REVIEW_2026-10-08.md`.
 
 ## Verification principles
 
@@ -21,7 +23,7 @@ New snapshot fields are optional for compatibility with retained encrypted snaps
 
 ## Verification completed
 
-- Full `pnpm verify` with an isolated PostgreSQL 17 database: **1,408 unit/contract/database tests and 50 browser checks passed** (48 desktop/mobile checks plus two real PostgreSQL persistence flows). The final coverage run also passed all 1,408 tests.
+- Full `pnpm verify` with an isolated PostgreSQL 17 database: **1,408 unit/contract/database tests and 52 browser checks passed** after the UI guide follow-up (50 desktop/mobile checks plus two real PostgreSQL persistence flows). The final coverage run also passed all 1,408 tests.
 - The synthetic suite skips one optional real-Entra test; a separate owner-authorized live acceptance run passed. Two desktop-only skips cover behavior tested on the mobile project. Live tenant material remains outside Git.
 - Lint, TypeScript, production build, Compose isolation and `git diff --check` passed.
 - Rule-lab scaffold and replay were executed successfully without a tenant connection.

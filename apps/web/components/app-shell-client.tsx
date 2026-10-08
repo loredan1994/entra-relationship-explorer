@@ -13,6 +13,7 @@ const navItems = [
   { href: "/investigations", label: "Investigations" },
   { href: "/security", label: "Threat workspace" },
   { href: "/settings", label: "Settings" },
+  { href: "/guide", label: "Guide" },
 ];
 
 function relativeTime(value: string): string {

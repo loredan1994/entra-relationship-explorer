@@ -3,100 +3,111 @@
 [![Product verification](https://github.com/loredan1994/entra-relationship-explorer/actions/workflows/ci.yml/badge.svg)](https://github.com/loredan1994/entra-relationship-explorer/actions/workflows/ci.yml)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 
-Understand who can reach what in a Microsoft Entra tenant, and why.
+**Understand access. Follow the evidence. Keep Entra read-only.**
 
-Entra Relationship Explorer is a local-first, read-only IAM investigation workspace. It collects a tenant snapshot through Microsoft Graph, preserves the evidence behind each relationship, explains reachable privilege paths, and gives reviewers a place to record decisions without changing Microsoft Entra.
+A local investigation workspace for Microsoft Entra administrators, security reviewers and application owners. Collect a snapshot of one tenant, explore application relationships, explain configured permissions, compare changes and record review decisions. Every relationship links back to object IDs and a Microsoft Graph source endpoint.
 
-![Fixture-mode tenant overview showing attack paths, configured permissions, and the review queue](previews/product-overview.png)
+The collector never grants permissions, removes assignments, rotates credentials or applies remediation. Review decisions stay in your own workspace. What-if plans operate on a copy in browser memory.
 
-The screenshots use the repository's synthetic **Clean Project** fixture. They show the real application in sample-data mode; no customer or live tenant data is included.
+![Synthetic tenant overview with inventory and investigation shortcuts](previews/product-overview.png)
 
-| Relationship map and evidence | Threat workspace |
-|---|---|
-| ![Relationship map with a selected federated credential relationship, connected objects, and exact source evidence](previews/relationship-map.png) | ![Threat workspace with finding lifecycle, inferred attack path, evidence class, and decision record](previews/threat-workspace.png) |
+All previews use the bundled **Clean Project** sample. No live tenant or customer data is included.
 
-## Try it without a tenant
+## Try it in two minutes
+
+Requirements: Node.js 22 or later and pnpm 11.23.0. CI and the container runtime use Node.js 24. Docker is needed only for the live stack or database integration tests.
 
 ```bash
 pnpm install --frozen-lockfile
 pnpm dev
 ```
 
-Open `http://localhost:3000/overview`. This runs against a synthetic sample tenant — no Microsoft account, no Graph calls, nothing to configure. [Connect your own tenant](#connect-your-own-tenant) when you want real data.
+Open [the overview](http://localhost:3000/overview), then **Guide** for a short walkthrough. The default workspace uses synthetic records: no Microsoft account, Graph calls or tenant configuration. Follow a connection in **Relationship map**, or select a question from the overview.
 
-## What it does and does not do
+## Choose an investigation
 
-**It does:** read one tenant you administer over Microsoft Graph, encrypt live snapshots and review decisions in your own PostgreSQL, draw evidence-backed relationships as a searchable map and table, compare findings across retained scans, find bounded privilege paths, map relevant scenarios to MITRE ATT&CK®, and export sanitized findings, focused evidence packets, reports, relationships, and MITRE Attack Flow.
-
-**It does not:** grant permissions, remove assignments, create secrets, remediate findings, schedule unattended scans, send notifications, or provide hosted multi-tenancy. The Graph transport is GET-only, and that is enforced in code, not by convention. Microsoft Graph is the only external API used for tenant evidence, and stored tenant data remains in the PostgreSQL instance you run.
-
-By default it requests two delegated permissions, `Application.Read.All` and `Directory.Read.All`. Four further read-only scopes are available, each consented separately and only if you want what they add. Write-capable scopes are rejected outright. [SECURITY.md](SECURITY.md) documents the full model.
-
-## The simple version
-
-- An **app registration** is the blueprint: what an application is, what roles it offers, and which APIs it wants to call.
-- An **enterprise application** is that application's local identity inside a tenant. Microsoft Graph calls it a **service principal**.
-- A **client service principal** receives permission to call a **resource service principal**.
-- This tool draws those facts as a searchable map and shows the evidence behind every line.
-
-The product is deliberately read-only. It does not grant permissions, remove assignments, create secrets, or change Entra.
-
-## Start here
-
-- [Product specification](docs/PRODUCT_SPEC.md)
-- [Architecture and Graph model](docs/ARCHITECTURE.md)
-- [Security and privacy](docs/SECURITY_PRIVACY.md)
-- [Implementation plan](docs/IMPLEMENTATION_PLAN.md)
-- [Phase 1 read-only tenant scan](docs/PHASE_1_READ_ONLY.md)
-- [Phase 2 investigation quality](docs/PHASE_2_INVESTIGATION.md)
-- [Local container operations](docs/LOCAL_OPERATIONS.md)
-- [Version 1 API contract](docs/openapi.yaml)
-- [Research notes and primary references](docs/RESEARCH_NOTES.md)
-- [Entra control-path rule catalog](docs/RULE_CATALOG.md)
-- [Rule contribution fixture template](docs/RULE_TEMPLATE.md)
-- [Design system](DESIGN.md)
-- [Third-party notices](THIRD_PARTY_NOTICES.md)
-
-## Diagrams
-
-| Diagram | PNG | Editable source |
+| Your question | Where to go | What you get |
 |---|---|---|
-| Evidence and relationship model | [PNG](diagrams/entra-object-model.png) | [Mermaid](diagrams/entra-object-model.mmd) |
-| Current local architecture | [PNG](diagrams/system-architecture.png) | [Mermaid](diagrams/system-architecture.mmd) |
-| Resumable GET-only scan flow | [PNG](diagrams/scan-flow.png) | [Mermaid](diagrams/scan-flow.mmd) |
+| What did the scan actually collect? | Investigations → Evidence coverage | Per-collector status, scope, limits, successful and failed reads |
+| How are these identities connected? | Relationship map | Searchable graph and equivalent table, with exact source evidence |
+| Who has access to this application? | Investigations → Application access | Sign-in controls, owners, direct assignments, consent and separate observed activity |
+| Which permissions were requested and granted? | Investigations → Permission ledger | Manifest requests reconciled with configured grants and consent audiences |
+| Which credentials or trusts need review? | Investigations → Credentials and federation | Validity metadata, rotation overlap and federated workload trust; never secret values |
+| What changed between scans? | Changes | Selectable retained snapshots, field differences and credential history |
+| What if a relationship were removed? | Investigations → What-if planner | Local path comparison and tenant/snapshot-bound review-plan import/export |
+| Which possible paths should we investigate? | Threat workspace | Bounded control paths, findings, lifecycle and saved review decisions |
+| How can I contribute a tested rule? | Investigations → Rule laboratory | Synthetic declarative cases with positive and negative expectations |
 
-## Current status
+The [user guide](docs/USER_GUIDE.md) explains a complete investigation. The [investigation reference](docs/INVESTIGATIONS.md) documents collection bounds, optional audit context and edge cases.
 
-The product includes fixture-driven exploration, single-tenant Microsoft sign-in, GET-only paginated Graph reads, PostgreSQL-backed encrypted sessions, checkpoints, snapshots, and finding decisions, a durable resumable scan queue, throttling-aware progress and cancellation, snapshot and finding-lifecycle comparison, explicit per-scan decision revalidation, bounded graph analysis, attack-path discovery, a versioned Entra control-path rule catalog, editable review copies of IAM attack flows, focused Markdown and versioned JSON evidence packets, and CSV, standalone HTML, relationship, and MITRE Attack Flow exports. Focused packets include only one selected finding or path and its referenced evidence—not the full tenant snapshot. The default local registration requests only `Application.Read.All` and `Directory.Read.All`; optional evidence is explicitly gated.
+| Relationship map and evidence | Threat workspace |
+|---|---|
+| ![Synthetic relationship map with exact source evidence](previews/relationship-map.png) | ![Synthetic finding, inferred path and review decision](previews/threat-workspace.png) |
 
-The core scan also resolves devices, administrative units and scoped roles, plus application and managed-identity federated workload trust. Optional scopes are configured through `ENTRA_OPTIONAL_GRAPH_SCOPES`: `RoleManagement.Read.Directory` adds active and PIM-eligible administrative roles, `Policy.Read.All` adds Conditional Access, authorization, and partner cross-tenant settings, `Policy.Read.PermissionGrant` adds consent-policy conditions, and `AuditLog.Read.All` adds a 30-day observed sign-in overlay. Unknown and write-capable scopes are rejected. All Graph transport remains GET-only.
+## Read the evidence correctly
+
+- **Configured:** a recorded grant or setting, not proof of use or effective access in every context.
+- **Observed:** an event within a collection window, not proof that a particular permission was exercised.
+- **Inferred:** a possible path under stated assumptions, not evidence of exploitation.
+- **Missing:** unavailable, disabled, partial or uncollected evidence, not proof of absence or safety.
+
+An **app registration** is the application's blueprint. An **enterprise application (service principal)** is its local tenant identity. The tool connects those records with owners, callers, resources, grants and source evidence. Display names alone are never used to establish identity.
+
+This is a local, single-tenant tool. It does not provide unattended scan schedules, notifications, hosted multi-tenancy or automated remediation. User sign-in evidence does not establish complete workload activity. Group membership, policy interpretation and path traversal have explicit limits. Check **Evidence coverage** before concluding that access is absent. [Security and privacy](docs/SECURITY_PRIVACY.md) describes the boundary.
 
 ## Connect your own tenant
 
-Only needed when you want to scan real data. Never point the product at a tenant you do not administer.
+Use a tenant you administer. The default collector requests only the delegated `Application.Read.All` and `Directory.Read.All` Microsoft Graph permissions. Graph transport is GET-only; write-capable scopes are rejected.
 
-1. In the Microsoft Entra admin center, create a **single-tenant** app registration.
-2. Add a **Web** redirect URI of `http://127.0.0.1:3000/api/auth/callback`, plus `http://127.0.0.1:3200/api/auth/callback` for the container stack.
-3. Add the **delegated** Microsoft Graph permissions `Application.Read.All` and `Directory.Read.All`, then grant administrator consent. Add nothing else.
-4. Create a client secret and keep it outside the repository.
-5. Copy `apps/web/.env.example` to `.env.local` at the repository root and fill in your tenant ID, client ID, client secret, and a data-encryption key from `openssl rand -base64 32`. `.env.local` is git-ignored.
-6. Start Docker Desktop and run `pnpm dev:live`, then open `http://127.0.0.1:3200/settings`.
+1. Create a **single-tenant** app registration in Microsoft Entra admin center.
+2. Add **Web** redirect URIs `http://127.0.0.1:3000/api/auth/callback` and `http://127.0.0.1:3200/api/auth/callback` for local and container use.
+3. Add the two delegated read permissions above and grant administrator consent.
+4. Create an app credential and keep it outside Git. Copy `apps/web/.env.example` to a git-ignored `.env.local` at the repository root and supply the tenant ID, client ID, client secret and a data-encryption key generated with `openssl rand -base64 32`.
+5. Start Docker Desktop, run `pnpm dev:live`, then open [Settings](http://127.0.0.1:3200/settings). Sign in and start the first scan.
+6. Open **Evidence coverage**, then investigate the recorded snapshot. Earlier snapshots remain available for 30 days.
 
-Full steps are in [CONTRIBUTING.md](CONTRIBUTING.md), and the runbook is in [docs/LOCAL_OPERATIONS.md](docs/LOCAL_OPERATIONS.md).
+The launcher supports Azure Key Vault as an alternative secret source; see [local operations](docs/LOCAL_OPERATIONS.md). It starts web, worker and PostgreSQL services on loopback interfaces and applies migrations. Live snapshots, sessions and review decisions are encrypted in your own database. Exports are explicit downloads and may still contain sensitive tenant identifiers; sanitized does not mean anonymous.
 
-## Development
+Optional evidence is deliberately separate:
 
-Quality gates beyond `pnpm run verify`: `pnpm security:dependencies` audits runtime and development dependencies against current registry advisories and also runs in CI. `pnpm quality:crap` runs unit coverage and writes a CRAP (Change Risk Anti-Patterns) report to `quality-reports/crap-report.md`, ranking every function by complexity² × (1 − coverage)³ + complexity; `pnpm test:mutation` runs StrykerJS mutation testing per package and writes HTML reports to each package's `reports/mutation/`. Run coverage and mutation checks sequentially so temporary instrumented sources cannot contaminate coverage discovery. Coverage and mutation results must be measured for the current revision; the mutation command enforces a 95% minimum score. See the dated verification reports in `docs/` for executed checks and their limits. Mutants that no input can distinguish are marked in the source with a `Stryker disable` comment stating why.
+| Optional read scope / setting | Adds |
+|---|---|
+| `RoleManagement.Read.Directory` | Active and PIM-eligible administrative roles |
+| `Policy.Read.All` | Conditional Access, authorization and partner cross-tenant settings |
+| `Policy.Read.PermissionGrant` | Consent-policy conditions |
+| `AuditLog.Read.All` | A bounded 30-day user sign-in overlay |
+| `ENTRA_COLLECT_DIRECTORY_AUDITS=true` | Bounded directory-audit context using the existing `Directory.Read.All` scope |
 
-Open `http://localhost:3000/overview`. The `/security` section prioritizes transitive identity paths, distinguishes configured facts from observed activity, inferred possibilities, and missing evidence, maps relevant scenarios to MITRE ATT&CK®, and provides a synchronized review workspace. Run `pnpm run verify`; it validates Compose isolation, lints and type-checks the workspace, runs domain, scanner, storage, authentication, accessibility, and browser tests, and builds every product route.
+Set optional scopes through `ENTRA_OPTIONAL_GRAPH_SCOPES`; consent only what you need. Operator role, licensing, retention and endpoint failures can still limit evidence. Audit correlation does not establish who caused a change. [Configuration and limits](docs/INVESTIGATIONS.md).
 
-The product remains in fixture mode by default, so you can explore it without a tenant. To scan a real tenant you need your own app registration; see [Connect your own tenant](#connect-your-own-tenant). With that in place, start Docker Desktop and run `pnpm dev:live`. It loads the app credential, encryption key, and database password from your Key Vault or a git-ignored `.env.local`, builds the containers, applies idempotent migrations, and starts PostgreSQL, web, and worker services on loopback interfaces. No secret is written into the repository.
+## Develop and verify
 
-## Contributing
+```bash
+pnpm verify                 # lint, types, tests, build and browser checks
+pnpm security:dependencies  # current runtime and development advisories
+pnpm quality:crap           # coverage and maintainability gate
+pnpm test:mutation --force --concurrency 2
+```
 
-Contributions are welcome. [CONTRIBUTING.md](CONTRIBUTING.md) covers setup, the quality gates, and the seven rules a change has to respect — the first being that the product never writes to Entra. Please read the [Code of Conduct](CODE_OF_CONDUCT.md) before participating.
+Run coverage and mutation checks sequentially. Mutation testing enforces a 95% floor per package; maintainability fails above CRAP 30. The [release verification report](docs/RELEASE_VERIFICATION_2026-10-08.md) records measured results, read-only Azure CLI comparisons and their limits.
 
-Found a security defect? **Do not open a public issue.** Follow [SECURITY.md](SECURITY.md).
+For database and browser persistence tests, set `TEST_DATABASE_URL` to an isolated loopback PostgreSQL database named `entra_review_test`. Without it, those tests explicitly skip. CI provisions this service and runs the full suite; [reproduction instructions](docs/INVESTIGATIONS.md#verification). No real tenant is needed for deterministic tests.
+
+## Documentation and contribution
+
+| Need | Read |
+|---|---|
+| First investigation | [User guide](docs/USER_GUIDE.md) · in-app **Guide** |
+| Feature details and limitations | [Investigation tools](docs/INVESTIGATIONS.md) · [Product specification](docs/PRODUCT_SPEC.md) |
+| Install, operate or upgrade | [Local operations](docs/LOCAL_OPERATIONS.md) · [Changelog](CHANGELOG.md) |
+| Data and authentication boundaries | [Security and privacy](docs/SECURITY_PRIVACY.md) · [Security reporting](SECURITY.md) |
+| Architecture and integration | [Architecture](docs/ARCHITECTURE.md) · [OpenAPI](docs/openapi.yaml) · [Research sources](docs/RESEARCH_NOTES.md) |
+| Submit a change | [Contributing](CONTRIBUTING.md) · [Code of conduct](CODE_OF_CONDUCT.md) · [Design system](DESIGN.md) |
+| Add an investigation rule | [Rule laboratory](docs/RULE_LAB.md) · [Rule catalog](docs/RULE_CATALOG.md) · [Fixture template](docs/RULE_TEMPLATE.md) |
+
+Diagrams: [relationship model](diagrams/entra-object-model.png), [local architecture](diagrams/system-architecture.png), [scan flow](diagrams/scan-flow.png). Editable Mermaid sources are beside each image.
+
+Contributions require behavioral tests, source evidence, tenant isolation and a signed-off commit. Never commit credentials or real tenant data. Report security defects through [SECURITY.md](SECURITY.md), not a public issue.
 
 ## License
 
@@ -105,7 +116,3 @@ Found a security defect? **Do not open a public issue.** Follow [SECURITY.md](SE
 ## Trademarks
 
 MITRE ATT&CK® is a registered trademark of The MITRE Corporation. Use of ATT&CK identifiers here does not imply MITRE's endorsement of, or affiliation with, this product; see the [ATT&CK terms of use](https://attack.mitre.org/resources/terms-of-use/). Microsoft, Microsoft Entra, Microsoft Graph, and Azure are trademarks of the Microsoft group of companies. This project is not affiliated with, endorsed by, or sponsored by Microsoft.
-
-## Investigation tools
-
-Open **Investigations → Application access** for sign-in audience, account/assignment controls, publisher context and direct incoming access with source evidence. No new Graph scope is required; older snapshots show unknown until a new read-only scan. Open **Investigations** for collector readiness and coverage, a requested-versus-granted permission ledger, individual credential and federation inventory, local what-if access planning, and the synthetic rule laboratory. **Changes** supports selectable retained snapshots and field-level differences with opt-in directory audit context. See [Investigation tools](docs/INVESTIGATIONS.md) and [Rule laboratory](docs/RULE_LAB.md) for scope, configuration, limitations and verification.

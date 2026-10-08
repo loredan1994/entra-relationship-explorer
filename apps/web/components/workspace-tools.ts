@@ -1,0 +1,10 @@
+export const workspaceTools = [
+  { id: "coverage", title: "Evidence coverage", question: "What did this scan actually collect?", href: "/investigations?view=coverage", description: "Check successful, partial, denied and disabled reads before drawing conclusions." },
+  { id: "map", title: "Relationship map", question: "How are these identities connected?", href: "/map", description: "Follow a relationship to its object IDs, permission and source endpoint. Switch to the table for a list view." },
+  { id: "applications", title: "Application access", question: "Who has access to this application?", href: "/investigations?view=applications", description: "Review sign-in controls, owners, direct assignments and consent. Observed sign-ins stay separate." },
+  { id: "ledger", title: "Permission ledger", question: "Which permissions were requested and granted?", href: "/investigations?view=ledger", description: "Compare application declarations with configured grants, including single-user and all-user consent." },
+  { id: "credentials", title: "Credentials and federation", question: "Which credentials or workload trusts need review?", href: "/investigations?view=credentials", description: "Inspect validity dates, rotation overlap and federated trust. Secret values are never collected." },
+  { id: "changes", title: "Snapshot timeline", question: "What changed between scans?", href: "/changes", description: "Compare retained snapshots and individual fields. Missing evidence leaves a change unconfirmed." },
+  { id: "scenarios", title: "What-if planner", question: "What if a configured relationship were removed?", href: "/investigations?view=scenarios", description: "Model excluded relationships in browser memory and compare possible paths. No tenant change is applied." },
+  { id: "security", title: "Threat workspace", question: "Which possible paths should we investigate?", href: "/security", description: "Review bounded control paths, supporting evidence and findings. Save a local review decision for the displayed scan." },
+] as const;

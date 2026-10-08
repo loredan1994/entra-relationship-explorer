@@ -4,6 +4,7 @@ import { AppShell } from "@/components/app-shell";
 import { PageHeading } from "@/components/page-heading";
 import { rankPermissions } from "@/components/permission-utils";
 import { RiskBadge } from "@/components/risk-badge";
+import { workspaceTools } from "@/components/workspace-tools";
 import { loadCurrentSnapshot } from "@/server/current-snapshot";
 import { analyzeTenantSecurity } from "@/server/tenant-security";
 
@@ -39,9 +40,9 @@ export default async function OverviewPage() {
           title="See the identities behind every permission."
           description={`${sample ? "Everything on this page is synthetic sample data, shown so the workspace is explorable before a tenant is connected." : "Everything on this page comes from an encrypted, read-only snapshot of your tenant."} ${activityCollected ? "Observed sign-ins are shown separately from configured access." : "Only configuration is collected — no sign-in activity, so nothing here claims a permission was actually used."}`}
           actions={
-            <Link className="button button-primary" href="/map">
+            <><Link className="button button-secondary" href="/guide">Workspace guide</Link><Link className="button button-primary" href="/map">
               Open relationship map
-            </Link>
+            </Link></>
           }
         />
 
@@ -63,9 +64,14 @@ export default async function OverviewPage() {
           </Link>
           <Link href="/security">
             <strong>{unowned.length}</strong>
-            <span>Unowned identities</span>
-            <small>Apps with no accountable owner recorded — nobody to ask “is this still needed?”</small>
+            <span>No owner recorded</span>
+            <small>Review owner coverage before concluding an identity is unowned</small>
           </Link>
+        </section>
+
+        <section className="overview-workflows" aria-labelledby="overview-workflows-title">
+          <div className="section-heading"><div><p className="eyebrow">Investigation tools</p><h2 id="overview-workflows-title">Start with a question</h2></div><Link className="text-link" href="/investigations?view=coverage">Check evidence coverage →</Link></div>
+          <div className="workflow-shortcuts">{workspaceTools.filter(tool => ["applications", "ledger", "credentials", "changes"].includes(tool.id)).map(tool => <Link key={tool.id} href={tool.href}><strong>{tool.question}</strong><span>{tool.title} <span aria-hidden="true">→</span></span></Link>)}</div>
         </section>
 
         {priorityPath ? <section className="panel priority-path-card">
@@ -142,7 +148,7 @@ export default async function OverviewPage() {
             <span className="completion-badge">{snapshot.completion.status}</span>
           </div>
           <p>
-            Scanned {scannedLabel} · {collectedEndpointPatterns.size} source endpoint patterns collected · {snapshot.completion.errors.length} errors · {activityCollected ? "30-day activity overlay collected" : "activity endpoints intentionally skipped"} · <Link className="text-link" href="/settings">Full scope in Settings</Link>
+            Scanned {scannedLabel} · {collectedEndpointPatterns.size} source endpoint patterns collected · {snapshot.completion.errors.length} errors · {activityCollected ? "Sign-in evidence recorded" : "No sign-in evidence recorded"} · <Link className="text-link" href="/investigations?view=coverage">Review collector coverage</Link>
           </p>
         </section>
       </div>

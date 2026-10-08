@@ -1,4 +1,5 @@
 import { cookies } from "next/headers";
+import Link from "next/link";
 import { AppShell } from "@/components/app-shell";
 import { PageHeading } from "@/components/page-heading";
 import { ScanControl } from "@/components/scan-control";
@@ -29,7 +30,7 @@ export default async function SettingsPage() {
   return (
     <AppShell>
       <div className="page-container settings-page">
-        <PageHeading eyebrow="Product boundary" title="Settings" description="Connection, collection scope, retention, and required permissions." />
+        <PageHeading eyebrow="Product boundary" title="Settings" description="Connection, collection scope, retention, and required permissions." actions={<Link className="button button-secondary" href="/guide">Workspace guide</Link>} />
         <section className="onboarding-callout" aria-labelledby="onboarding-title">
           <div><p className="eyebrow">Before you connect</p><h2 id="onboarding-title">Read-only by design</h2><p>The collector inventories Entra relationships so it can explain configured access and possible privilege paths. It never grants consent, changes an object, creates a credential, or sends a token to the browser.</p></div>
           <ol>
@@ -61,8 +62,17 @@ export default async function SettingsPage() {
           <div className="settings-card endpoint-list">
             <h3>Collected endpoint patterns</h3>
             {endpointPatterns(snapshot.completion.collectedEndpoints).map(([endpoint, count]) => <code key={endpoint}>{endpoint}{count > 1 ? ` · ${count} reads` : ""}</code>)}
-            <h3>Intentionally skipped</h3>
+            <h3>Skipped or unavailable</h3>
             {endpointPatterns(snapshot.completion.skippedEndpoints).map(([endpoint, count]) => <code key={endpoint}>{endpoint} · {count > 1 ? `${count} unavailable reads` : "unavailable in this scan"}</code>)}
+            <p><Link className="text-link" href="/investigations?view=coverage">Review collection status, limits and failed reads →</Link></p>
+          </div>
+        </section>
+        <section className="settings-section">
+          <div><h2>Storage and retention</h2><p>Review records are local workspace data. Saving one never changes Microsoft Entra.</p></div>
+          <div className="settings-card">
+            <div className="setting-row"><div><strong>Tenant evidence and review decisions</strong><p>Encrypted in your own PostgreSQL database. Snapshot evidence and linked decisions expire after 30 days.</p></div></div>
+            <div className="setting-row"><div><strong>Sample workspace and what-if plans</strong><p>Demo decisions use browser storage. What-if calculations stay in memory; importing a review plan does not upload it.</p></div></div>
+            <div className="setting-row"><div><strong>Explicit exports</strong><p>Downloads can contain tenant identifiers and sensitive relationships. Sanitized exports are not anonymous; store and share them accordingly.</p></div></div>
           </div>
         </section>
       </div>

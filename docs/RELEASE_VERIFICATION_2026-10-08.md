@@ -12,7 +12,7 @@ The tenant cannot exercise every optional feature: group membership remains part
 
 ## Executed verification
 
-- Full `pnpm verify` passed: Compose security, ESLint, TypeScript, production build, **1,408 unit/contract/database tests and 50 browser checks** (48 desktop/mobile checks and two real PostgreSQL persistence flows). Two desktop cases are intentionally covered by the mobile project; the opt-in Graph live test is not part of the synthetic run.
+- Full `pnpm verify` passed after the UI guide follow-up: Compose security, ESLint, TypeScript, production build, **1,408 unit/contract/database tests and 52 browser checks** (50 desktop/mobile checks and two real PostgreSQL persistence flows). Two desktop cases are intentionally covered by the mobile project; the opt-in Graph live test is not part of the synthetic run.
 - Both the full verification and final coverage run passed: domain 552, Graph 419, backend 208 (including eight real PostgreSQL tests), web server 229. This includes standalone rule evaluation without prior evidence and policy-type validation.
 - Maintainability: **734 functions measured; zero above CRAP 30**. Permission reconciliation, collector coverage and rule-lab validation now pass without lowering the threshold.
 - Fresh release image built and restarted the existing local stack successfully, preserving encrypted history. A fresh GET-only worker scan completed with **1,522 objects, 1,100 relationships and 451 enterprise-application profiles**.
@@ -43,7 +43,7 @@ Every package completed a fresh `--force` run against the current production sou
 
 Stryker counts non-terminating mutations detected by timeout separately from assertion failures. Exclusions are visible in source comments; the score applies to the mutations enabled by the published configuration. The new tests also exposed loose assertions that selected an unrelated permission row or accidentally accepted a wrong sort; those assertions now select the exact grant and check ordering from both input directions.
 
-The targeted final scan checked **261 tracked/non-ignored candidate files**, with zero matches for the runtime client secret, encryption key, database password or real tenant/client identifiers. It reports aggregates only; live data and tokens remain outside Git.
+The targeted final scan checked **267 tracked/non-ignored candidate files**, with zero matches for the runtime client secret, encryption key, database password or real tenant/client identifiers. It reports aggregates only; live data and tokens remain outside Git. Public screenshots were captured only after asserting the synthetic-data banner.
 
 ## Reproduction and scope
 
@@ -55,6 +55,18 @@ The targeted final scan checked **261 tracked/non-ignored candidate files**, wit
 Coverage and mutation scope is domain, Graph and backend production sources plus web server modules. These percentages do not claim coverage of every React component or worker line. Browser tests and database tests verify those boundaries separately. Optional live tests and intentional desktop-only skips are reported separately from passing tests.
 
 Equivalent mutations are handled by simplifying redundant logic or narrowly documented source annotations. No whole new feature is excluded. Standalone catalog import tests catch module-initialization failures as failed tests; test discovery excludes leftover mutation sandboxes. Exact-value secret/tenant-ID checks supplement, but do not replace, a full Git-history secret audit or a container OS vulnerability scan.
+
+## UI, documentation and pull-request follow-up
+
+The overview now offers question-based investigation shortcuts and a coverage entry point. The in-app Guide explains the product boundary, evidence classes, first investigation and local data handling. Settings exposes storage/retention and accurately labels skipped or unavailable reads. README, the operator user guide, product specification, design notes and synthetic previews were updated together.
+
+Full verification passed after these presentation changes: **1,408 unit/contract/database tests and 52 browser checks**, including two new navigation cases and Guide accessibility/layout coverage. All 61 local documentation links checked resolve. Domain, Graph, backend and web-server logic is unchanged from the fresh mutation measurements above.
+
+The hosted quality run for `2f0d9c312eca` also passed at 100% in all four packages. Its repeated Vitest summaries exceeded GitHub's summary-size limit without failing the gate; mutation CI now omits only the per-invocation summary destination, preserving assertions, logs, reports and thresholds.
+
+The final UI image rebuilt and restarted successfully, preserving the tenant database. A repeated Azure CLI comparison against that image again matched all 5,136 checks across 19 GET requests, with no unavailable reads. The earlier authenticated browser comparison remains valid for the unchanged application-access component; the session expired before its post-Guide repeat, which was not claimed as a pass. No session lifetime or authentication control was changed to bypass this limitation.
+
+All 15 open pull requests were reviewed with their diffs, release information and failed job logs. [The per-PR review](PULL_REQUEST_REVIEW_2026-10-08.md) records blockers, genuinely superseded updates and merge candidates. Future CodeQL action updates are grouped to keep `init` and `analyze` on the same version.
 
 ## Upgrade notes
 

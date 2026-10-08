@@ -23,9 +23,9 @@ Microsoft Entra stores application identity across several related object types 
 - Review IAM threats with evidence, remediation, ownership, assumptions, and expiry.
 - Distinguish newly detected, ongoing, returned, and no-longer-detected findings across retained scans without silently carrying forward old decisions.
 
-## MVP
+## Current product
 
-The MVP signs an administrator in, requests read-only consent, scans one tenant, normalizes the results, and presents:
+The workspace starts with synthetic sample data. An operator can configure one tenant, sign in with read-only consent, collect a snapshot, and investigate:
 
 - Application registrations and their local service principals
 - Incoming and outgoing application-role assignments
@@ -36,6 +36,10 @@ The MVP signs an administrator in, requests read-only consent, scans one tenant,
 - Evidence-backed IAM findings and multi-stage attack flows
 - A threat workspace with encrypted tenant decision records, editable analyst flow copies, and sanitized CSV, HTML, and Attack Flow exports
 - A recurring investigation lifecycle with explicit per-scan review revalidation and acceptance-expiry warnings
+- Application access context, per-collector coverage, requested-versus-granted permission reconciliation and individual credential/federation history
+- Selectable retained snapshots with field-level differences and explicitly enabled directory-audit correlation
+- Local what-if review plans and a synthetic rule laboratory
+- Question-based overview shortcuts and an in-app Guide explaining workflows, evidence classes and data handling
 
 Optional evidence is implemented behind separately approved read-only scopes: sign-in activity, active and PIM-eligible roles, Conditional Access, and partner cross-tenant settings. Maester is not embedded: an isolated posture worker remains appropriate only after a concrete, license-verified test pack produces evidence that the native Graph collector does not already provide.
 
@@ -74,3 +78,12 @@ The evidence panel then shows both service-principal object IDs, the resource ap
 | `/changes` | Snapshot comparison |
 | `/security` | IAM findings, attack paths, and threat workspace |
 | `/settings` | Connection, permissions, scan scope, retention |
+| `/investigations?view=coverage` | Readiness, collection status, failures and bounds |
+| `/investigations?view=applications` | Application sign-in controls, ownership, assignments and consent |
+| `/investigations?view=ledger` | Requested-versus-granted permission reconciliation |
+| `/investigations?view=credentials` | Individual credentials and federated workload trust |
+| `/investigations?view=scenarios` | Local what-if path comparison and review plans |
+| `/investigations?view=rules` | Synthetic rule replay and contributor guidance |
+| `/guide` | Product boundary, question-based workflows, evidence interpretation and first steps |
+
+The [user guide](USER_GUIDE.md) is the operator walkthrough. [Investigation tools](INVESTIGATIONS.md) is the detailed behavior and limitations reference. [Release verification](RELEASE_VERIFICATION_2026-10-08.md) separates measured acceptance from the success measures above.

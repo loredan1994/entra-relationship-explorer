@@ -44,6 +44,8 @@ Open `http://localhost:3000/overview`. This is **fixture mode**: a synthetic
 tenant, no Microsoft account, no network calls to Graph. Nearly all development
 can and should happen here.
 
+Open **Guide** for the product boundary and a question-based walkthrough. Keep [README](README.md), [USER_GUIDE](docs/USER_GUIDE.md), in-app labels and [PRODUCT_SPEC](docs/PRODUCT_SPEC.md) aligned when a user-facing workflow changes. Public screenshots must use the bundled synthetic fixture; verify the sample-data banner before capturing them.
+
 ### Connecting your own tenant
 
 Only needed when changing scan or authentication behaviour. Never point the

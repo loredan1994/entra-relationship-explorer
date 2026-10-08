@@ -96,4 +96,6 @@ jobs:
         run: pnpm quality:crap
 
       - name: Fresh mutation gate (95% per package)
-        run: pnpm test:mutation --force --concurrency 2
+        # Each mutant invokes Vitest; repeated summaries exceed GitHub's 1 MiB limit.
+        # Keep the score tables and reports, without a separate summary per mutant.
+        run: env -u GITHUB_STEP_SUMMARY pnpm test:mutation --force --concurrency 2

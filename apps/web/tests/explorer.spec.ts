@@ -49,7 +49,7 @@ test("filters can be saved locally and objects expand to a bounded one-hop view"
 });
 
 test("core routes have no detectable WCAG A or AA violations", async ({ page }, testInfo) => {
-  for (const route of ["/overview", "/map", "/permissions", "/changes", "/security", "/settings"]) {
+  for (const route of ["/overview", "/guide", "/map", "/permissions", "/changes", "/security", "/settings"]) {
     await page.goto(route);
     const results = await new AxeBuilder({ page })
       .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"])
