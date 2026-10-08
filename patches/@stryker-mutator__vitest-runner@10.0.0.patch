@@ -1,0 +1,18 @@
+diff --git a/dist/src/vitest-test-runner.js b/dist/src/vitest-test-runner.js
+index 84f1ca026503b8e92b7adc952ec6c6a401943656..8bc36ce07cd941e1edd3f497000f7798e9b20478 100644
+--- a/dist/src/vitest-test-runner.js
++++ b/dist/src/vitest-test-runner.js
+@@ -144,9 +144,11 @@ export class VitestTestRunner {
+         if (testIds.length > 0) {
+             const parsedTests = testIds.map(fromTestId);
+             const regexTestNameFilter = parsedTests
+-                .map(({ test: name }) => escapeRegExp(name))
++                .map(({ test: name }) => escapeRegExp(name).replace(/ /g, '(?: > | )'))
+                 .join('|');
+-            const regex = new RegExp(regexTestNameFilter);
++            // Compatibility backport: https://github.com/stryker-mutator/stryker-js/pull/6247
++            // Vitest 5 separates nested names with ' > '; anchor the suffix to avoid prefix matches.
++            const regex = new RegExp(`(?:${regexTestNameFilter})\\s*$`);
+             testFilesToRun = parsedTests.map(({ file }) => file);
+             this.ctx.projects.forEach((project) => {
+                 project.config.testNamePattern = regex;

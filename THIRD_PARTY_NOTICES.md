@@ -16,6 +16,8 @@ Entra Relationship Explorer is original application code. The following projects
 | TypeScript | 5.9.2 | Apache-2.0 | Build tooling only. |
 | Playwright | 1.63.0 | Apache-2.0 | Test tooling only. |
 | Vitest | 5.0.3 | MIT | Test tooling only. |
+| Stryker core | 10.0.0 | Apache-2.0 | Mutation-test tooling only; no upstream source modifications. |
+| Stryker Vitest runner | 10.0.0 | Apache-2.0 | Development-only test-name filter backport from [upstream PR #6247](https://github.com/stryker-mutator/stryker-js/pull/6247), reviewed at `d6e90d7d1353db6b2c6fab906379ca26cd66401b`. The modification is recorded in [the pnpm patch](patches/@stryker-mutator__vitest-runner@10.0.0.patch); upstream license files remain intact. |
 | axe-core Playwright | 4.13.0 | MPL-2.0 | Accessibility test tooling only. |
 | ESLint / @eslint/js | 10.12.0 / 10.0.1 | MIT | Static-analysis tooling only. |
 | typescript-eslint | 8.71.1 | MIT | TypeScript lint integration only. |

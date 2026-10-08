@@ -29,6 +29,10 @@ Independent Azure CLI validation repeated **19 GET requests and 5,136 comparison
 
 ## Automated verification
 
+The first Vitest 5 mutation run exposed Stryker 10's nested-name compatibility bug: 699 domain mutations falsely survived because selected tests did not run. The installed runner constructs space-separated filters, while [Vitest 5 uses ` > ` between suites](https://vitest.dev/config/testnamepattern). A minimal pnpm patch backports the reviewed filter change from [upstream PR #6247](https://github.com/stryker-mutator/stryker-js/pull/6247), including its suffix anchor to avoid similarly named siblings. This is development-only; attribution and the modified component are recorded in the notices.
+
+`pnpm test:mutation:runner` runs the actual installed runner against a tiny temporary synthetic project. It failed before the patch with zero selected tests and passed afterward: five boundary mutants killed, and one deliberately weak arithmetic test's survivor executing exactly its single covering test. Nested names contain regex metacharacters, and a prefix-matching sibling must not be selected. This canary precedes every root mutation run. Its deliberate survivor is separate from product scores; no production thresholds or exclusions change. Remove the backport only when an upstream version passes this canary and the full mutation suite.
+
 - Full `pnpm verify` passed with **1,412 unit/contract/database tests**, including eight real PostgreSQL integration tests, and **52 browser checks** (50 desktop/mobile and two real persistence flows). Optional live-test and intentional desktop-only skips remain explicit.
 - An initial local browser run reused an older preview server after the build changed. Verification now owns a fresh server on port 3102 and refuses reuse; preview port 3100 and persistence-test port 3101 remain separate. The complete verification command passed after this correction.
 - `pnpm quality:crap` passed: **734 functions, zero above CRAP 30**. Measured coverage remains domain 100/99.88/100, Graph 99.86/99.85/100, backend 99.73/100/99.01 and web server 100/100/100 for statements/branches/functions.

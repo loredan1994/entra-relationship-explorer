@@ -15,7 +15,7 @@ All previews use the bundled **Clean Project** sample. No live tenant or custome
 
 ## Try it in two minutes
 
-Requirements: Node.js 22 or later and pnpm 11.23.0. CI and the container runtime use Node.js 24. Docker is needed only for the live stack or database integration tests.
+Requirements: Node.js 24 (recommended) and pnpm 11.23.0. Development also supports Node.js 22.12+ on the 22.x line or 26+. CI and the container runtime use Node.js 24. Docker is needed only for the live stack or database integration tests.
 
 ```bash
 pnpm install --frozen-lockfile

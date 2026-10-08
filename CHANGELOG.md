@@ -47,6 +47,7 @@ Breaking changes are always called out under **Changed** with a migration note.
 
 ### Fixed
 
+- Backport Stryker's Vitest 5 nested-test selection fix through a pinned pnpm patch. An end-to-end runner check rejects missing tests and incorrect prefix matches before the production mutation suite runs.
 - Browser verification always starts the current build on a dedicated port instead of silently reusing an older local preview server.
 - Keep future CodeQL action updates together to avoid incompatible `init`/`analyze` versions, and prevent repeated mutation-test summaries from exceeding GitHub's upload limit.
 

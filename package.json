@@ -5,7 +5,7 @@
   "license": "Apache-2.0",
   "packageManager": "pnpm@11.23.0",
   "engines": {
-    "node": ">=22.0.0"
+    "node": "^22.12.0 || ^24.0.0 || >=26.0.0"
   },
   "scripts": {
     "dev": "pnpm --filter @entra-explorer/web dev",
@@ -20,7 +20,8 @@
     "security:dependencies": "pnpm audit",
     "verify": "pnpm security:compose && pnpm lint && pnpm typecheck && pnpm test && pnpm build && pnpm test:e2e && pnpm test:persistence",
     "test:coverage": "pnpm -r --if-present test:coverage",
-    "test:mutation": "pnpm -r --workspace-concurrency=1 --if-present test:mutation",
+    "test:mutation": "pnpm test:mutation:runner && pnpm -r --workspace-concurrency=1 --if-present test:mutation",
+    "test:mutation:runner": "node scripts/check-mutation-runner.mjs",
     "quality:crap": "pnpm test:coverage && node scripts/crap-report.mjs",
     "rule:lab": "pnpm --filter @entra-explorer/web exec node --import tsx ../../scripts/rule-lab.mts",
     "test:persistence": "node scripts/persistence-tests.mjs"
