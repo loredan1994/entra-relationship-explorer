@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { mkdtemp, readFile, rm, stat, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -35,6 +35,23 @@ try {
   const packet = await readFile(output, "utf8"); assert.ok(!packet.includes("synthetic-tenant")); assert.ok(!packet.includes("privateMapping"));
   if (process.platform !== "win32") assert.equal((await stat(output)).mode & 0o777, 0o600);
   assert.equal(JSON.parse(run(0, "verify", output).stdout).verified, true);
+  const bounded = join(directory, "bounded.json");
+  await writeFile(bounded, packet + " ".repeat(5_000_000 - Buffer.byteLength(packet)));
+  assert.equal(JSON.parse(run(0, "verify", bounded).stdout).verified, true);
+  await writeFile(bounded, " ", { flag: "a" });
+  assert.match(run(2, "verify", bounded).stderr, /Input file exceeds its size limit/);
+  if (process.platform !== "win32") {
+    // A FIFO reports size zero while supplying more bytes. This reproduces why
+    // pre-reading filesystem metadata cannot enforce the actual read limit.
+    const fifo = join(directory, "growing-input"), oversized = join(directory, "oversized.json");
+    const source = await readFile(present, "utf8");
+    await writeFile(oversized, source + " ".repeat(10_000_001 - Buffer.byteLength(source)));
+    assert.equal(spawnSync("mkfifo", [fifo]).status, 0);
+    const writer = spawn(process.execPath, ["-e", "require('node:fs').writeFileSync(process.argv[1], require('node:fs').readFileSync(process.argv[2]))", fifo, oversized], { stdio: "ignore" });
+    const finished = new Promise<void>((resolve, reject) => { writer.once("exit", () => resolve()); writer.once("error", reject); });
+    try { assert.match(run(2, "proof", fifo, q).stderr, /Input file exceeds its size limit/); }
+    finally { writer.kill(); await finished; }
+  }
   run(2, "export", present, q, output); assert.equal(await readFile(output, "utf8"), packet);
   if (process.platform !== "win32") { const link = join(directory, "link.json"); await symlink(output, link); run(2, "export", present, q, link); assert.equal(await readFile(output, "utf8"), packet); }
   await writeFile(output, packet.replace('"digest":"', '"digest":"0'));

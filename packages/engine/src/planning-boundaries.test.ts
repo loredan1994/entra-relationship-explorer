@@ -73,8 +73,16 @@ it("deduplicates shared read endpoints, scopes and prerequisites under a bounded
   expect(result).toMatchObject({ optimal: false, verdict: "unknown", unresolved: [], lowerBound: 2, limits: { steps: 1, maxSteps: 1, exhausted: true } });
   expect(result.plans[0]).toEqual({ reads: ["one", "two"], endpoints: ["/same"], requiredScopes: ["Directory.Read.All"], unavailableScopes: ["Directory.Read.All"], cost: 4, mayResolve: ["a", "b"] });
 });
-it.each(["Directory.ReadWrite.All", "Directory.Read.All ", "xDirectory.Read.All!", "DirectoryXReadXAll", "Read.All", "Directory.Read.1", "Directory.ReadWrite"])("rejects scope outside the read-only grammar: %s", scope => {
+it.each(["Directory.ReadWrite.All", "Directory.Read.All ", "xDirectory.Read.All!", "DirectoryXReadXAll", "Read.All", "Directory.Read.1", "Directory.ReadWrite", ".Directory.Read.All", "Directory..Read.All", "Directory.Read.All."])("rejects scope outside the read-only grammar: %s", scope => {
   expect(() => planEvidenceGaps(evaluateAuthorization(compileSnapshot(snapshot()), query), [{ id: "r", cost: 1, resolves: [], endpoints: ["/users"], scopes: [scope], requirement: "" }])).toThrow("read scopes only");
+});
+it("bounds scope parsing and handles repeated Read segments without backtracking", () => {
+  const proof = evaluateAuthorization(compileSnapshot(snapshot()), query);
+  const plan = (scope: string) => planEvidenceGaps(proof, [{ id: "r", cost: 1, resolves: [], endpoints: ["/users"], scopes: [scope], requirement: "" }]);
+  expect(() => plan("A".repeat(247) + ".Read.All")).not.toThrow();
+  expect(() => plan("A".repeat(248) + ".Read.All")).toThrow("read scopes only");
+  expect(() => plan("..Read" + ".A.Read".repeat(10_000) + "!")).toThrow("read scopes only");
+  expect(() => plan("Multi.Namespace.Read.All")).not.toThrow();
 });
 it("rejects an unsafe read among safe reads, endpoints and scopes", () => {
   const proof = evaluateAuthorization(compileSnapshot(snapshot()), query);

@@ -1,11 +1,23 @@
-import { readFile, writeFile, stat } from "node:fs/promises";
+import { open, writeFile } from "node:fs/promises";
 import { compileSnapshot, evaluateAuthorization, evaluateContract, compareContract, parseContract, exportInvestigation, verifyInvestigation, canonical, type AuthorizationQuery } from "../packages/engine/src/index.ts";
 import type { TenantSnapshot } from "../packages/domain/src/types.ts";
 
 async function textFile(path: string | undefined, limit = 10_000_000): Promise<string> {
   if (!path) throw new Error("A required file argument is missing.");
-  if ((await stat(path)).size > limit) throw new Error("Input file exceeds its size limit.");
-  return readFile(path, "utf8");
+  const file = await open(path, "r");
+  try {
+    // Bound the bytes actually read from this open file, including a concurrent
+    // append. A prior path stat cannot establish a later read's size or identity.
+    const buffer = Buffer.alloc(limit + 1);
+    let length = 0;
+    while (length < buffer.length) {
+      const { bytesRead } = await file.read(buffer, length, buffer.length - length, null);
+      if (!bytesRead) break;
+      length += bytesRead;
+    }
+    if (length > limit) throw new Error("Input file exceeds its size limit.");
+    return buffer.subarray(0, length).toString("utf8");
+  } finally { await file.close(); }
 }
 const [command, first, second, third] = process.argv.slice(2);
 try {

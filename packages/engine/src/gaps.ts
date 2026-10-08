@@ -25,8 +25,14 @@ export function suggestReads(proof: EvidenceProof): ReadCandidate[] {
   });
 }
 
+function readScope(scope: string): boolean {
+  if (scope.length > 256) return false;
+  const segments = scope.split(".");
+  return segments.includes("Read", 1) && segments.every(segment => /^[A-Za-z]+$/.test(segment));
+}
+
 export function planEvidenceGaps(proof: EvidenceProof, reads = suggestReads(proof), availableScopes: string[] = [], maxSteps = 100_000): GapResult {
-  if (reads.some(r => r.endpoints.some(e => !e.startsWith("/") || e.startsWith("//")) || r.scopes.some(s => !/^[A-Za-z.]+\.Read(?:\.[A-Za-z]+)*$/.test(s)))) throw new Error("Evidence plans accept relative GET endpoints and read scopes only.");
+  if (reads.some(r => r.endpoints.some(e => !e.startsWith("/") || e.startsWith("//")) || r.scopes.some(s => !readScope(s)))) throw new Error("Evidence plans accept relative GET endpoints and read scopes only.");
   const resolvable = proof.missing.filter(m => reads.some(r => r.resolves.includes(m)));
   const solution = solveChanges({ context: proof, paths: resolvable.map(id => ({ id, dependencies: [id] })),
     candidates: reads.map(r => ({ id: r.id, cost: r.cost, removes: r.resolves, description: r.requirement })), protectedIntegrations: [], evidenceComplete: true, maxSteps });

@@ -19,17 +19,17 @@ The engine consumes recorded, tenant-bound facts. It has no Graph transport, aut
 | Access contracts | Strict declarative schemas, shortest witnesses, semantic change detection and partial-evidence uncertainty |
 | Portable replay | Independent-process CLI replay, missing dependencies, rehashed tampering, tenant isolation, size/depth limits and private mapping separation |
 
-The UI exposes all ten workflows on desktop and mobile. The CLI implements proof evaluation, contracts, semantic comparison, export and independent replay. Fifteen subprocess checks verify actual exit codes, malformed input handling, owner-only export permissions and refusal to overwrite existing files or follow output symlinks.
+The UI exposes all ten workflows on desktop and mobile. The CLI implements proof evaluation, contracts, semantic comparison, export and independent replay. Eighteen subprocess checks verify actual exit codes, malformed input handling, owner-only export permissions and refusal to overwrite existing files or follow output symlinks.
 
 ## Automated results
 
 The complete `pnpm verify` command covers Compose invariants, lint, types, unit/contract/database tests, the CLI, production build and browser flows. An isolated loopback PostgreSQL database contains only synthetic test fixtures.
 
-- **2,000 unit/contract/database tests:** 552 domain, 562 engine, 445 Graph, 208 backend and 233 web-server tests.
+- **2,004 unit/contract/database tests:** 552 domain, 566 engine, 445 Graph, 208 backend and 233 web-server tests.
 - **64 browser checks:** 62 desktop/mobile checks and two separate PostgreSQL persistence flows. Intentional optional-live and desktop-only skips remain explicit; persistence flows were actually run.
-- **15 CLI subprocess checks**, including local export and replay.
-- **Coverage and maintainability:** 1,052 measured functions; zero above CRAP 30. Engine coverage is 99.89% statements, 99.56% branches and 100% functions.
-- **Fresh engine mutation score: 95.68%.** Of 3,054 mutations, 2,900 were killed, 22 timed out, 128 survived and four had no coverage. This passes the existing 95% package gate; it is not a claim that every mutation was detected. Remaining survivors include redundant checks and unasserted formatting/guard variants. No threshold was reduced or production semantic module excluded.
+- **18 CLI subprocess checks**, including local export and replay.
+- **Coverage and maintainability:** 1,054 measured functions; zero above CRAP 30. Engine coverage is 99.89% statements, 99.56% branches and 100% functions.
+- **Fresh engine mutation score: 95.69%.** Of 3,064 mutations, 2,910 were killed, 22 timed out, 128 survived and four had no coverage. This passes the existing 95% package gate; it is not a claim that every mutation was detected. Remaining survivors include redundant checks and unasserted formatting/guard variants. No threshold was reduced or production semantic module excluded.
 - **Fresh Graph mutation score: 99.48%.** 2,300 killed, four timed out, 12 survived and none without coverage. Other production packages retain their existing mutation gate and are rerun by hosted CI.
 - **Dependency audit:** zero known advisories at validation time.
 - **Container:** the production image built with the reviewed Node 24 Alpine digest from PR #46 and restarted the existing local web/worker stack while preserving encrypted snapshots and sessions. Unrelated Docker services were left intact.
@@ -53,6 +53,8 @@ Four delegated records had incomplete or ambiguous resource-scope mappings. They
 The saved application's optional role, policy and activity collectors remained disabled. Group membership was partial, and directory audit access was denied. Historical snapshots lacking structured trust/policy fields remain readable and produce unknown where needed. The authenticated UI correctly preserves these limits. No optional scope was enabled or consented for validation.
 
 ## Defects found and corrected during validation
+
+- Hosted CodeQL identified a file-size check/read race and a potentially quadratic scope expression. The CLI now reads at most the permitted bytes plus one through a single open handle; scope parsing uses bounded, separately validated segments. Exact file-size boundaries, a growing input stream and crafted scope inputs have regression checks. The growing-stream test was also run against the original reader and failed as expected; the corrected reader passed.
 
 - Missing single-user consent context and unresolved delegated scope IDs could otherwise turn missing evidence into a false negative. Both now remain unknown.
 - Proof-cache dependencies now include source endpoint and collection metadata; canonical path ordering agrees with derivation references.
