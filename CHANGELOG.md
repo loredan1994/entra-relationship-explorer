@@ -13,6 +13,12 @@ Breaking changes are always called out under **Changed** with a migration note.
 
 ### Added
 
+- Investigation workspace with collector coverage, permission reconciliation, credential and federation review, local access scenarios, and a synthetic rule laboratory.
+- Application access review showing sign-in controls, publisher context, assignments, consent audiences, accountable owners, and separately labelled observed activity.
+- Local scenario export/import bound to the tenant and snapshot, with recomputed results and bounded candidate ranking.
+- Individual credential and federation history, field-level snapshot differences, and opt-in directory audit correlation that does not claim causation.
+- Behavioral and mutation contracts for sparse data, failed reads, exact time and size limits, tenancy, stale worker leases, physical retention, and concurrent review decisions.
+- Isolated PostgreSQL integration and browser persistence checks, plus continuous mutation and maintainability verification.
 - GET-only collectors for directory devices, administrative units and scoped roles, application and managed-identity federated credentials, tenant authorization policy, and optional consent-policy conditions.
 - Explainable administrative-unit, workload-federation, and consent-policy relationships, with focused inferred federation paths and a configured broad-consent finding.
 - Finding lifecycle across retained scans: newly detected, ongoing, returned, no-longer-detected, and unconfirmed when collection coverage cannot establish absence.
@@ -24,10 +30,30 @@ Breaking changes are always called out under **Changed** with a migration note.
 
 ### Changed
 
+- **Review API migration:** review GET/PUT/POST requests require the displayed `snapshot` query parameter. PUT/POST require `expectedRevision` (`null` for a new decision, the loaded revision for an existing one). Stale snapshots and competing writes return HTTP 409. Update external API clients with the application.
+- The database adds a review `revision` column automatically during the existing startup migration. Existing encrypted records remain readable; legacy revisions use the empty-string value until the next save. Restart the web and worker services together after upgrading.
+- New snapshot metadata remains optional. Older scans display unknown coverage and unconfirmed differences until a fresh read-only scan supplies evidence.
+- Test discovery excludes mutation sandboxes, keeping normal runs and reported counts independent of failed mutation runs.
+- Permission reconciliation and collector coverage are split into smaller functions with explicit responsibilities.
 - Tenant and client identifiers are now supplied through the environment rather
   than committed as defaults in `compose.yaml`.
 - `pnpm dev:live` reads secrets from a Key Vault named by `ENTRA_KEY_VAULT_NAME`,
   or from a git-ignored `.env.local`, instead of a hard-coded vault.
+
+### Fixed
+
+- Prevent group membership and API access from being mistaken for control of application credentials; disclose bounded or incomplete path analysis.
+- Preserve missing inventory as uncertainty when comparing permissions, owners, credentials, consent and application controls; missing authorization-policy assignments no longer imply disabled user consent.
+- Scope pending and unsaved review state to each finding; reject invalid expiry dates, stale snapshot decisions and competing revisions.
+- Refresh worker leases during long scans, recover abandoned scans during idle polling, and physically prune expired evidence and authentication records.
+- Reject cross-tenant memory checkpoints and reviews for missing or expired snapshots; align finding-limit deduplication with PostgreSQL.
+- Report failed reads without authorization evidence as unavailable, and ignore malformed audit targets without discarding valid event context.
+- Identify default application access only when the resource's collected role inventory is explicitly empty.
+
+### Security
+
+- All Microsoft Graph operations remain GET-only. New application fields use existing permissions; directory audits require an explicit opt-in under an existing read scope.
+- Updated dependency overrides and the lockfile to resolve the advisories found during verification. Tenant data, secret values and certificate material remain excluded from Git and evidence exports.
 
 ## Prior work
 

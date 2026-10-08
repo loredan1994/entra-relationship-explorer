@@ -54,3 +54,17 @@ The default implementation uses the two core delegated permissions above. Option
 Tenant snapshots and permissions may identify people and reveal organizational relationships. Repeated snapshots and access records are linkable. Exports cross into an operator-controlled environment, and directory subjects may not be aware of the local administrative scan. The product minimizes fields, excludes raw Graph bodies and secrets, uses tenant-bound encryption, keeps activity collection optional, prunes snapshots after 30 days, and requires explicit export. Owner-approved retention, deletion/rights, backup, incident-response, and export-handling policies are still required before broader organizational use.
 
 Customer-facing threat decisions are intentionally separate from developer assurance. A finding may be accepted only with an owner, rationale, and expiry. In tenant mode, decisions and analyst-edited attack-flow copies use authenticated tenant-scoped encryption in PostgreSQL; fixture mode uses clearly labeled browser storage. Neither path modifies Microsoft Entra.
+
+## Investigation data and review concurrency
+
+Directory audit collection requires `ENTRA_COLLECT_DIRECTORY_AUDITS=true` and is disabled by default. It uses the existing `Directory.Read.All` scope. Event/actor/target IDs and event times are personal tenant data and inherit encrypted snapshot storage and 30-day retention. Raw modified properties, raw old/new values, UPNs and IP addresses are not retained. Correlated audit events never establish causality by themselves.
+
+Per-credential inventory stores key IDs and validity metadata, never secret values or certificate bytes. Consent audience/principal IDs are retained to explain configured grants. New fields are optional for older snapshots; missing collection is unknown.
+
+What-if changes exist only in browser memory and cannot call Microsoft Graph. Scenario exports are explicitly requested, contain tenant object IDs, and require sensitive-data handling. Scenario imports are bounded to 100 KB and 100 exclusions, must match the displayed tenant/snapshot/time, and are recomputed locally without trusting imported results or uploading the file. Imported rule-lab scenarios reference only a compiled synthetic fixture; code and tenant exports are rejected.
+
+Live review writes are bound to the displayed snapshot and an opaque revision. Concurrent/stale saves fail instead of overwriting newer context. Snapshot and current/prior review reads enforce retention even when the worker is idle; periodic worker maintenance removes expired evidence and linked decisions. Workers refresh leases, recover stale work periodically, and reject stale ownership on database writes.
+
+### Application access context
+
+Snapshots may also retain allowlisted sign-in audience, service-principal account state, assignment requirement, home-tenant ID, preferred SSO mode and verified-publisher ID/name. These are configuration evidence, not effective access or publisher safety judgments. Existing Graph read scopes cover them. Missing historical fields remain unknown. Incoming assignments/consent and observed sign-ins remain separate, including in the relationship inspector.

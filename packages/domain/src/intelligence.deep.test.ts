@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { analyzeTenantIntelligence, type FindingSeverity, type IamFinding } from "./intelligence";
-import { edge, node, snapshot } from "./test-support";
+import { edge, node, snapshot, syntheticWorkloadActivity } from "./test-support";
 import type { TenantSnapshot } from "./types";
 
 function findingByCategory(snap: TenantSnapshot, category: IamFinding["category"]): IamFinding | undefined {
@@ -94,7 +94,7 @@ describe("attack path structure", () => {
   it("marks a complete snapshot as medium confidence and a partial one as low", () => {
     expect(analyzeTenantIntelligence(snap).paths[0]!.confidence).toBe("medium");
     const partial = snapshot(snap.nodes, snap.edges, {
-      completion: { status: "partial", collectedEndpoints: ["/applications"], skippedEndpoints: [], errors: [] },
+      completion: { collectors: syntheticWorkloadActivity, status: "partial", collectedEndpoints: ["/applications"], skippedEndpoints: [], errors: [] },
     });
     const partialPath = analyzeTenantIntelligence(partial).paths[0]!;
     expect(partialPath.confidence).toBe("low");
@@ -287,7 +287,7 @@ describe("dormant access finding", () => {
     expect(findingByCategory(withoutActivity, "dormant-access")).toBeUndefined();
 
     const withActivity = snapshot([caller, graph], [call], {
-      completion: { status: "complete", collectedEndpoints: ["/servicePrincipals", "/auditLogs/signIns"], skippedEndpoints: [], errors: [] },
+      completion: { collectors: syntheticWorkloadActivity, status: "complete", collectedEndpoints: ["/servicePrincipals", "/auditLogs/signIns"], skippedEndpoints: [], errors: [] },
     });
     const dormant = findingByCategory(withActivity, "dormant-access")!;
     expect(dormant.severity).toBe("medium");
@@ -302,7 +302,7 @@ describe("dormant access finding", () => {
       edge("CAN_CALL_AS_APP", caller, graph, { permissions: ["User.Read"] }),
       edge("OBSERVED_CALL", caller, graph),
     ], {
-      completion: { status: "complete", collectedEndpoints: ["/servicePrincipals", "/auditLogs/signIns"], skippedEndpoints: [], errors: [] },
+      completion: { collectors: syntheticWorkloadActivity, status: "complete", collectedEndpoints: ["/servicePrincipals", "/auditLogs/signIns"], skippedEndpoints: [], errors: [] },
     });
     expect(findingByCategory(snap, "dormant-access")).toBeUndefined();
   });
@@ -316,7 +316,7 @@ describe("dormant access finding", () => {
       edge("CAN_CALL_AS_APP", caller, vault, { id: "vault-grant", permissions: ["Vault.Read"] }),
       edge("OBSERVED_CALL", caller, graph),
     ], {
-      completion: { status: "complete", collectedEndpoints: ["/servicePrincipals", "/auditLogs/signIns"], skippedEndpoints: [], errors: [] },
+      completion: { collectors: syntheticWorkloadActivity, status: "complete", collectedEndpoints: ["/servicePrincipals", "/auditLogs/signIns"], skippedEndpoints: [], errors: [] },
     });
     expect(analyzeTenantIntelligence(snap).findings.filter((finding) => finding.category === "dormant-access").map((finding) => finding.edgeIds)).toEqual([["vault-grant"]]);
   });
@@ -325,10 +325,10 @@ describe("dormant access finding", () => {
 describe("coverage finding and counts", () => {
   it("marks skipped endpoints missing and escalates severity for a partial snapshot", () => {
     const complete = snapshot([node({ kind: "application", label: "A", ownerIds: ["o"] })], [], {
-      completion: { status: "complete", collectedEndpoints: ["/applications"], skippedEndpoints: ["/auditLogs/signIns"], errors: [] },
+      completion: { collectors: syntheticWorkloadActivity, status: "complete", collectedEndpoints: ["/applications"], skippedEndpoints: ["/auditLogs/signIns"], errors: [] },
     });
     const partial = snapshot([node({ kind: "application", label: "A", ownerIds: ["o"] })], [], {
-      completion: { status: "partial", collectedEndpoints: ["/applications"], skippedEndpoints: ["/auditLogs/signIns"], errors: ["429 throttled"] },
+      completion: { collectors: syntheticWorkloadActivity, status: "partial", collectedEndpoints: ["/applications"], skippedEndpoints: ["/auditLogs/signIns"], errors: ["429 throttled"] },
     });
     expect(findingByCategory(complete, "coverage")!.severity).toBe("low");
     const partialCoverage = findingByCategory(partial, "coverage")!;
@@ -339,7 +339,7 @@ describe("coverage finding and counts", () => {
 
   it("does not raise a coverage finding when nothing was skipped and no error occurred", () => {
     const clean = snapshot([node({ kind: "application", label: "A", ownerIds: ["o"] })], [], {
-      completion: { status: "complete", collectedEndpoints: ["/applications"], skippedEndpoints: [], errors: [] },
+      completion: { collectors: syntheticWorkloadActivity, status: "complete", collectedEndpoints: ["/applications"], skippedEndpoints: [], errors: [] },
     });
     expect(findingByCategory(clean, "coverage")).toBeUndefined();
   });
@@ -506,7 +506,7 @@ describe("dormant access coverage window", () => {
     const c = caller();
     const r = api();
     return analyzeTenantIntelligence(snapshot([c, r], [edge("CAN_CALL_AS_APP", c, r, { id: "edge-1", permissions: ["Api.Read"] })], {
-      completion: { status: "complete", collectedEndpoints, skippedEndpoints: [], errors: [] },
+      completion: { collectors: syntheticWorkloadActivity, status: "complete", collectedEndpoints, skippedEndpoints: [], errors: [] },
     }));
   }
 
@@ -524,7 +524,7 @@ describe("dormant access coverage window", () => {
     const c = caller();
     const r = api();
     const result = analyzeTenantIntelligence(snapshot([c, r], [edge("CAN_CALL_DELEGATED", c, r, { id: "edge-1", permissions: ["Mail.Read"] })], {
-      completion: { status: "complete", collectedEndpoints: ["/auditLogs/signIns"], skippedEndpoints: [], errors: [] },
+      completion: { collectors: syntheticWorkloadActivity, status: "complete", collectedEndpoints: ["/auditLogs/signIns"], skippedEndpoints: [], errors: [] },
     }));
     expect(result.findings.find((finding) => finding.category === "dormant-access")?.edgeIds).toEqual(["edge-1"]);
   });
@@ -533,7 +533,7 @@ describe("dormant access coverage window", () => {
     const person = node({ id: "user-1", kind: "user", label: "Avery" });
     const app = node({ id: "app-1", kind: "application", label: "App", ownerIds: ["user-1"] });
     const result = analyzeTenantIntelligence(snapshot([person, app], [edge("OWNS", person, app)], {
-      completion: { status: "complete", collectedEndpoints: ["/auditLogs/signIns"], skippedEndpoints: [], errors: [] },
+      completion: { collectors: syntheticWorkloadActivity, status: "complete", collectedEndpoints: ["/auditLogs/signIns"], skippedEndpoints: [], errors: [] },
     }));
     expect(result.findings.some((finding) => finding.category === "dormant-access")).toBe(false);
   });
@@ -585,7 +585,7 @@ describe("finding wording that carries meaning", () => {
     const complete = analyzeTenantIntelligence(snapshot([orphan], [])).findings.find((item) => item.category === "ownership")!;
     expect(complete.uncertainty).toEqual([]);
     const partial = analyzeTenantIntelligence(snapshot([orphan], [], {
-      completion: { status: "partial", collectedEndpoints: ["/applications"], skippedEndpoints: ["/servicePrincipals"], errors: [] },
+      completion: { collectors: syntheticWorkloadActivity, status: "partial", collectedEndpoints: ["/applications"], skippedEndpoints: ["/servicePrincipals"], errors: [] },
     })).findings.find((item) => item.category === "ownership")!;
     expect(partial.uncertainty).toEqual(["Owner collection may be incomplete in this partial snapshot."]);
   });

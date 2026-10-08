@@ -121,21 +121,39 @@ function discoverPaths(snapshot: TenantSnapshot, maxDepth = 5): { paths: AttackP
     const queue: Traversal[] = [{ nodeId: origin.id, traversed: [], visited: new Set([origin.id]) }];
     while (queue.length > 0) {
       const current = queue.shift()!;
-      if (current.traversed.length >= maxDepth) continue;
+      if (current.traversed.length >= maxDepth) {
+        if ((outgoing.get(current.nodeId) ?? []).some((view) => !current.visited.has(view.target.id) && controlTransition(view, current.traversed) !== "stop")) truncated = true;
+        continue;
+      }
       for (const view of outgoing.get(current.nodeId) ?? []) {
         // A path never revisits an object, and observed activity is evidence of use rather
         // than a relationship an attacker could traverse.
-        if (current.visited.has(view.target.id) || view.edge.type === "OBSERVED_CALL") continue;
+        const transition = controlTransition(view, current.traversed);
+        if (current.visited.has(view.target.id) || transition === "stop") continue;
         if (traversals >= MAX_PATH_TRAVERSALS || paths.length >= MAX_ATTACK_PATHS) { truncated = true; break pathSearch; }
         traversals += 1;
         const traversed = [...current.traversed, view];
         const severity = severityFor(view);
         if (severity) paths.push(attackPath(snapshot, origin, view, traversed, severity));
-        queue.push({ nodeId: view.target.id, traversed, visited: new Set([...current.visited, view.target.id]) });
+        if (transition === "continue") queue.push({ nodeId: view.target.id, traversed, visited: new Set([...current.visited, view.target.id]) });
       }
     }
   }
   return { paths: rankPaths(paths), truncated, traversals };
+}
+
+/** A relationship's presence does not imply control of its target identity. */
+export function controlTransition(view: RelationshipView, prior: RelationshipView[]): "stop" | "terminal" | "continue" {
+  const type = view.edge.type;
+  // Membership supplies only the group's role assignment; nested membership does not
+  // propagate Entra role eligibility or the application's own credentials.
+  if (prior.at(-1)?.edge.type === "MEMBER_OF" && type !== "ACTIVE_IN_ROLE" && type !== "ELIGIBLE_FOR_ROLE") return "stop";
+  if (["CAN_CALL_AS_APP", "CAN_CALL_DELEGATED", "ACTIVE_IN_ROLE", "ELIGIBLE_FOR_ROLE"].includes(type)) return "terminal";
+  if (type === "MEMBER_OF") return view.target.kind === "group" ? "continue" : "stop";
+  if (type === "OWNS") return ["application", "servicePrincipal"].includes(view.target.kind) ? "continue" : "stop";
+  if (type === "INSTANTIATES_AS") return view.source.kind === "application" && view.target.kind === "servicePrincipal" ? "continue" : "stop";
+  if (type === "FEDERATES_AS") return view.source.kind === "federatedCredential" && ["application", "managedIdentity"].includes(view.target.kind) ? "continue" : "stop";
+  return "stop";
 }
 
 function outgoingRelationships(snapshot: TenantSnapshot): Map<string, RelationshipView[]> {
@@ -200,7 +218,10 @@ function pathFindings(paths: AttackPath[]): IamFinding[] {
 
 function consentPolicyFindings(snapshot: TenantSnapshot): IamFinding[] {
   const legacyPolicyId = "microsoft-user-default-legacy";
-  return snapshot.nodes.filter((node) => node.kind === "policy" && node.metadata?.policyType === "authorization" && String(node.metadata.permissionGrantPoliciesAssigned ?? "").split(/,\s*/).includes(`ManagePermissionGrantsForSelf.${legacyPolicyId}`)).map((node) => {
+  return snapshot.nodes.filter((node) => {
+    const assignments = node.metadata?.permissionGrantPoliciesAssigned;
+    return node.kind === "policy" && node.metadata?.policyType === "authorization" && typeof assignments === "string" && assignments.split(/,\s*/).includes(`ManagePermissionGrantsForSelf.${legacyPolicyId}`);
+  }).map((node) => {
     const edge = snapshot.edges.find((item) => item.type === "ASSIGNS_CONSENT_POLICY" && item.sourceId === node.id && item.targetId === legacyPolicyId);
     return { id: stableId("finding-consent-policy", [node.id, legacyPolicyId]), title: "Users can consent broadly to applications", category: "consent-policy" as const, severity: "high" as const, evidenceClass: "configured" as const, summary: "The default authorization policy assigns the legacy user-consent policy.", whyItMatters: "The legacy policy can let users consent to permissions that do not require administrator consent for applications without the tighter verified-publisher and low-impact restrictions.", remediation: ["Review the business requirement for user consent and replace the legacy assignment with a restricted permission grant policy or disable user consent through the approved Entra change process.", "Re-scan and confirm the authorization policy no longer assigns the legacy policy."], affectedObjectIds: [node.id, legacyPolicyId], edgeIds: edge ? [edge.id] : [], attackPathId: null, sourceEndpoints: edge ? [edge.evidence.sourceEndpoint] : ["/policies/authorizationPolicy"], uncertainty: ["This configured policy does not prove that any user granted consent or that an application used delegated access."] };
   });
@@ -231,7 +252,8 @@ function relationshipFindings(snapshot: TenantSnapshot): IamFinding[] {
  */
 function dormantAccessFindings(snapshot: TenantSnapshot): IamFinding[] {
   const findings: IamFinding[] = [];
-  const hasActivityCoverage = snapshot.completion.collectedEndpoints.some((endpoint) => endpoint.startsWith("/auditLogs/signIns"));
+  const activity = snapshot.completion.collectors?.find((collector) => collector.id === "activity");
+  const hasActivityCoverage = snapshot.completion.collectedEndpoints.some(e => e.startsWith("/auditLogs/signIns")) && activity?.state === "complete" && activity.window?.eventClasses.includes("servicePrincipal") && activity.window.eventClasses.includes("nonInteractiveUser");
   if (hasActivityCoverage) {
     const activeRelationships = new Set(snapshot.edges.filter((edge) => edge.type === "OBSERVED_CALL").map((edge) => `${edge.sourceId}\0${edge.targetId}`));
     for (const view of relationships(snapshot).filter((item) => (item.edge.type === "CAN_CALL_AS_APP" || item.edge.type === "CAN_CALL_DELEGATED") && !activeRelationships.has(`${item.source.id}\0${item.target.id}`))) findings.push({ id: stableId("finding-dormant", [view.edge.id]), title: `Configured access from ${view.source.label} had no observed sign-in in the collection window`, category: "dormant-access", severity: "medium", evidenceClass: "inferred", summary: `The permission remains configured, while the collected 30-day sign-in window contained no matching workload activity for this source identity and target resource.`, whyItMatters: "Unused access can remain exploitable even when normal business activity has stopped.", remediation: ["Confirm the access is still required with the owner.", "Use an approved change process to remove unnecessary grants, then re-scan."], affectedObjectIds: [view.source.id, view.target.id], edgeIds: [view.edge.id], attackPathId: null, sourceEndpoints: [view.edge.evidence.sourceEndpoint, ...snapshot.completion.collectedEndpoints.filter((endpoint) => endpoint.startsWith("/auditLogs/signIns"))], uncertainty: ["Absence in a bounded sign-in dataset is not proof that the permission was never used.", "Observed sign-ins identify the source and resource, but do not prove which configured permission was exercised."] });
@@ -296,9 +318,10 @@ function coverageFindings(snapshot: TenantSnapshot): IamFinding[] {
 export function analyzeTenantIntelligence(snapshot: TenantSnapshot): TenantIntelligence {
   const pathResult = discoverPaths(snapshot);
   const paths = pathResult.paths;
+  // Stryker disable next-line ArrayDeclaration: snapshot-scope rules never read previousPaths.
   const focused = evaluateEntraRules({ current: snapshot, previous: null, paths, previousPaths: [] }, "snapshot");
-  const consumedPaths = new Set(focused.filter((finding) => finding.rule?.id === "ERE-IAM-001").map((finding) => finding.attackPathId));
-  const focusedOwnership = new Set(focused.filter((finding) => finding.rule?.id === "ERE-IAM-004").map((finding) => finding.affectedObjectIds[0]));
+  const consumedPaths = new Set(focused.filter((finding) => finding.rule!.id === "ERE-IAM-001").map((finding) => finding.attackPathId));
+  const focusedOwnership = new Set(focused.filter((finding) => finding.rule!.id === "ERE-IAM-004").map((finding) => finding.affectedObjectIds[0]));
   const findings = [...focused, ...findingsFor(snapshot, paths).filter((finding) => !consumedPaths.has(finding.attackPathId) && !(finding.category === "ownership" && focusedOwnership.has(finding.affectedObjectIds[0])))];
   return summarizeIntelligence(snapshot, paths, findings, pathResult);
 }
@@ -307,7 +330,7 @@ export function analyzeTenantIntelligenceHistory(history: TenantSnapshot[]): Ten
   validateIntelligenceHistory(history);
   const current = analyzeTenantIntelligence(history[0]!);
   const previous = history[1] ? analyzeTenantIntelligence(history[1]) : null;
-  const historyFindings = evaluateEntraRules({ current: history[0]!, previous: history[1] ?? null, paths: current.paths, previousPaths: previous?.paths ?? [] }, "history");
+  const historyFindings = previous ? evaluateEntraRules({ current: history[0]!, previous: history[1]!, paths: current.paths, previousPaths: previous.paths }, "history") : [];
   return summarizeIntelligence(history[0]!, current.paths, [...historyFindings, ...current.findings], current.pathAnalysis);
 }
 

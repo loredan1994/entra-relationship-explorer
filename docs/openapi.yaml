@@ -4,20 +4,20 @@ info:
   version: 1.0.0
   description: Read-only local API. It queues Microsoft Graph reads and never changes Microsoft Entra.
 servers:
-  - url: http://127.0.0.1:3200/api/v1
+  - url: http://127.0.0.1:3200/api
 paths:
-  /health:
+  /v1/health:
     get:
       summary: Check web and PostgreSQL readiness
       responses:
         "200": { description: Ready }
         "503": { description: PostgreSQL unavailable }
-  /session:
+  /v1/session:
     get:
       summary: Read the current local session state
       responses:
         "200": { description: Session state }
-  /scans:
+  /v1/scans:
     get:
       summary: Read the latest scan job for the authenticated tenant
       responses:
@@ -29,7 +29,7 @@ paths:
         "202": { description: Scan accepted or existing active scan returned }
         "401": { description: Authentication required }
         "403": { description: Same-origin check failed }
-  /scans/{id}:
+  /v1/scans/{id}:
     get:
       summary: Read one tenant-scoped scan job
       parameters:
@@ -48,17 +48,48 @@ paths:
         "401": { description: Authentication required }
         "403": { description: Same-origin check failed }
         "404": { description: Active job absent from this tenant }
-  /threat-reviews/{id}:
+  /v1/threat-reviews/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string }, description: Finding ID from the displayed snapshot }
+      - { name: snapshot, in: query, required: true, schema: { type: string }, description: Displayed snapshot ID; must still be the latest retained snapshot }
     get:
       summary: Read one encrypted tenant-scoped finding decision
       responses:
-        "200": { description: Review or null }
+        "200": { description: Current review and latest retained prior review, either may be null }
+        "400": { description: Displayed snapshot ID is missing }
+        "409": { description: A newer scan is available; reload its evidence }
         "401": { description: Authentication required }
         "404": { description: Finding absent from the latest tenant snapshot }
     put:
       summary: Save a decision and optional analyst-edited attack-flow copy
+      description: expectedRevision is null when GET returned no review; otherwise send the opaque review.revision from GET. A successful write returns a new revision. Conflicts require reloading and reviewing the latest decision.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [disposition, expectedRevision]
+              properties:
+                expectedRevision: { type: [string, "null"] }
+                disposition: { type: string, enum: [open, mitigating, accepted, resolved] }
+                owner: { type: string, maxLength: 160 }
+                assumption: { type: string, maxLength: 4000 }
+                expiresAt: { type: [string, "null"], format: date, description: Valid calendar date; required for accepted risk }
+                flowDraft:
+                  type: array
+                  maxItems: 20
+                  items:
+                    type: object
+                    required: [title]
+                    properties:
+                      id: { type: string, maxLength: 100 }
+                      title: { type: string, maxLength: 500 }
+                      evidenceEdgeId: { type: [string, "null"], maxLength: 160 }
       responses:
-        "200": { description: Encrypted review saved }
+        "200": { description: Encrypted review saved with a new opaque revision }
+        "404": { description: Finding absent from the latest retained tenant snapshot }
+        "409": { description: Snapshot expired or changed, or another analyst saved a decision }
         "400": { description: Invalid decision or accepted-risk fields }
         "401": { description: Authentication required }
         "403": { description: Same-origin check failed }
@@ -71,23 +102,24 @@ paths:
           application/json:
             schema:
               type: object
-              required: [sourceSnapshotId]
+              required: [sourceSnapshotId, expectedRevision]
               properties:
                 sourceSnapshotId: { type: string, format: uuid }
+                expectedRevision: { type: [string, "null"] }
       responses:
         "200": { description: Current snapshot review created from validated prior context }
         "400": { description: Prior source snapshot is missing }
         "401": { description: Authentication required }
         "403": { description: Same-origin check failed }
-        "409": { description: Prior review is stale or unavailable }
-  /exports/relationships.csv:
+        "409": { description: Prior review is stale or unavailable, the snapshot changed, or the review revision conflicts }
+  /export/relationships.csv:
     get:
       summary: Export the latest tenant snapshot as CSV
       responses:
         "200": { description: CSV export }
         "401": { description: Authentication required }
         "404": { description: No tenant snapshot }
-  /exports/evidence-packet.json:
+  /export/evidence-packet.json:
     get:
       summary: Export one current finding or attack path as versioned focused JSON
       description: Returns schema ere-evidence-packet/1.0 with only the selected subject and referenced evidence. The full tenant snapshot is not included.
@@ -99,7 +131,7 @@ paths:
         "400": { description: Missing or invalid subject selector }
         "401": { description: Authentication required }
         "404": { description: Subject absent from the current snapshot }
-  /exports/evidence-packet.md:
+  /export/evidence-packet.md:
     get:
       summary: Export one current finding or attack path as sanitized Markdown
       parameters:

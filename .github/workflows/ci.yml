@@ -20,6 +20,17 @@ jobs:
   verify:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:17-alpine@sha256:18cfe3ef5e6815560c98237d6216d1e5119702fb0f3894c8785dd58b8bbe5d73
+        env:
+          POSTGRES_USER: entra_test
+          POSTGRES_PASSWORD: synthetic-test-only
+          POSTGRES_DB: entra_review_test
+        ports: ["5432:5432"]
+        options: --health-cmd "pg_isready -U entra_test -d entra_review_test" --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      TEST_DATABASE_URL: postgresql://entra_test:synthetic-test-only@127.0.0.1:5432/entra_review_test
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -42,5 +53,47 @@ jobs:
       - name: Install browser for product checks
         run: pnpm --filter @entra-explorer/web exec playwright install --with-deps chromium
 
+      - name: Audit runtime and development dependencies
+        run: pnpm security:dependencies
+
       - name: Type-check, test, and build
         run: pnpm run verify
+
+  quality:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    services:
+      postgres:
+        image: postgres:17-alpine@sha256:18cfe3ef5e6815560c98237d6216d1e5119702fb0f3894c8785dd58b8bbe5d73
+        env:
+          POSTGRES_USER: entra_test
+          POSTGRES_PASSWORD: synthetic-test-only
+          POSTGRES_DB: entra_review_test
+        ports: ["5432:5432"]
+        options: --health-cmd "pg_isready -U entra_test -d entra_review_test" --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      TEST_DATABASE_URL: postgresql://entra_test:synthetic-test-only@127.0.0.1:5432/entra_review_test
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+        with:
+          version: 11.23.0
+          run_install: false
+
+      - name: Use Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Coverage and maintainability gate
+        run: pnpm quality:crap
+
+      - name: Fresh mutation gate (95% per package)
+        run: pnpm test:mutation --force --concurrency 2

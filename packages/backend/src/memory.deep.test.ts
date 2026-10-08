@@ -26,6 +26,7 @@ function snapshotFor(tenantId = TENANT, scannedAt = new Date().toISOString()) {
 
 let backend: MemoryBackend;
 beforeEach(() => { backend = new MemoryBackend(); });
+afterEach(() => vi.restoreAllMocks());
 
 /** Queues a job and claims it, returning the running job. */
 async function runningJob(workerId = "worker-1"): Promise<ScanJob> {
@@ -334,6 +335,7 @@ describe("scan cancellation", () => {
 
 describe("snapshot retention", () => {
   it("discards snapshots older than the retention cutoff on completion", async () => {
+    vi.spyOn(Date, "now").mockReturnValue(Date.parse("2026-08-02T00:00:00Z"));
     const job = await runningJob();
     const stale = snapshotFor(TENANT, "2020-01-01T00:00:00.000Z");
     const fresh = snapshotFor(TENANT, "2026-08-26T00:00:00.000Z");
@@ -352,6 +354,7 @@ describe("snapshot retention", () => {
   }
 
   it("returns snapshots newest first", async () => {
+    vi.spyOn(Date, "now").mockReturnValue(Date.parse("2026-08-02T00:00:00Z"));
     const job = await runningJob();
     await backend.completeJob(job.id, "worker-1", snapshotFor(TENANT, "2026-01-01T00:00:00.000Z"), new Date(0));
     const second = await runningJobAfterCompletion();
@@ -408,13 +411,18 @@ describe("threat reviews", () => {
   });
 
   it("stamps its own update time rather than trusting the caller's", async () => {
-    const stored = await backend.upsertThreatReview(review(), null);
+    const first = review();
+    const job = await runningJob();
+    await backend.completeJob(job.id, "worker-1", { ...snapshotFor(), id: first.snapshotId }, new Date(0));
+    const stored = await backend.upsertThreatReview(first, null);
     expect(stored.updatedAt).not.toBe("1970-01-01T00:00:00.000Z");
     expect(Date.parse(stored.updatedAt)).toBeGreaterThan(0);
   });
 
   it("replaces an existing decision for the same finding instead of duplicating it", async () => {
     const first = review();
+    const queued = await runningJob("review-worker");
+    await backend.completeJob(queued.id, "review-worker", { ...snapshotFor(), id: first.snapshotId }, new Date(0));
     await backend.upsertThreatReview(first, null);
     await backend.upsertThreatReview({ ...first, disposition: "resolved", owner: "Security" }, null);
     expect(await backend.getThreatReview(TENANT, first.snapshotId, first.findingId)).toMatchObject({ disposition: "resolved", owner: "Security" });
@@ -422,6 +430,8 @@ describe("threat reviews", () => {
 
   it("records an audit event naming the reviewed finding", async () => {
     const first = review();
+    const job = await runningJob();
+    await backend.completeJob(job.id, "worker-1", { ...snapshotFor(), id: first.snapshotId }, new Date(0));
     await backend.upsertThreatReview(first, "session-9");
     expect((await backend.recentAccessEvents(TENANT))[0]).toMatchObject({
       action: "update", resourceType: "threat_review", resourceId: first.findingId, sessionId: "session-9",
@@ -512,7 +522,7 @@ describe("time boundaries and ordering", () => {
 
   it("returns only the requested number of snapshots when more are retained", async () => {
     const ids: string[] = [];
-    for (const scannedAt of ["2026-01-01T00:00:00.000Z", "2026-02-01T00:00:00.000Z", "2026-03-01T00:00:00.000Z"]) {
+    for (const scannedAt of [2, 1, 0].map(days => new Date(Date.now() - days * 86400000).toISOString())) {
       const live = session();
       await backend.createSession(live);
       await backend.enqueueScan(TENANT, live.id);

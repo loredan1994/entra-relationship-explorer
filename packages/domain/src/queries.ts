@@ -78,7 +78,7 @@ export function assertTenantBoundary(snapshot: TenantSnapshot): void {
   const tenantId = snapshot.tenant.tenantId;
   const invalidNode = snapshot.nodes.find((node) => node.tenantId !== tenantId);
   const invalidEdge = snapshot.edges.find((edge) => edge.tenantId !== tenantId);
-  if (invalidNode || invalidEdge) {
+  if (invalidNode || invalidEdge || snapshot.auditEvents?.some(event => event.tenantId !== tenantId)) {
     throw new Error("Snapshot records must belong to exactly one tenant.");
   }
 }

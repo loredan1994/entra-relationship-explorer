@@ -10,6 +10,7 @@ const navItems = [
   { href: "/map", label: "Relationship map" },
   { href: "/permissions", label: "Permissions" },
   { href: "/changes", label: "Changes" },
+  { href: "/investigations", label: "Investigations" },
   { href: "/security", label: "Threat workspace" },
   { href: "/settings", label: "Settings" },
 ];

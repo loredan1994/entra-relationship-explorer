@@ -93,8 +93,8 @@ describe("optional-scope stages", () => {
       {
         id: "signin-1",
         createdDateTime: "2026-08-20T09:00:00Z",
-        servicePrincipalId: "sp-1",
-        resourceServicePrincipalId: "sp-2",
+        appId: "client-app",
+        resourceId: "resource-app",
         appDisplayName: "Caller",
         resourceDisplayName: "Resource",
         status: { errorCode: 0 },
@@ -116,7 +116,7 @@ describe("optional-scope stages", () => {
     expect(scan.signIns).toEqual([]);
     // The stages are still marked done so a resume does not retry an ungranted read.
     expect(scan.completedStages).toEqual(
-      expect.arrayContaining<ScanStage>(["roles", "conditionalAccess", "authorizationPolicy", "permissionGrantPolicies", "crossTenantAccess", "activity"]),
+      expect.arrayContaining<ScanStage>(["roles", "conditionalAccess", "authorizationPolicy", "permissionGrantPolicies", "crossTenantAccess", "activity", "directoryAudits"]),
     );
   });
 
@@ -182,8 +182,8 @@ describe("optional-scope stages", () => {
     expect(scan.signIns?.[0]?.record).toEqual({
       id: "signin-1",
       createdDateTime: "2026-08-20T09:00:00Z",
-      servicePrincipalId: "sp-1",
-      resourceServicePrincipalId: "sp-2",
+      appId: "client-app",
+      resourceId: "resource-app",
       appDisplayName: "Caller",
       resourceDisplayName: "Resource",
       status: { errorCode: 0 },
@@ -201,8 +201,8 @@ describe("optional-scope stages", () => {
     expect(scan.signIns?.[0]?.record).toEqual({
       id: "signin-2",
       createdDateTime: "2026-08-21T09:00:00Z",
-      servicePrincipalId: null,
-      resourceServicePrincipalId: null,
+      appId: null,
+      resourceId: null,
       appDisplayName: null,
       resourceDisplayName: null,
       status: null,
@@ -679,7 +679,7 @@ describe("stage bookkeeping", () => {
 
   it("records every stage it completed, in the order the scan runs them", async () => {
     const scan = await scanTenant(clientFor(routedFetch(inventory)), TENANT, { now, enabledScopes: ALL_OPTIONAL_SCOPES });
-    expect(scan.completedStages).toEqual(STAGE_ENDPOINTS.map(([stage]) => stage));
+    expect(scan.completedStages).toEqual([...STAGE_ENDPOINTS.map(([stage]) => stage), "directoryAudits"]);
   });
 
   it.each(STAGE_ENDPOINTS)("skips the %s reads when the checkpoint already completed that stage", async (stage, endpoints) => {
@@ -802,7 +802,7 @@ describe("record sanitization at the edges", () => {
 describe("resuming a finished scan", () => {
   const ALL_STAGES: ScanStage[] = [
     "applications", "servicePrincipals", "federatedIdentityCredentials", "usersAndGroups", "groupMemberships", "devices", "administrativeUnits", "delegatedPermissionGrants",
-    "appRoleAssignments", "owners", "roles", "conditionalAccess", "authorizationPolicy", "permissionGrantPolicies", "crossTenantAccess", "activity",
+    "appRoleAssignments", "owners", "roles", "conditionalAccess", "authorizationPolicy", "permissionGrantPolicies", "crossTenantAccess", "activity", "directoryAudits",
   ];
 
   it("reads nothing and checkpoints nothing when every stage is already complete", async () => {

@@ -48,7 +48,7 @@ const relationshipLabels: Record<RelationshipType, string> = {
   ASSIGNS_CONSENT_POLICY: "Assigns consent policy",
   CROSS_TENANT_ACCESS: "Cross-tenant setting",
   OWNS: "Owns",
-  OBSERVED_CALL: "Called recently",
+  OBSERVED_CALL: "Successful sign-in to resource",
 };
 
 const MAP_NODE_LIMIT = 15;
@@ -373,7 +373,7 @@ export function RelationshipExplorer({ snapshot }: { snapshot: TenantSnapshot })
           ) : null}
           <div className="configured-key">
             <span aria-hidden="true" />
-            Configured directory facts · no observed activity
+            {filteredViews.some(({ edge }) => edge.evidence.observed) ? "Configured facts and observed sign-ins · inspect evidence" : "Configured directory facts · no observed activity recorded"}
           </div>
           {viewMode === "map" ? <span className="map-hint">Drag or scroll to pan · ⌘/Ctrl + scroll to zoom</span> : null}
         </div>
@@ -514,7 +514,7 @@ function RelationshipTable({
   );
 }
 
-function EvidenceInspector({ view, snapshot }: { view?: RelationshipView; snapshot: TenantSnapshot }) {
+export function EvidenceInspector({ view, snapshot }: { view?: RelationshipView; snapshot: TenantSnapshot }) {
   if (!view) {
     return (
       <aside className="evidence-inspector">
@@ -529,12 +529,12 @@ function EvidenceInspector({ view, snapshot }: { view?: RelationshipView; snapsh
       <div className="inspector-header">
         <p className="eyebrow">Why this line exists</p>
         <h2>{edge.plainLabel}</h2>
-        <span className="evidence-status"><i aria-hidden="true" /> Configured relationship</span>
+        <span className="evidence-status"><i aria-hidden="true" /> {edge.evidence.configured ? "Configured relationship" : edge.evidence.observed ? "Observed sign-in" : "Evidence incomplete"}</span>
       </div>
 
       <div className="plain-explanation">
         <p>{explanation(view)}</p>
-        <p className="trust-note"><strong>Configured access.</strong> This does not prove recent use.</p>
+        <p className="trust-note">{edge.evidence.configured ? <><strong>Configured access.</strong> This does not prove recent use.</> : edge.evidence.observed ? <><strong>Observed user sign-in.</strong> A successful sign-in does not prove a configured permission was exercised.</> : "Evidence is incomplete; neither configured access nor activity is established."}</p>
       </div>
 
       {edge.permissions.length > 0 ? (
@@ -574,12 +574,13 @@ function EvidenceInspector({ view, snapshot }: { view?: RelationshipView; snapsh
       <section className="inspector-section evidence-facts">
         <h3>Source evidence</h3>
         <dl>
+          {edge.consent ? <><div><dt>Consent audience</dt><dd>{edge.consent.audience === "all-users" ? "All users" : edge.consent.audience === "single-user" ? "One user" : "Unknown consent audience"}</dd></div><div><dt>Consent principal ID</dt><dd><code>{edge.consent.principalId ?? "Not specified"}</code></dd></div></> : null}
           <div><dt>Relationship type</dt><dd><code>{edge.type}</code></dd></div>
           <div><dt>Source endpoint</dt><dd><code>{edge.evidence.sourceEndpoint}</code></dd></div>
           <div><dt>Source record IDs</dt><dd>{edge.evidence.sourceRecordIds.map((id) => <code key={id}>{id}</code>)}</dd></div>
           <div><dt>Collected</dt><dd>{new Date(edge.evidence.scannedAt).toLocaleString("en", { timeZone: "UTC", timeZoneName: "short" })}</dd></div>
           <div><dt>Completeness</dt><dd className="capitalized">{edge.evidence.completeness}</dd></div>
-          <div><dt>Observed activity</dt><dd>Not collected</dd></div>
+          <div><dt>Observed activity</dt><dd>{edge.evidence.observed ? <>Successful sign-in at <time dateTime={edge.evidence.observed.lastSeenAt}>{edge.evidence.observed.lastSeenAt}</time><br />Requested window starts {edge.evidence.observed.windowStartsAt}</> : "No activity attached to this relationship"}</dd></div>
         </dl>
       </section>
 

@@ -27,6 +27,20 @@ export class PostgresBackend implements Backend {
 
   async health(): Promise<BackendHealth> { await this.pool.query("SELECT 1"); return { ok: true, database: "postgres" }; }
 
+  async pruneExpiredData(tenantId: string, retainAfter: Date): Promise<void> {
+    await this.transaction(async client => {
+      await client.query("DELETE FROM threat_reviews r USING snapshots s WHERE r.tenant_id=$1 AND r.snapshot_id=s.id AND s.tenant_id=$1 AND s.scanned_at<$2", [tenantId, retainAfter]);
+      await client.query("DELETE FROM snapshots WHERE tenant_id=$1 AND scanned_at<$2", [tenantId, retainAfter]);
+      await client.query("DELETE FROM auth_flows WHERE tenant_id=$1 AND expires_at<=now()", [tenantId]);
+      await client.query("DELETE FROM sessions WHERE tenant_id=$1 AND expires_at<=now()", [tenantId]);
+    });
+  }
+
+  async heartbeatJob(id: string, workerId: string): Promise<boolean> {
+    const result = await this.pool.query("UPDATE scan_jobs SET updated_at=now(),locked_at=now() WHERE id=$1 AND worker_id=$2 AND status IN ('running','cancel_requested')", [id, workerId]);
+    return result.rowCount === 1;
+  }
+
   async createAuthFlow(flow: DurableAuthFlow): Promise<void> {
     const encrypted = encryptJson(flow, this.key, flowContext(flow.id, flow.tenantId));
     await this.pool.query("INSERT INTO auth_flows (id, tenant_id, expires_at, iv, ciphertext, auth_tag) VALUES ($1,$2,$3,$4,$5,$6)", [flow.id, flow.tenantId, new Date(flow.expiresAt), encrypted.iv, encrypted.ciphertext, encrypted.authTag]);
@@ -139,7 +153,7 @@ export class PostgresBackend implements Backend {
 
   async recentSnapshots(tenantId: string, limit = 20): Promise<TenantSnapshot[]> {
     const bounded = Math.max(1, Math.min(limit, 100));
-    const result = await this.pool.query<EncryptedRow>("SELECT * FROM snapshots WHERE tenant_id=$1 ORDER BY scanned_at DESC LIMIT $2", [tenantId, bounded]);
+    const result = await this.pool.query<EncryptedRow>("SELECT * FROM snapshots WHERE tenant_id=$1 AND scanned_at>=now()-interval '30 days' ORDER BY scanned_at DESC LIMIT $2", [tenantId, bounded]);
     return result.rows.map((row) => decryptJson<TenantSnapshot>(encrypted(row), this.key, snapshotContext(row.id, row.tenant_id, row.scanned_at!.toISOString())));
   }
 
@@ -154,21 +168,22 @@ export class PostgresBackend implements Backend {
   }
 
   async getThreatReview(tenantId: string, snapshotId: string, findingId: string): Promise<ThreatReview | null> {
-    const row = (await this.pool.query<EncryptedRow>("SELECT tenant_id,snapshot_id AS id,finding_id,iv,ciphertext,auth_tag,updated_at FROM threat_reviews WHERE tenant_id=$1 AND snapshot_id=$2 AND finding_id=$3", [tenantId, snapshotId, findingId])).rows[0] as (EncryptedRow & { finding_id?: string; updated_at?: Date }) | undefined;
+    const row = (await this.pool.query<EncryptedRow>("SELECT tenant_id,snapshot_id AS id,finding_id,iv,ciphertext,auth_tag,updated_at FROM threat_reviews WHERE tenant_id=$1 AND snapshot_id=$2 AND finding_id=$3 AND EXISTS (SELECT 1 FROM snapshots s WHERE s.tenant_id=$1 AND s.id=$2 AND s.scanned_at>=now()-interval '30 days')", [tenantId, snapshotId, findingId])).rows[0] as (EncryptedRow & { finding_id?: string; updated_at?: Date }) | undefined;
     return row ? decryptJson<ThreatReview>(encrypted(row), this.key, reviewContext(tenantId, snapshotId, findingId)) : null;
   }
 
   async priorThreatReviews(tenantId: string, currentSnapshotId: string, findingIds: string[]): Promise<ThreatReview[]> {
     const bounded = [...new Set(findingIds)].slice(0, 5_000);
     if (bounded.length === 0) return [];
-    const result = await this.pool.query<EncryptedRow & { finding_id: string; snapshot_id: string }>("WITH current_snapshot AS (SELECT id,scanned_at FROM snapshots WHERE tenant_id=$1 AND id=$2) SELECT DISTINCT ON (r.finding_id) r.tenant_id,r.snapshot_id AS id,r.snapshot_id,r.finding_id,r.iv,r.ciphertext,r.auth_tag,r.updated_at FROM threat_reviews r JOIN snapshots reviewed ON reviewed.id=r.snapshot_id AND reviewed.tenant_id=r.tenant_id CROSS JOIN current_snapshot current WHERE r.tenant_id=$1 AND r.finding_id=ANY($3::text[]) AND reviewed.scanned_at<current.scanned_at ORDER BY r.finding_id,reviewed.scanned_at DESC", [tenantId, currentSnapshotId, bounded]);
+    const result = await this.pool.query<EncryptedRow & { finding_id: string; snapshot_id: string }>("WITH current_snapshot AS (SELECT id,scanned_at FROM snapshots WHERE tenant_id=$1 AND id=$2 AND scanned_at>=now()-interval '30 days') SELECT DISTINCT ON (r.finding_id) r.tenant_id,r.snapshot_id AS id,r.snapshot_id,r.finding_id,r.iv,r.ciphertext,r.auth_tag,r.updated_at FROM threat_reviews r JOIN snapshots reviewed ON reviewed.id=r.snapshot_id AND reviewed.tenant_id=r.tenant_id CROSS JOIN current_snapshot current WHERE r.tenant_id=$1 AND r.finding_id=ANY($3::text[]) AND reviewed.scanned_at<current.scanned_at AND reviewed.scanned_at>=now()-interval '30 days' ORDER BY r.finding_id,reviewed.scanned_at DESC", [tenantId, currentSnapshotId, bounded]);
     return result.rows.map((row) => decryptJson<ThreatReview>(encrypted(row), this.key, reviewContext(tenantId, row.snapshot_id, row.finding_id)));
   }
 
-  async upsertThreatReview(review: ThreatReview, sessionId: string | null): Promise<ThreatReview> {
-    const value = { ...review, updatedAt: new Date().toISOString() };
+  async upsertThreatReview(review: ThreatReview, sessionId: string | null, expectedRevision?: string | null): Promise<ThreatReview> {
+    const value = { ...review, revision: randomUUID(), updatedAt: new Date().toISOString() };
     const payload = encryptJson(value, this.key, reviewContext(value.tenantId, value.snapshotId, value.findingId));
-    await this.pool.query("INSERT INTO threat_reviews (tenant_id,snapshot_id,finding_id,iv,ciphertext,auth_tag,updated_at) SELECT $1,$2,$3,$4,$5,$6,now() FROM snapshots WHERE tenant_id=$1 AND id=$2 ON CONFLICT (tenant_id,snapshot_id,finding_id) DO UPDATE SET iv=EXCLUDED.iv,ciphertext=EXCLUDED.ciphertext,auth_tag=EXCLUDED.auth_tag,updated_at=now()", [value.tenantId, value.snapshotId, value.findingId, payload.iv, payload.ciphertext, payload.authTag]);
+    const result = await this.pool.query("INSERT INTO threat_reviews (tenant_id,snapshot_id,finding_id,iv,ciphertext,auth_tag,updated_at,revision) SELECT $1,$2,$3,$4,$5,$6,now(),$7 FROM snapshots WHERE tenant_id=$1 AND id=$2 AND scanned_at>=now()-interval '30 days' AND ($9::boolean OR $8::text IS NULL OR EXISTS (SELECT 1 FROM threat_reviews prior WHERE prior.tenant_id=$1 AND prior.snapshot_id=$2 AND prior.finding_id=$3 AND prior.revision=$8::text)) ON CONFLICT (tenant_id,snapshot_id,finding_id) DO UPDATE SET iv=EXCLUDED.iv,ciphertext=EXCLUDED.ciphertext,auth_tag=EXCLUDED.auth_tag,updated_at=now(),revision=EXCLUDED.revision WHERE $9::boolean OR ($8::text IS NOT NULL AND threat_reviews.revision=$8::text)", [value.tenantId, value.snapshotId, value.findingId, payload.iv, payload.ciphertext, payload.authTag, value.revision, expectedRevision ?? null, expectedRevision === undefined]);
+    if (result.rowCount !== 1) throw new Error("Review conflict: the snapshot expired or another decision was saved. Reload before saving.");
     await this.recordAccess(value.tenantId, sessionId, "update", "threat_review", value.findingId);
     return value;
   }

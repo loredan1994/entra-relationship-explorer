@@ -78,3 +78,7 @@ export function snapshot(
     edges,
   };
 }
+
+/** Synthetic full event-class coverage for domain-only dormant-access contracts.
+ * The production v1.0 scanner deliberately does not emit this coverage. */
+export const syntheticWorkloadActivity = [{ id: "activity", state: "complete" as const, reason: "Synthetic full workload window", collectedAt: "2026-08-26T10:00:00Z", endpoints: ["/auditLogs/signIns"], failedEndpoints: [], itemCount: 0, scope: "AuditLog.Read.All", window: { startsAt: "2026-07-27T10:00:00Z", endsAt: "2026-08-26T10:00:00Z", eventClasses: ["servicePrincipal", "nonInteractiveUser"] } }];

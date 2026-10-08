@@ -76,20 +76,28 @@ pnpm run verify
 
 That single command validates Compose isolation, lints, type-checks, runs the
 domain, scanner, storage, authentication, accessibility, and browser tests, and
-builds every route. CI runs exactly this, so a green local run means a green
-pipeline.
+builds every route. CI runs this with an isolated PostgreSQL service. A separate quality job runs
+coverage, maintainability and fresh mutation checks.
 
-Two further gates exist and are worth running when you touch logic:
+Run the same quality checks when changing logic:
 
 ```bash
 pnpm quality:crap      # coverage plus a Change Risk Anti-Patterns report
 pnpm test:mutation     # StrykerJS mutation testing, per package
 ```
 
-The project holds near-total line coverage and above 80% mutation score on every
-package. New logic is expected to arrive with tests that would fail if the logic
+Each package enforces a mutation score of at least **95%**. CI tests every mutant
+from scratch; locally use `pnpm test:mutation --force --concurrency 2` to do the same.
+The maintainability report fails when a function exceeds CRAP 30. New logic is expected to arrive with tests that would fail if the logic
 were wrong — not tests that merely execute it. Shared fixtures live in each
 package's `test-support.ts`; prefer extending those over inventing new ones.
+
+Mutation survivors must be reviewed for an observable behavioral difference. Add a
+regression that fails for the mutation, or simplify redundant logic. Narrow Stryker
+exclusions are reserved for proven equivalent mutations with an explanation beside
+the code. Do not lower thresholds or ignore whole modules to pass the gate. Run
+ordinary tests and mutation checks sequentially; package test discovery also excludes
+sandbox copies left behind by interrupted mutation runs.
 
 ## Pull requests
 
@@ -139,3 +147,7 @@ Do not use the public issue tracker. Follow [SECURITY.md](SECURITY.md).
 | `docs/` | Product specification, architecture, security model, API contract |
 | `security/` | Threat models, ASVS mapping, and scanner configuration |
 | `scripts/` | Local operations and quality tooling |
+
+## Adding investigation rules
+
+Use the [synthetic rule laboratory](docs/RULE_LAB.md) to scaffold and replay a declarative regression case. New compiled rules need positive, nearby negative, coverage and version-change tests. The [investigation guide](docs/INVESTIGATIONS.md) describes the database and browser checks; passing mocks alone is not evidence of PostgreSQL concurrency correctness.

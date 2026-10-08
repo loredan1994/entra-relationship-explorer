@@ -15,6 +15,7 @@ x-app-environment: &app-environment
   ENTRA_CLIENT_ID: ${ENTRA_CLIENT_ID:?Set ENTRA_CLIENT_ID to your own app registration GUID}
   ENTRA_CLIENT_SECRET: ${ENTRA_CLIENT_SECRET:?Retrieve ENTRA_CLIENT_SECRET from Key Vault}
   ENTRA_REDIRECT_URI: http://127.0.0.1:3200/api/auth/callback
+  ENTRA_COLLECT_DIRECTORY_AUDITS: ${ENTRA_COLLECT_DIRECTORY_AUDITS:-false}
   ENTRA_OPTIONAL_GRAPH_SCOPES: ${ENTRA_OPTIONAL_GRAPH_SCOPES:-}
 
 x-app-image: &app-image

@@ -27,11 +27,11 @@ const shortRelationshipLabel: Record<RelationshipType, string> = {
   FEDERATES_AS: "federates as",
   ACTIVE_IN_ROLE: "active role",
   ELIGIBLE_FOR_ROLE: "eligible role",
-  GOVERNED_BY: "governed by",
+  GOVERNED_BY: "policy includes",
   ASSIGNS_CONSENT_POLICY: "assigns consent",
   CROSS_TENANT_ACCESS: "partner setting",
   OWNS: "owns",
-  OBSERVED_CALL: "called recently",
+  OBSERVED_CALL: "successful sign-in",
 };
 
 export interface Point {

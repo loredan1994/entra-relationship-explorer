@@ -1,0 +1,119 @@
+import { randomBytes, randomUUID } from "node:crypto";
+import { Pool } from "pg";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { cleanProjectFixture } from "@entra-explorer/domain";
+import { PostgresBackend } from "./postgres";
+import type { ThreatReview } from "./types";
+
+const connectionString = process.env.TEST_DATABASE_URL;
+if (connectionString) {
+  const url = new URL(connectionString);
+  if (!["localhost", "127.0.0.1"].includes(url.hostname) || url.pathname !== "/entra_review_test") throw new Error("Integration tests require an isolated loopback entra_review_test database.");
+}
+describe.skipIf(!connectionString)("real PostgreSQL boundaries", () => {
+  const tenantId = randomUUID();
+  const key = randomBytes(32);
+  let backend: PostgresBackend;
+  let sql: Pool;
+  const sessionId = randomUUID();
+  async function saveSnapshot(scannedAt = new Date().toISOString()) {
+    const job = await backend.enqueueScan(tenantId, sessionId);
+    await backend.claimNextJob("integration", tenantId);
+    const snapshot = { ...cleanProjectFixture, id: randomUUID(), tenant: { tenantId, tenantLabel: "Synthetic integration tenant" }, scannedAt };
+    await backend.completeJob(job.id, "integration", snapshot, new Date(0));
+    return snapshot;
+  }
+  beforeAll(async () => {
+    backend = new PostgresBackend({ connectionString: connectionString!, encryptionKey: key });
+    sql = new Pool({ connectionString });
+    await backend.migrate(); await backend.migrate();
+    await backend.createSession({ id: sessionId, tenantId, account: {}, accessToken: "synthetic-only", accessTokenExpiresAt: Date.now() + 3600000, sessionExpiresAt: Date.now() + 3600000, tokenCache: "synthetic" });
+  });
+  afterAll(async () => {
+    if (sql) {
+      for (const table of ["threat_reviews", "scan_checkpoints", "scan_jobs", "snapshots", "sessions", "auth_flows", "access_events"]) await sql.query(`DELETE FROM ${table} WHERE tenant_id=$1`, [tenantId]);
+      await sql.end();
+    }
+    await backend?.close();
+  });
+  it("round-trips encrypted evidence and accepts exactly one competing decision", async () => {
+    const snapshot = await saveSnapshot();
+    expect((await backend.recentSnapshots(tenantId))[0]!.id).toBe(snapshot.id);
+    expect(await backend.recentSnapshots(randomUUID())).toEqual([]);
+    const review: ThreatReview = { tenantId, snapshotId: snapshot.id, findingId: "finding", disposition: "open", owner: "Original", expiresAt: null, assumption: "synthetic rationale", updatedAt: snapshot.scannedAt };
+    const saved = await backend.upsertThreatReview(review, sessionId, null);
+    const results = await Promise.allSettled([backend.upsertThreatReview({ ...review, owner: "First" }, sessionId, saved.revision), backend.upsertThreatReview({ ...review, owner: "Second" }, sessionId, saved.revision)]);
+    expect(results.filter(r => r.status === "fulfilled")).toHaveLength(1);
+    expect(results.filter(r => r.status === "rejected")).toHaveLength(1);
+    const stored = (await backend.getThreatReview(tenantId, snapshot.id, "finding"))!;
+    expect(["First", "Second"]).toContain(stored.owner);
+    const raw = (await sql.query("SELECT ciphertext FROM threat_reviews WHERE tenant_id=$1", [tenantId])).rows[0];
+    expect(raw.ciphertext.toString()).not.toContain("synthetic rationale");
+    await expect(backend.upsertThreatReview({ ...review, tenantId: randomUUID() }, sessionId, null)).rejects.toThrow("Review conflict");
+  });
+  it("filters expired evidence before idle maintenance physically removes it", async () => {
+    const expired = await saveSnapshot(new Date(Date.now() - 31 * 86400000).toISOString());
+    expect((await backend.recentSnapshots(tenantId)).some(s => s.id === expired.id)).toBe(false);
+    await backend.pruneExpiredData(tenantId, new Date(Date.now() - 30 * 86400000));
+    expect((await sql.query("SELECT id FROM snapshots WHERE tenant_id=$1 AND id=$2", [tenantId, expired.id])).rowCount).toBe(0);
+  });
+  it("does not expose expired decisions before cleanup, including as prior context", async () => {
+    const old = await saveSnapshot(new Date(Date.now() - 1000).toISOString());
+    await backend.upsertThreatReview({ tenantId, snapshotId: old.id, findingId: "expired-review", disposition: "open", owner: "Expired owner", assumption: "Expired rationale", expiresAt: null, updatedAt: old.scannedAt }, null, null);
+    const current = await saveSnapshot();
+    expect(await backend.priorThreatReviews(tenantId, current.id, ["expired-review"])).toHaveLength(1);
+    await sql.query("UPDATE snapshots SET scanned_at=now()-interval '31 days' WHERE tenant_id=$1 AND id=$2", [tenantId, old.id]);
+    expect(await backend.getThreatReview(tenantId, old.id, "expired-review")).toBeNull();
+    expect(await backend.priorThreatReviews(tenantId, current.id, ["expired-review"])).toEqual([]);
+    expect(await backend.priorThreatReviews(tenantId, old.id, ["expired-review"])).toEqual([]);
+    expect((await sql.query("SELECT finding_id FROM threat_reviews WHERE tenant_id=$1 AND snapshot_id=$2", [tenantId, old.id])).rowCount).toBe(1);
+  });
+  it("recovers expired leases and rejects writes by the old owner", async () => {
+    const job = await backend.enqueueScan(tenantId, sessionId);
+    await backend.claimNextJob("old", tenantId);
+    expect(await backend.heartbeatJob(job.id, "wrong")).toBe(false);
+    expect(await backend.recoverStaleJobs(tenantId, new Date(Date.now() - 600000))).toBe(0);
+    await sql.query("UPDATE scan_jobs SET updated_at=now()-interval '11 minutes',locked_at=now()-interval '11 minutes' WHERE id=$1 AND tenant_id=$2", [job.id, tenantId]);
+    expect(await backend.recoverStaleJobs(tenantId, new Date(Date.now() - 600000))).toBe(1);
+    expect((await backend.claimNextJob("new", tenantId))!.id).toBe(job.id);
+    expect(await backend.heartbeatJob(job.id, "old")).toBe(false);
+    await expect(backend.updateJobProgress(job.id, "old", "applications", 1, "stale")).rejects.toThrow();
+    await backend.failJob(job.id, "new", "Synthetic test complete");
+  });
+  it.each(["idle", "completion"])("%s physically deletes expired review ciphertext", async (mode) => {
+    const old = await saveSnapshot();
+    await backend.upsertThreatReview({ tenantId, snapshotId: old.id, findingId: "purge", disposition: "open", owner: "Owner", expiresAt: null, assumption: "Synthetic", updatedAt: "" }, null, null);
+    await sql.query("UPDATE snapshots SET scanned_at=now()-interval '31 days' WHERE id=$1 AND tenant_id=$2", [old.id, tenantId]);
+    if (mode === "idle") await backend.pruneExpiredData(tenantId, new Date(Date.now() - 30 * 86400000));
+    else {
+      const job = await backend.enqueueScan(tenantId, sessionId); await backend.claimNextJob("integration", tenantId);
+      await backend.completeJob(job.id, "integration", { ...old, id: randomUUID(), scannedAt: new Date().toISOString() }, new Date(Date.now() - 30 * 86400000));
+    }
+    expect((await sql.query("SELECT finding_id FROM threat_reviews WHERE tenant_id=$1 AND snapshot_id=$2", [tenantId, old.id])).rowCount).toBe(0);
+  });
+  it("physically removes expired auth records during idle maintenance", async () => {
+    const expiredId = randomUUID(); const freshId = randomUUID();
+    for (const [id, expiresAt] of [[expiredId, Date.now() - 1000], [freshId, Date.now() + 60000]] as const) {
+      await backend.createAuthFlow({ id, tenantId, state: "synthetic", verifier: "synthetic", expiresAt });
+      await backend.createSession({ id, tenantId, account: {}, accessToken: "synthetic", tokenCache: "synthetic", accessTokenExpiresAt: expiresAt, sessionExpiresAt: expiresAt });
+    }
+    await backend.pruneExpiredData(tenantId, new Date(0));
+    for (const table of ["auth_flows", "sessions"]) {
+      const result = await sql.query(`SELECT id FROM ${table} WHERE tenant_id=$1 AND id=ANY($2::uuid[])`, [tenantId, [expiredId, freshId]]);
+      expect(result.rows).toEqual([{ id: freshId }]);
+    }
+  });
+  it("renews both lease timestamps for the owner, including while cancellation is pending", async () => {
+    const job = await backend.enqueueScan(tenantId, sessionId); await backend.claimNextJob("owner", tenantId);
+    await sql.query("UPDATE scan_jobs SET updated_at=now()-interval '9 minutes',locked_at=now()-interval '9 minutes' WHERE id=$1 AND tenant_id=$2", [job.id, tenantId]);
+    expect(await backend.heartbeatJob(job.id, "owner")).toBe(true);
+    const row = (await sql.query("SELECT updated_at,locked_at FROM scan_jobs WHERE id=$1", [job.id])).rows[0];
+    expect(row.locked_at.getTime()).toBeGreaterThan(Date.now() - 5000);
+    expect(row.updated_at.getTime()).toBe(row.locked_at.getTime());
+    await backend.requestScanCancellation(job.id, tenantId);
+    expect(await backend.heartbeatJob(job.id, "owner")).toBe(true);
+    await backend.cancelJob(job.id, "owner");
+    expect(await backend.heartbeatJob(job.id, "owner")).toBe(false);
+  });
+
+});

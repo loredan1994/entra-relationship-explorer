@@ -11,6 +11,7 @@ export interface LiveEntraConfig {
   authority: string;
   scopes: string[];
   graphScopes: string[];
+  collectDirectoryAudits?: boolean;
   databaseUrl: string;
   dataEncryptionKey: Uint8Array;
   sessionMaxAgeSeconds: number;
@@ -68,6 +69,7 @@ export function parseEntraConfig(environment: NodeJS.ProcessEnv): EntraConfig {
     authority: `https://login.microsoftonline.com/${tenantId}`,
     scopes,
     graphScopes,
+    collectDirectoryAudits: environment.ENTRA_COLLECT_DIRECTORY_AUDITS === "true",
     databaseUrl,
     dataEncryptionKey,
     sessionMaxAgeSeconds,

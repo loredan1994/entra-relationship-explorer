@@ -1,4 +1,4 @@
-import { analyzeFindingLifecycle, analyzeTenantIntelligenceHistory } from "@entra-explorer/domain";
+import { analyzeFindingLifecycle, analyzeTenantIntelligenceHistory, coverageMatrix } from "@entra-explorer/domain";
 import { AppShell } from "@/components/app-shell";
 import { PageHeading } from "@/components/page-heading";
 import { ThreatWorkspace } from "@/components/threat-workspace";
@@ -15,5 +15,5 @@ export default async function SecurityPage() {
     eyebrow={snapshot.mode === "fixture" ? "Sample IAM intelligence" : "Your tenant's IAM intelligence"}
     title="Attack paths and threat workspace"
     description="Prioritize ways an identity could reach powerful access, inspect every configured step, and record the decision. Possibilities are inferred from configuration; activity is never invented."
-  /><ThreatWorkspace intelligence={intelligence} lifecycle={lifecycle} priorReviews={priorReviews} today={new Date().toISOString().slice(0, 10)} tenantLabel={snapshot.tenant.tenantLabel} snapshotId={snapshot.id} completion={snapshot.completion.status} persistence={snapshot.mode === "tenant" ? "server" : "browser"} /></div></AppShell>;
+  /><ThreatWorkspace key={snapshot.id} coverage={coverageMatrix(snapshot)} intelligence={intelligence} lifecycle={lifecycle} priorReviews={priorReviews} today={new Date().toISOString().slice(0, 10)} tenantLabel={snapshot.tenant.tenantLabel} snapshotId={snapshot.id} completion={snapshot.completion.status} persistence={snapshot.mode === "tenant" ? "server" : "browser"} /></div></AppShell>;
 }

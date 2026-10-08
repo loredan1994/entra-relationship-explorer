@@ -37,6 +37,7 @@ interface PacketRelationship {
   sourceId: string;
   targetId: string;
   permissions: string[];
+  consent?: RelationshipEdge["consent"];
   scope?: NonNullable<RelationshipEdge["scope"]>;
   evidence: RelationshipEdge["evidence"];
 }
@@ -72,9 +73,9 @@ export function buildFindingEvidencePacket(history: TenantSnapshot[], findingId:
   if (!current) throw new Error("At least one snapshot is required for a finding evidence packet.");
   const intelligence = analyzeTenantIntelligenceHistory(history);
   const lifecycle = analyzeFindingLifecycle(history);
-  const finding = intelligence.findings.find((item) => item.id === findingId);
   const lifecycleRecord = lifecycle.records.find((item) => item.finding.id === findingId);
-  if (!finding || !lifecycleRecord || lifecycleRecord.lastDetectedSnapshotId !== current.id) throw new Error("Finding is not detected in the current snapshot.");
+  if (!lifecycleRecord || lifecycleRecord.lastDetectedSnapshotId !== current.id) throw new Error("Finding is not detected in the current snapshot.");
+  const finding = lifecycleRecord.finding;
   const attackPath = finding.attackPathId ? intelligence.paths.find((item) => item.id === finding.attackPathId)! : null;
   const edgeIds = unique(finding.edgeIds);
   const objectIds = unique(finding.affectedObjectIds);
@@ -158,7 +159,7 @@ function appendEvidence(lines: string[], evidence: PacketEvidence): void {
   for (const object of evidence.objects) lines.push(`- ${markdown(object.label)} — ${code(object.kind)} ${code(object.id)}`);
   if (evidence.objects.length === 0) lines.push("- None");
   lines.push("", "### Relationships", "");
-  for (const edge of evidence.relationships) lines.push(`- ${code(edge.id)}: ${code(edge.sourceId)} → ${code(edge.targetId)}; ${markdown(edge.type)}; endpoint ${code(edge.evidence.sourceEndpoint)}; ${edge.evidence.observed ? "observed" : edge.evidence.configured ? "configured" : "unresolved"} evidence`);
+  for (const edge of evidence.relationships) lines.push(`- ${code(edge.id)}: ${code(edge.sourceId)} → ${code(edge.targetId)}; ${markdown(edge.type)}; endpoint ${code(edge.evidence.sourceEndpoint)}; ${edge.consent ? `consent audience ${markdown(edge.consent.audience)}; consent principal ${code(edge.consent.principalId ?? "Not specified")}; ` : ""}${edge.evidence.observed ? "observed" : edge.evidence.configured ? "configured" : "unresolved"} evidence`);
   if (evidence.relationships.length === 0) lines.push("- None");
   lines.push("");
 }
@@ -175,7 +176,7 @@ function appendList(lines: string[], heading: string, values: string[]): void {
 }
 
 function snapshotIdentity(snapshot: TenantSnapshot): PacketSnapshotIdentity {
-  return { id: snapshot.id, scannedAt: snapshot.scannedAt, tenantId: snapshot.tenant.tenantId, tenantLabel: snapshot.tenant.tenantLabel, completion: { ...snapshot.completion, collectedEndpoints: [...snapshot.completion.collectedEndpoints], skippedEndpoints: [...snapshot.completion.skippedEndpoints], errors: [...snapshot.completion.errors] } };
+  return { id: snapshot.id, scannedAt: snapshot.scannedAt, tenantId: snapshot.tenant.tenantId, tenantLabel: snapshot.tenant.tenantLabel, completion: { ...snapshot.completion, ...(snapshot.completion.collectors ? { collectors: structuredClone(snapshot.completion.collectors) } : {}), collectedEndpoints: [...snapshot.completion.collectedEndpoints], skippedEndpoints: [...snapshot.completion.skippedEndpoints], errors: [...snapshot.completion.errors] } };
 }
 
 function focusedEvidence(snapshot: TenantSnapshot, objectIds: string[], edgeIds: string[]): PacketEvidence {
@@ -183,7 +184,7 @@ function focusedEvidence(snapshot: TenantSnapshot, objectIds: string[], edgeIds:
   const wantedEdges = new Set(edgeIds);
   return {
     objects: snapshot.nodes.filter((node) => wantedObjects.has(node.id)).map((node) => ({ id: node.id, kind: node.kind, label: node.label, appId: node.appId ?? null, ownerIds: [...node.ownerIds], isExternal: node.isExternal ?? false, risk: { ...node.risk } })).sort((a, b) => a.id.localeCompare(b.id)),
-    relationships: snapshot.edges.filter((edge) => wantedEdges.has(edge.id)).map((edge) => ({ id: edge.id, type: edge.type, sourceId: edge.sourceId, targetId: edge.targetId, permissions: [...edge.permissions], ...(edge.scope ? { scope: { ...edge.scope } } : {}), evidence: { ...edge.evidence, sourceRecordIds: [...edge.evidence.sourceRecordIds], observed: edge.evidence.observed ? { ...edge.evidence.observed } : null } })).sort((a, b) => a.id.localeCompare(b.id)),
+    relationships: snapshot.edges.filter((edge) => wantedEdges.has(edge.id)).map((edge) => ({ id: edge.id, type: edge.type, sourceId: edge.sourceId, targetId: edge.targetId, permissions: [...edge.permissions], ...(edge.consent ? { consent: { ...edge.consent } } : {}), ...(edge.scope ? { scope: { ...edge.scope } } : {}), evidence: { ...edge.evidence, sourceRecordIds: [...edge.evidence.sourceRecordIds], observed: edge.evidence.observed ? { ...edge.evidence.observed } : null } })).sort((a, b) => a.id.localeCompare(b.id)),
   };
 }
 
@@ -207,5 +208,5 @@ function code(value: string): string {
 function unique(values: string[]): string[] { return [...new Set(values)]; }
 
 function stripControls(value: string): string {
-  return [...value].map((character) => { const point = character.codePointAt(0)!; return point < 32 || point === 127 ? " " : character; }).join("");
+  return [...value].map((character) => { const point = character.codePointAt(0)!; return point <= 31 || point === 127 ? " " : character; }).join("");
 }

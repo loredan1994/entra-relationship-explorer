@@ -11,14 +11,15 @@
     "build": "tsc --noEmit",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:coverage": "vitest run --coverage --coverage.reporter=text-summary --coverage.reporter=json --coverage.reporter=json-summary --coverage.all --coverage.include=src --coverage.exclude=src/**/*.test.ts --coverage.exclude=src/test-support.ts --coverage.exclude=src/index.ts --coverage.exclude=src/fixtures.ts",
+    "test:coverage": "vitest run --coverage --coverage.reporter=text-summary --coverage.reporter=json --coverage.reporter=json-summary --coverage.include='src/**/*.ts' --coverage.exclude=src/**/*.test.ts --coverage.exclude=src/test-support.ts --coverage.exclude=src/index.ts --coverage.exclude=src/fixtures.ts",
     "test:mutation": "stryker run"
   },
   "devDependencies": {
     "@stryker-mutator/core": "^10.0.0",
     "@stryker-mutator/vitest-runner": "^10.0.0",
-    "@vitest/coverage-v8": "3.2.6",
+    "@types/node": "24.3.0",
+    "@vitest/coverage-v8": "4.1.11",
     "typescript": "5.9.2",
-    "vitest": "3.2.6"
+    "vitest": "4.1.11"
   }
 }

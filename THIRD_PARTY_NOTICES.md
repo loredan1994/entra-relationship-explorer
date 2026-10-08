@@ -6,16 +6,16 @@ Entra Relationship Explorer is original application code. The following projects
 |---|---:|---|---|
 | Microsoft Graph JavaScript Client Library | 3.0.7 | MIT | Installed for the collector integration boundary; no upstream source modifications. The hardened product transport still constrains every request to HTTPS GET and validates continuation links. |
 | Cytoscape.js | 3.34.1 | MIT | Headless relationship layout feeding the product's accessible HTML graph and table; no upstream source modifications. |
-| Next.js | 16.3.3 | MIT | Web application framework; no upstream source modifications. |
-| React / React DOM | 19.2.7 | MIT | User interface runtime; no upstream source modifications. |
-| MSAL Node | 5.4.3 | MIT | Microsoft identity authorization-code and token-cache integration; no upstream source modifications. |
+| Next.js | 16.3.8 | MIT | Web application framework; no upstream source modifications. |
+| React / React DOM | 19.2.8 | MIT | User interface runtime; no upstream source modifications. |
+| MSAL Node | 5.6.0 | MIT | Microsoft identity authorization-code and token-cache integration; no upstream source modifications. |
 | node-postgres (`pg`) | 8.23.0 | MIT | Parameterized PostgreSQL access; no upstream source modifications. |
 | server-only | 0.0.1 | MIT | React server-boundary marker; no upstream source modifications. |
 | tsx | 4.23.12 | MIT | Migration and worker TypeScript runtime; no upstream source modifications. |
 | PostgreSQL container | 17 Alpine (digest pinned in `compose.yaml`) | PostgreSQL License | Local tenant-isolated persistence; no upstream source modifications. |
 | TypeScript | 5.9.2 | Apache-2.0 | Build tooling only. |
 | Playwright | 1.62.1 | Apache-2.0 | Test tooling only. |
-| Vitest | 3.2.6 | MIT | Test tooling only. |
+| Vitest | 4.1.11 | MIT | Test tooling only. |
 | axe-core Playwright | 4.13.0 | MPL-2.0 | Accessibility test tooling only. |
 | ESLint / @eslint/js | 10.9.1 / 10.0.1 | MIT | Static-analysis tooling only. |
 | typescript-eslint | 8.68.0 | MIT | TypeScript lint integration only. |

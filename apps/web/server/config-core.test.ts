@@ -217,3 +217,9 @@ describe("optional scope parsing", () => {
     expect(config.scopes.slice(0, 3)).toEqual(["openid", "profile", "offline_access"]);
   });
 });
+
+ it.each([undefined, "", "false", "TRUE", "1", "true"])("directory audit collection requires an explicit lowercase opt-in: %s", (value) => {
+  const config = parseEntraConfig({ ...validEnvironment, ENTRA_COLLECT_DIRECTORY_AUDITS: value });
+  expect(config).toMatchObject({ collectDirectoryAudits: value === "true" });
+  if (config.enabled) expect(config.graphScopes).toEqual(["https://graph.microsoft.com/Application.Read.All", "https://graph.microsoft.com/Directory.Read.All"]);
+ });

@@ -570,7 +570,7 @@ describe("observed activity edges", () => {
       signIns: [sourced(signIn({ id: "s-1", createdDateTime: "2026-08-20T09:00:00Z", servicePrincipalId: "sp-1", resourceServicePrincipalId: "sp-2", appDisplayName: "Caller", resourceDisplayName: "Resource" }))],
     }));
     const observed = edgesOfType(snapshot, "OBSERVED_CALL")[0]!;
-    expect(observed).toMatchObject({ sourceId: "sp-1", targetId: "sp-2", plainLabel: "Called recently", permissions: [] });
+    expect(observed).toMatchObject({ sourceId: "sp-1", targetId: "sp-2", plainLabel: "Successful sign-in to resource", permissions: [] });
     expect(observed.evidence.configured).toBe(false);
     expect(observed.evidence.observed).toEqual({
       lastSeenAt: "2026-08-20T09:00:00Z",

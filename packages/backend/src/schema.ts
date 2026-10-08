@@ -85,6 +85,7 @@ CREATE TABLE IF NOT EXISTS threat_reviews (
   tenant_id uuid NOT NULL,
   snapshot_id uuid NOT NULL,
   finding_id text NOT NULL,
+  revision text NOT NULL DEFAULT '',
   iv bytea NOT NULL,
   ciphertext bytea NOT NULL,
   auth_tag bytea NOT NULL,
@@ -92,4 +93,5 @@ CREATE TABLE IF NOT EXISTS threat_reviews (
   PRIMARY KEY (tenant_id, snapshot_id, finding_id)
 );
 CREATE INDEX IF NOT EXISTS threat_reviews_tenant_snapshot ON threat_reviews (tenant_id, snapshot_id);
+ALTER TABLE threat_reviews ADD COLUMN IF NOT EXISTS revision text NOT NULL DEFAULT '';
 `;

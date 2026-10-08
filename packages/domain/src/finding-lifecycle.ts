@@ -41,11 +41,11 @@ export function analyzeFindingLifecycle(history: TenantSnapshot[]): FindingLifec
 
   for (const finding of currentFindings.values()) {
     const previousMatch = previousFindings.get(finding.id);
-    const olderMatches = history.flatMap((snapshot, index) => findingsBySnapshot[index]!.has(finding.id) ? [{ snapshot, index }] : []);
-    const oldestMatch = olderMatches.at(-1)!.snapshot;
+    const olderMatches = history.filter((_, index) => findingsBySnapshot[index]!.has(finding.id));
+    const oldestMatch = olderMatches.at(-1)!;
     records.push({
       finding,
-      status: previousMatch ? "ongoing" : olderMatches.some(({ index }) => index > 1) ? "returned" : "new",
+      status: previousMatch ? "ongoing" : olderMatches.length > 1 ? "returned" : "new",
       currentSnapshotId: current!.id,
       previousSnapshotId: previous?.id ?? null,
       lastDetectedSnapshotId: current!.id,
@@ -54,22 +54,20 @@ export function analyzeFindingLifecycle(history: TenantSnapshot[]): FindingLifec
     });
   }
 
-  if (previous) {
-    for (const finding of previousFindings.values()) {
-      if (currentFindings.has(finding.id)) continue;
-      const olderMatches = history.slice(1).filter((_, index) => findingsBySnapshot[index + 1]!.has(finding.id));
-      // The previous snapshot itself always matches because this loop iterates its findings.
-      const oldestMatch = olderMatches.at(-1)!;
-      records.push({
-        finding,
-        status: absenceIsTrustworthy(current!, previous, finding) ? "no-longer-detected" : "unconfirmed",
-        currentSnapshotId: current!.id,
-        previousSnapshotId: previous.id,
-        lastDetectedSnapshotId: previous.id,
-        firstDetectedAt: oldestMatch.scannedAt,
-        lastDetectedAt: previous.scannedAt,
-      });
-    }
+  for (const finding of previousFindings.values()) {
+    if (currentFindings.has(finding.id)) continue;
+    const olderMatches = history.slice(1).filter((_, index) => findingsBySnapshot[index + 1]!.has(finding.id));
+    // The previous snapshot itself always matches because this loop iterates its findings.
+    const oldestMatch = olderMatches.at(-1)!;
+    records.push({
+      finding,
+      status: !analyses[0]!.pathAnalysis.truncated && absenceIsTrustworthy(current!, previous!, finding) ? "no-longer-detected" : "unconfirmed",
+      currentSnapshotId: current!.id,
+      previousSnapshotId: previous!.id,
+      lastDetectedSnapshotId: previous!.id,
+      firstDetectedAt: oldestMatch.scannedAt,
+      lastDetectedAt: previous!.scannedAt,
+    });
   }
 
   records.sort((left, right) => severityOrder[left.finding.severity] - severityOrder[right.finding.severity]

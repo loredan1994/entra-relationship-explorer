@@ -44,7 +44,8 @@ export default async function PermissionsPage() {
           </article>
         </section>
 
-        <div className="notice-banner"><strong>Configured is not observed.</strong> These records describe consent and assignments — what is allowed to happen. The product does not collect activity, so nothing here proves a call occurred.</div>
+        <div className="notice-banner"><strong>Configured is not observed.</strong> These records describe consent and assignments — what is allowed to happen. Optional sign-in evidence is separate and does not prove that a configured permission was used.</div>
+        <p><a className="button button-secondary" href="/investigations?view=ledger">Reconcile requested and granted permissions</a></p>
         <PermissionsTable grants={security.grants} />
       </div>
     </AppShell>

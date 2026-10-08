@@ -11,7 +11,7 @@
     "build": "tsc --noEmit",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:coverage": "vitest run --coverage --coverage.reporter=text-summary --coverage.reporter=json --coverage.reporter=json-summary --coverage.all --coverage.include=src --coverage.exclude=src/**/*.test.ts --coverage.exclude=src/test-support.ts --coverage.exclude=src/index.ts",
+    "test:coverage": "vitest run --coverage --coverage.reporter=text-summary --coverage.reporter=json --coverage.reporter=json-summary --coverage.include='src/**/*.ts' --coverage.exclude=src/**/*.test.ts --coverage.exclude=src/test-support.ts --coverage.exclude=src/index.ts",
     "test:mutation": "stryker run"
   },
   "dependencies": {
@@ -23,8 +23,8 @@
     "@stryker-mutator/vitest-runner": "^10.0.0",
     "@types/node": "24.3.0",
     "@types/pg": "8.23.1",
-    "@vitest/coverage-v8": "3.2.6",
+    "@vitest/coverage-v8": "4.1.11",
     "typescript": "5.9.2",
-    "vitest": "3.2.6"
+    "vitest": "4.1.11"
   }
 }

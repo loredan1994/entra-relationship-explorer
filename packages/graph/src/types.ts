@@ -1,3 +1,5 @@
+import type { CollectorCoverage, DirectoryAuditEvent } from "@entra-explorer/domain";
+
 export interface GraphCredentialMetadata {
   keyId: string;
   displayName?: string | null;
@@ -15,23 +17,36 @@ export interface GraphAppRole {
   allowedMemberTypes?: string[];
 }
 
-export interface GraphApplication {
+export interface GraphApplicationProfile {
+  signInAudience?: string | null;
+  verifiedPublisher?: { verifiedPublisherId?: string | null; displayName?: string | null } | null;
+}
+
+export interface GraphApplication extends GraphApplicationProfile {
   id: string;
   appId: string;
   displayName: string;
   publisherDomain?: string | null;
   appRoles: GraphAppRole[];
+  requiredResourceAccess?: Array<{ resourceAppId: string; resourceAccess: Array<{ id: string; type: string }> }>;
   passwordCredentials: GraphCredentialMetadata[];
   keyCredentials: GraphCredentialMetadata[];
 }
 
-export interface GraphServicePrincipal {
+export interface GraphServicePrincipal extends GraphApplicationProfile {
+  /** Distinguishes a successful empty role list from missing/legacy inventory. */
+  appRolesCollected?: boolean;
+  accountEnabled?: boolean | null;
+  appRoleAssignmentRequired?: boolean | null;
+  appOwnerOrganizationId?: string | null;
+  preferredSingleSignOnMode?: string | null;
   id: string;
   appId: string;
   displayName: string;
   publisherName?: string | null;
   servicePrincipalType?: string | null;
   appRoles: GraphAppRole[];
+  oauth2PermissionScopes?: Array<{ id: string; value?: string | null }>;
   passwordCredentials: GraphCredentialMetadata[];
   keyCredentials: GraphCredentialMetadata[];
 }
@@ -88,7 +103,7 @@ export interface GraphAdministrativeUnitMembership extends Sourced<GraphDirector
 export interface GraphRoleDefinition { id: string; displayName: string; templateId?: string | null; isBuiltIn?: boolean | null; }
 export interface GraphRoleSchedule { id: string; principalId: string; roleDefinitionId: string; directoryScopeId?: string | null; }
 export interface GraphConditionalAccessPolicy { id: string; displayName: string; state: string; conditions?: { users?: { includeUsers?: string[]; includeGroups?: string[] }; applications?: { includeApplications?: string[] } }; grantControls?: { builtInControls?: string[]; operator?: string | null } | null; }
-export interface GraphSignIn { id: string; createdDateTime: string; servicePrincipalId?: string | null; resourceServicePrincipalId?: string | null; appDisplayName?: string | null; resourceDisplayName?: string | null; status?: { errorCode?: number | null } | null; }
+export interface GraphSignIn { id: string; createdDateTime: string; appId?: string | null; resourceId?: string | null; servicePrincipalId?: string | null; resourceServicePrincipalId?: string | null; appDisplayName?: string | null; resourceDisplayName?: string | null; status?: { errorCode?: number | null } | null; }
 export interface GraphCrossTenantPartner { tenantId: string; inboundTrust?: { isMfaAccepted?: boolean | null; isCompliantDeviceAccepted?: boolean | null; isHybridAzureADJoinedDeviceAccepted?: boolean | null } | null; isInMultiTenantOrganization?: boolean | null; }
 export interface GraphAuthorizationPolicy { id: string; displayName: string; allowInvitesFrom?: string | null; allowEmailVerifiedUsersToJoinOrganization?: boolean | null; blockMsolPowerShell?: boolean | null; defaultUserRolePermissions?: { allowedToCreateApps?: boolean | null; allowedToCreateSecurityGroups?: boolean | null; allowedToCreateTenants?: boolean | null; allowedToReadBitlockerKeysForOwnedDevice?: boolean | null; allowedToReadOtherUsers?: boolean | null; permissionGrantPoliciesAssigned?: string[] } | null; }
 export interface GraphPermissionGrantPolicy { id: string; displayName: string; description?: string | null; }
@@ -129,6 +144,8 @@ export interface RawTenantScan {
   skippedEndpoints: string[];
   errors: Array<{ endpoint: string; code: string; message: string }>;
   completedStages?: ScanStage[];
+  coverage?: CollectorCoverage[];
+  auditEvents?: DirectoryAuditEvent[];
 }
 
 export type ScanStage =
@@ -148,6 +165,7 @@ export type ScanStage =
   | "permissionGrantPolicies"
   | "crossTenantAccess"
   | "activity"
+  | "directoryAudits"
   | "normalizing"
   | "complete";
 

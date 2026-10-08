@@ -36,6 +36,13 @@ export interface DirectoryNode {
   isExternal?: boolean;
   metadata?: Record<string, string | boolean | number | null>;
   ownerIds: string[];
+  /** Absent in older snapshots means not collected, not an empty manifest. */
+  requestedPermissions?: RequestedPermission[];
+  permissionDefinitions?: PermissionDefinition[];
+  credentials?: CredentialMetadata[];
+  sourceEndpoint?: string;
+  /** Missing historical fields remain unknown, never false or disabled. */
+  applicationProfile?: ApplicationProfile;
   credential?: {
     status: "healthy" | "expiring" | "expired" | "none";
     expiresAt: string | null;
@@ -44,6 +51,16 @@ export interface DirectoryNode {
     level: RiskLevel;
     reason: string;
   };
+}
+
+export interface ApplicationProfile {
+  signInAudience: string | null;
+  verifiedPublisherId: string | null;
+  verifiedPublisherName: string | null;
+  accountEnabled?: boolean | null;
+  assignmentRequired?: boolean | null;
+  homeTenantId?: string | null;
+  preferredSsoMode?: string | null;
 }
 
 export interface RelationshipEvidence {
@@ -68,6 +85,8 @@ export interface RelationshipEdge {
   targetId: string;
   plainLabel: string;
   permissions: string[];
+  permissionIds?: string[];
+  consent?: { audience: "all-users" | "single-user" | "unknown"; principalId: string | null };
   scope?: {
     directoryScopeId: string;
     objectId: string | null;
@@ -85,9 +104,45 @@ export interface TenantSnapshot {
     collectedEndpoints: string[];
     skippedEndpoints: string[];
     errors: string[];
+    collectors?: CollectorCoverage[];
   };
+  auditEvents?: DirectoryAuditEvent[];
   nodes: DirectoryNode[];
   edges: RelationshipEdge[];
+}
+
+export interface RequestedPermission { resourceAppId: string; permissionId: string; kind: "application" | "delegated"; }
+export interface PermissionDefinition { id: string; value: string; kind: "application" | "delegated"; }
+export interface CredentialMetadata {
+  id: string;
+  kind: "password" | "certificate";
+  label: string | null;
+  startsAt: string | null;
+  expiresAt: string | null;
+  sourceEndpoint: string;
+}
+export type CoverageState = "complete" | "partial" | "denied" | "unavailable" | "not-enabled" | "unknown";
+export interface CollectorCoverage {
+  id: string;
+  state: CoverageState;
+  reason: string;
+  collectedAt: string | null;
+  endpoints: string[];
+  failedEndpoints: string[];
+  itemCount: number;
+  scope: string;
+  limits?: { maxPagesPerEndpoint: number; maxItemsPerEndpoint: number };
+  window?: { startsAt: string; endsAt: string; eventClasses: string[] };
+}
+export interface DirectoryAuditEvent {
+  id: string;
+  tenantId: string;
+  occurredAt: string;
+  activity: string;
+  result: string;
+  actor: { id: string | null; kind: "user" | "application" | "unknown" };
+  targetIds: string[];
+  sourceEndpoint: string;
 }
 
 export interface RelationshipView {

@@ -1,6 +1,6 @@
 import { hostname } from "node:os";
 import { randomUUID } from "node:crypto";
-import { PostgresBackend, type DurableSession, type ScanJob, type ScanJobStage } from "@entra-explorer/backend";
+import { PostgresBackend, WorkerPoller, type DurableSession, type ScanJob, type ScanJobStage } from "@entra-explorer/backend";
 import { normalizeTenantScan, ReadOnlyGraphClient, scanTenant, ScanCancelledError } from "@entra-explorer/graph";
 import type { RawTenantScan } from "@entra-explorer/graph";
 import type { AccountInfo } from "@azure/msal-node";
@@ -18,9 +18,9 @@ process.on("SIGINT", () => { stopping = true; });
 
 async function main() {
   await backend.migrate();
-  await backend.recoverStaleJobs(liveConfig.tenantId, new Date(Date.now() - 10 * 60 * 1_000));
+  const poller = new WorkerPoller(backend, liveConfig.tenantId, workerId);
   while (!stopping) {
-    const job = await backend.claimNextJob(workerId, liveConfig.tenantId);
+    const job = await poller.poll();
     if (job && job.tenantId !== liveConfig.tenantId) throw new Error("The claimed scan job crossed the configured tenant boundary.");
     if (!job) { await delay(1_000); continue; }
     await run(job);
@@ -29,6 +29,8 @@ async function main() {
 }
 
 async function run(job: ScanJob): Promise<void> {
+  let ownsLease = true;
+  const heartbeat = setInterval(() => { void backend.heartbeatJob(job.id, workerId).then(owned => { ownsLease = owned; }).catch(() => { ownsLease = false; }); }, 30_000);
   try {
     if (!job.sessionId) throw new Error("The scan no longer has an authenticated session.");
     let session = await backend.getSession(job.sessionId, job.tenantId);
@@ -56,17 +58,25 @@ async function run(job: ScanJob): Promise<void> {
     const raw = await scanTenant(client, job.tenantId, {
       concurrency: 4,
       onProgress: (event) => progress(event.stage, event.collected, event.detail),
-      shouldCancel: () => backend.isScanCancellationRequested(job.id, workerId),
+      shouldCancel: async () => {
+        if (!ownsLease) throw new Error("Worker lease lost.");
+        return backend.isScanCancellationRequested(job.id, workerId);
+      },
       enabledScopes: liveConfig.graphScopes,
+      collectDirectoryAudits: liveConfig.collectDirectoryAudits,
       resumeFrom: checkpoint?.payload as RawTenantScan | undefined,
       onCheckpoint: (payload) => backend.saveScanCheckpoint({ jobId: job.id, tenantId: job.tenantId, payload, updatedAt: new Date().toISOString() }, workerId),
     });
+    await progressWrites;
     await backend.updateJobProgress(job.id, workerId, "normalizing", job.collected, "Normalizing source records into explainable relationships");
     const snapshot = normalizeTenantScan(raw);
     await backend.completeJob(job.id, workerId, snapshot, new Date(Date.now() - 30 * 24 * 60 * 60 * 1_000));
   } catch (error) {
+    if (!ownsLease) return;
     if (error instanceof ScanCancelledError || await backend.isScanCancellationRequested(job.id, workerId)) { await backend.cancelJob(job.id, workerId); return; }
     await backend.failJob(job.id, workerId, "Scan failed. Review worker diagnostics; tokens and response bodies are not included.");
+  } finally {
+    clearInterval(heartbeat);
   }
 }
 

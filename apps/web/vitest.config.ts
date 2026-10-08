@@ -13,6 +13,6 @@ export default defineConfig({
     // The standalone build copies server/ verbatim, test files included. Those copies
     // cannot resolve the workspace tsconfig, so a test run after a build would fail on
     // duplicates of tests that already passed.
-    exclude: ["**/node_modules/**", "**/.next/**"],
+    exclude: ["**/node_modules/**", "**/.next/**", "**/.stryker-tmp/**"],
   },
 });

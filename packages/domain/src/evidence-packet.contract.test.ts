@@ -175,13 +175,64 @@ describe("evidence packet archival contract", () => {
     const findingPacket = buildFindingEvidencePacket([snapshot], finding.id, review);
     const coveragePacket = buildFindingEvidencePacket([snapshot], coverage.id);
     const pathPacket = buildAttackPathEvidencePacket([snapshot], finding.attackPathId!, review);
+    // Reviewed additive fixture scope: the precise resource assignment endpoint now establishes missing-grant coverage.
     expect({ finding: digest(findingPacket), coverage: digest(coveragePacket), path: digest(pathPacket), findingMarkdown: digest(renderEvidencePacketMarkdown(findingPacket)), coverageMarkdown: digest(renderEvidencePacketMarkdown(coveragePacket)), pathMarkdown: digest(renderEvidencePacketMarkdown(pathPacket)) }).toEqual({
-      finding: "e1cdb79ce7b2b059d41633cc5f72f0c5ba1321281b5524ed079bd6100f6eee77",
-      coverage: "d3c90c9ce45750b10fc0b203c8756783384ad9ec35b837d3f906ce275d5c56bd",
-      path: "e4378070b9fa0ecd041ceb702a296ff2ed1267f5647efe5d0bc95fd07f276735",
-      findingMarkdown: "39c7dfcb57d9a294686a81b83cca940a92f733bfa11c3825f591d4acfd951d19",
-      coverageMarkdown: "6c6868b1fa608eeb8ac7c2ef1f4c5cdcf7ff3ebd49f80f138bffdc7c0488a603",
-      pathMarkdown: "ec663150cdfb54c75d630b83d244432b515b290d0483d439ce8b702b8607a472",
+      finding: "5fb6a6ca05c1ee02556369b424ee4d025fed5a33d1ea6c261ef53941fd6cdc19",
+      coverage: "c98e627424b3bfdcfe2d6cce41ba7c2c4f14bd4928fe6d3ef6cbfbc0f8f6b4e2",
+      path: "0c61df363b73dc029160e3dabf49321bcc80d05e4d6db36efc325540ce304e0b",
+      findingMarkdown: "c9ad9b6028f776e135808d1a10190789b358bd54c4ca38856827d44ac35aaf48",
+      coverageMarkdown: "39c9bb40554810e1f0b887a1f361a684249f9e9e971bebd339a8bc99c2734403",
+      pathMarkdown: "f38abe8f5ddf5eee177d961653c59c93a47cf5cd2001dbfef155699a0fd65f29",
     });
   });
+});
+
+it("preserves delegated consent audience and principal in focused Markdown", () => {
+  const snapshot = fixture();
+  const delegated = snapshot.edges.find(edge => edge.type === "CAN_CALL_DELEGATED")!;
+  const finding = analyzeTenantIntelligenceHistory([snapshot]).findings.find(finding => finding.edgeIds.includes(delegated.id))!;
+  expect(finding).toBeDefined();
+  const packet = buildFindingEvidencePacket([snapshot], finding.id);
+  const relationship = packet.evidence.relationships.find(edge => edge.id === delegated.id)!;
+  relationship.consent = { audience: "single-user", principalId: "synthetic-person-id" };
+  const singleUser = renderEvidencePacketMarkdown(packet);
+  expect(singleUser).toContain("single\\-user");
+  expect(singleUser).toContain("synthetic-person-id");
+  relationship.consent = { audience: "all-users", principalId: null };
+  const allUsers = renderEvidencePacketMarkdown(packet);
+  expect(allUsers).toContain("all\\-users");
+  expect(allUsers).not.toContain("synthetic-person-id");
+});
+
+it("copies detailed coverage and consent fields rather than sharing mutable nested objects", () => {
+  const snapshot = fixture();
+  snapshot.completion.collectors = [{ id: "activity", state: "partial", reason: "User activity only", collectedAt: snapshot.scannedAt, endpoints: ["/auditLogs/signIns"], failedEndpoints: [], itemCount: 1, scope: "AuditLog.Read.All", window: { startsAt: "2026-07-27", endsAt: snapshot.scannedAt, eventClasses: ["interactiveUser"] } }];
+  const path = analyzeTenantIntelligenceHistory([snapshot]).paths[0]!;
+  const first = snapshot.edges.find(e => e.id === path.steps[0]!.edgeId)!;
+  first.consent = { audience: "single-user", principalId: null };
+  const packet = buildAttackPathEvidencePacket([snapshot], path.id);
+  expect(packet.evidence.relationships.find(e => e.id === first.id)!.consent).toEqual({ audience: "single-user", principalId: null });
+  expect(renderEvidencePacketMarkdown(packet)).toContain("consent principal `Not specified`");
+  snapshot.completion.collectors[0]!.window!.eventClasses.push("changed-after-export");
+  first.consent.audience = "all-users";
+  expect(packet.snapshot.completion.collectors![0]!.window!.eventClasses).toEqual(["interactiveUser"]);
+  expect(packet.evidence.relationships.find(e => e.id === first.id)!.consent!.audience).toBe("single-user");
+});
+it("trims surrounding whitespace while replacing control characters with readable separators", () => {
+  const snapshot = fixture(); const path = analyzeTenantIntelligenceHistory([snapshot]).paths[0]!;
+  const packet = buildAttackPathEvidencePacket([snapshot], path.id);
+  packet.attackPath.title = "  Left\u001fRight\u007fEnd  ";
+  packet.snapshot.id = "  before`after  ";
+  const rendered = renderEvidencePacketMarkdown(packet);
+  expect(rendered.split("\n")[0]).toBe("# Left Right End");
+  expect(rendered).toContain("- Snapshot: `before after`");
+});
+
+it("rejects a retained finding that is absent from the current snapshot", async () => {
+  const { node, snapshot } = await import("./test-support");
+  const app = node({ id: "orphan", kind: "application", label: "Orphan" });
+  const before = snapshot([app], [], { id: "before", scannedAt: "2026-08-25T00:00:00Z" });
+  const after = snapshot([{ ...app, ownerIds: ["owner"] }], [], { id: "after", scannedAt: "2026-08-26T00:00:00Z" });
+  const finding = analyzeTenantIntelligenceHistory([before]).findings.find(f => f.category === "ownership")!;
+  expect(() => buildFindingEvidencePacket([after, before], finding.id)).toThrow("Finding is not detected in the current snapshot.");
 });

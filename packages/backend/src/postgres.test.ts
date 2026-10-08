@@ -190,6 +190,7 @@ describe("encrypted round trips", () => {
       findingId: "finding-1", snapshotId: "snap-1", tenantId: TENANT, disposition: "mitigating",
       owner: "IAM", expiresAt: null, assumption: "Control holds", updatedAt: "1970-01-01T00:00:00.000Z",
     };
+    pool.responder = respondTo("INSERT INTO threat_reviews", { rowCount: 1 });
     const stored = await backend.upsertThreatReview(review, "session-1");
     expect(stored.updatedAt).not.toBe(review.updatedAt);
     expect(pool.matching("INSERT INTO threat_reviews")).toHaveLength(1);
@@ -481,7 +482,7 @@ describe("result page bounds", () => {
       await backend.recentSnapshots(TENANT, limit);
       await backend.recentAccessEvents(TENANT, limit);
     }
-    for (const query of [...pool.matching("FROM snapshots WHERE tenant_id=$1 ORDER BY"), ...pool.matching("FROM access_events")]) {
+    for (const query of [...pool.matching("FROM snapshots WHERE tenant_id=$1 AND"), ...pool.matching("FROM access_events")]) {
       const bound = Number(query.params[1]);
       expect(bound).toBeGreaterThanOrEqual(1);
       expect(bound).toBeLessThanOrEqual(100);
@@ -492,7 +493,7 @@ describe("result page bounds", () => {
     const { backend, pool } = backendUnderTest();
     await backend.recentSnapshots(TENANT);
     await backend.recentAccessEvents(TENANT);
-    expect(pool.only("FROM snapshots WHERE tenant_id=$1 ORDER BY").params[1]).toBe(20);
+    expect(pool.only("FROM snapshots WHERE tenant_id=$1 AND").params[1]).toBe(20);
     expect(pool.only("FROM access_events").params[1]).toBe(100);
   });
 
@@ -683,7 +684,7 @@ describe("statement parameters", () => {
       owner: "IAM", expiresAt: null, assumption: "", updatedAt: "1970-01-01T00:00:00.000Z",
     };
     await backend.upsertThreatReview(review, "session-1");
-    expect(pool.only("INSERT INTO threat_reviews").params).toEqual([TENANT, "snap-1", "finding-1", ...ANY_PAYLOAD]);
+    expect(pool.only("INSERT INTO threat_reviews").params).toEqual([TENANT, "snap-1", "finding-1", ...ANY_PAYLOAD, expect.any(String), null, true]);
   });
 
   it("decrypts the latest prior review for each requested finding", async () => {
@@ -694,4 +695,12 @@ describe("statement parameters", () => {
     expect(pool.only("WITH current_snapshot").params).toEqual([TENANT, "snap-current", ["finding-1"]]);
     expect(await backend.priorThreatReviews(TENANT, "snap-current", [])).toEqual([]);
   });
+});
+
+it("caps prior review queries at 5000 distinct finding IDs", async () => {
+  const { backend, pool } = backendUnderTest();
+  const ids = ["first", "first", ...Array.from({ length: 5000 }, (_, i) => `finding-${i}`)];
+  await backend.priorThreatReviews(TENANT, "snapshot", ids);
+  const query = pool.queries.find(q => q.sql.startsWith("WITH current_snapshot"))!;
+  expect(query.params[2]).toEqual(["first", ...Array.from({ length: 4999 }, (_, i) => `finding-${i}`)]);
 });

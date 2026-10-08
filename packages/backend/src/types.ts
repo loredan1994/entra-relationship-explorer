@@ -1,7 +1,7 @@
 import type { TenantSnapshot } from "@entra-explorer/domain";
 
 export type ScanJobStatus = "queued" | "running" | "complete" | "failed" | "cancel_requested" | "cancelled";
-export type ScanJobStage = "applications" | "servicePrincipals" | "federatedIdentityCredentials" | "usersAndGroups" | "groupMemberships" | "devices" | "administrativeUnits" | "appRoleAssignments" | "delegatedPermissionGrants" | "owners" | "roles" | "conditionalAccess" | "authorizationPolicy" | "permissionGrantPolicies" | "crossTenantAccess" | "activity" | "normalizing" | "complete";
+export type ScanJobStage = "applications" | "servicePrincipals" | "federatedIdentityCredentials" | "usersAndGroups" | "groupMemberships" | "devices" | "administrativeUnits" | "appRoleAssignments" | "delegatedPermissionGrants" | "owners" | "roles" | "conditionalAccess" | "authorizationPolicy" | "permissionGrantPolicies" | "crossTenantAccess" | "activity" | "directoryAudits" | "normalizing" | "complete";
 
 export interface DurableSession {
   id: string;
@@ -55,6 +55,7 @@ export interface AccessEvent {
 }
 
 export interface ThreatReview {
+  revision?: string;
   findingId: string;
   snapshotId: string;
   tenantId: string;
@@ -74,6 +75,8 @@ export interface ScanCheckpoint {
 }
 
 export interface Backend {
+  pruneExpiredData(tenantId: string, retainAfter: Date): Promise<void>;
+  heartbeatJob(id: string, workerId: string): Promise<boolean>;
   migrate(): Promise<void>;
   health(): Promise<BackendHealth>;
   createAuthFlow(flow: DurableAuthFlow): Promise<void>;
@@ -100,6 +103,6 @@ export interface Backend {
   recentAccessEvents(tenantId: string, limit?: number): Promise<AccessEvent[]>;
   getThreatReview(tenantId: string, snapshotId: string, findingId: string): Promise<ThreatReview | null>;
   priorThreatReviews(tenantId: string, currentSnapshotId: string, findingIds: string[]): Promise<ThreatReview[]>;
-  upsertThreatReview(review: ThreatReview, sessionId: string | null): Promise<ThreatReview>;
+  upsertThreatReview(review: ThreatReview, sessionId: string | null, expectedRevision?: string | null): Promise<ThreatReview>;
   close(): Promise<void>;
 }

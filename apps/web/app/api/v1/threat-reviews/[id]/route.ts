@@ -18,6 +18,9 @@ async function contextFor(request: NextRequest, id: string) {
   const history = await backend.recentSnapshots(session.tenantId, 20);
   const snapshot = history[0];
   if (!snapshot) return { error: noStoreJson({ error: "No tenant snapshot is available." }, { status: 404 }) };
+  const expectedSnapshot = request.nextUrl.searchParams.get("snapshot");
+  if (!expectedSnapshot) return { error: noStoreJson({ error: "The displayed snapshot ID is required." }, { status: 400 }) };
+  if (expectedSnapshot !== snapshot.id) return { error: noStoreJson({ error: "A newer scan is available. Reload and review its evidence before saving." }, { status: 409 }) };
   if (!analyzeTenantIntelligenceHistory(history).findings.some((finding) => finding.id === id)) return { error: noStoreJson({ error: "Finding not found in the current tenant snapshot." }, { status: 404 }) };
   return { config, session, backend, snapshot };
 }
@@ -40,9 +43,11 @@ export async function PUT(request: NextRequest, route: { params: Promise<{ id: s
   try { requireSameOrigin(request, context.config.redirectUri); } catch { return noStoreJson({ error: "Cross-origin request rejected." }, { status: 403 }); }
   const body = await request.json().catch(() => null) as Record<string, unknown> | null;
   if (!body || typeof body.disposition !== "string" || !DISPOSITIONS.has(body.disposition)) return noStoreJson({ error: "A valid disposition is required." }, { status: 400 });
+  if (!(body.expectedRevision === null || typeof body.expectedRevision === "string")) return noStoreJson({ error: "The current review revision is required." }, { status: 400 });
   const owner = typeof body.owner === "string" ? body.owner.trim().slice(0, 160) : "";
   const assumption = typeof body.assumption === "string" ? body.assumption.trim().slice(0, 4_000) : "";
   const expiresAt = typeof body.expiresAt === "string" && /^\d{4}-\d{2}-\d{2}$/.test(body.expiresAt) ? body.expiresAt : null;
+  if (expiresAt && (!Number.isFinite(Date.parse(expiresAt)) || new Date(expiresAt).toISOString().slice(0, 10) !== expiresAt)) return noStoreJson({ error: "Expiry must be a valid calendar date." }, { status: 400 });
   const flowDraft = Array.isArray(body.flowDraft) ? body.flowDraft.slice(0, 20).flatMap((candidate, index) => {
     if (!candidate || typeof candidate !== "object") return [];
     const item = candidate as Record<string, unknown>;
@@ -51,8 +56,13 @@ export async function PUT(request: NextRequest, route: { params: Promise<{ id: s
     return [{ id: typeof item.id === "string" ? item.id.slice(0, 100) : `step-${index + 1}`, title, evidenceEdgeId: typeof item.evidenceEdgeId === "string" ? item.evidenceEdgeId.slice(0, 160) : null }];
   }) : [];
   if (body.disposition === "accepted" && (!owner || !expiresAt || !assumption)) return noStoreJson({ error: "Accepted risk requires an owner, expiry date, and rationale." }, { status: 400 });
-  const review = await context.backend.upsertThreatReview({ findingId: id, snapshotId: context.snapshot.id, tenantId: context.session.tenantId, disposition: body.disposition as "open" | "mitigating" | "accepted" | "resolved", owner, expiresAt, assumption, flowDraft, updatedAt: new Date().toISOString() }, context.session.id);
-  return noStoreJson({ review });
+  try {
+    const review = await context.backend.upsertThreatReview({ findingId: id, snapshotId: context.snapshot.id, tenantId: context.session.tenantId, disposition: body.disposition as "open" | "mitigating" | "accepted" | "resolved", owner, expiresAt, assumption, flowDraft, updatedAt: new Date().toISOString() }, context.session.id, body.expectedRevision);
+    return noStoreJson({ review });
+  } catch (error) {
+    if (error instanceof Error && error.message.startsWith("Review conflict:")) return noStoreJson({ error: error.message }, { status: 409 });
+    throw error;
+  }
 }
 
 export async function POST(request: NextRequest, route: { params: Promise<{ id: string }> }) {
@@ -62,9 +72,15 @@ export async function POST(request: NextRequest, route: { params: Promise<{ id: 
   try { requireSameOrigin(request, context.config.redirectUri); } catch { return noStoreJson({ error: "Cross-origin request rejected." }, { status: 403 }); }
   const body = await request.json().catch(() => null) as Record<string, unknown> | null;
   if (!body || typeof body.sourceSnapshotId !== "string") return noStoreJson({ error: "A prior source snapshot is required." }, { status: 400 });
+  if (!(body.expectedRevision === null || typeof body.expectedRevision === "string")) return noStoreJson({ error: "The current review revision is required." }, { status: 400 });
   const prior = (await context.backend.priorThreatReviews(context.session.tenantId, context.snapshot.id, [id]))[0];
   if (!prior || prior.snapshotId !== body.sourceSnapshotId) return noStoreJson({ error: "The prior review is stale or unavailable." }, { status: 409 });
-  const review = await context.backend.upsertThreatReview(revalidateThreatReview(prior, context.snapshot.id), context.session.id);
-  await context.backend.recordAccess(context.session.tenantId, context.session.id, "revalidate", "threat_review", id);
-  return noStoreJson({ review });
+  try {
+    const review = await context.backend.upsertThreatReview(revalidateThreatReview(prior, context.snapshot.id), context.session.id, body.expectedRevision);
+    await context.backend.recordAccess(context.session.tenantId, context.session.id, "revalidate", "threat_review", id);
+    return noStoreJson({ review });
+  } catch (error) {
+    if (error instanceof Error && error.message.startsWith("Review conflict:")) return noStoreJson({ error: error.message }, { status: 409 });
+    throw error;
+  }
 }

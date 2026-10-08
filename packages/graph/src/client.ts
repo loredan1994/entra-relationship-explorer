@@ -65,6 +65,10 @@ export class ReadOnlyGraphClient {
     });
   }
 
+  get collectionLimits(): { maxPagesPerEndpoint: number; maxItemsPerEndpoint: number } {
+    return { maxPagesPerEndpoint: this.maxPages, maxItemsPerEndpoint: this.maxItems };
+  }
+
   async getAll<T>(endpoint: string, onPage?: (totalItems: number) => void): Promise<T[]> {
     let nextUrl: string | undefined = this.resolveGraphUrl(endpoint);
     const items: T[] = [];

@@ -7,6 +7,11 @@ const coreRoutes = [
   "/changes",
   "/security",
   "/settings",
+  "/investigations",
+  "/investigations?view=ledger",
+  "/investigations?view=credentials",
+  "/investigations?view=scenarios",
+  "/investigations?view=rules",
   "/applications/30000000-0000-4000-8000-000000000001",
 ];
 

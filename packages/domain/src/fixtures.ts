@@ -1,4 +1,5 @@
 import type { DirectoryNode, RelationshipEdge, TenantSnapshot } from "./types";
+import { COLLECTORS } from "./coverage";
 
 export const fixtureTenantId = "00000000-0000-4000-8000-000000000001";
 export const fixtureScannedAt = "2026-08-26T10:00:00Z";
@@ -44,6 +45,7 @@ const nodes: DirectoryNode[] = [
     id: "30000000-0000-4000-8000-000000000002",
     tenantId: fixtureTenantId,
     kind: "servicePrincipal",
+    applicationProfile: { signInAudience: "AzureADMyOrg", accountEnabled: true, assignmentRequired: true, homeTenantId: fixtureTenantId, verifiedPublisherId: "sample-publisher", verifiedPublisherName: "Clean Project", preferredSsoMode: "oidc" },
     label: "Clean Project API",
     description: "Tenant identity for the resource API inside the fixture tenant.",
     appId: "20000000-0000-4000-8000-000000000002",
@@ -188,6 +190,27 @@ const edges: RelationshipEdge[] = [
   { id: "70000000-0000-4000-8000-000000000011", tenantId: fixtureTenantId, type: "ACTIVE_IN_ROLE", sourceId: nodes[5]!.id, targetId: nodes[12]!.id, plainLabel: "Active in role", permissions: ["/administrativeUnits/90000000-0000-4000-8000-000000000002"], scope: { directoryScopeId: "/administrativeUnits/90000000-0000-4000-8000-000000000002", objectId: nodes[8]!.id }, evidence: evidence(nodes[5]!.id, nodes[12]!.id, "/roleManagement/directory/roleAssignments", ["94000000-0000-4000-8000-000000000001"]) },
 ];
 
+// Explicit synthetic manifest and credential metadata demonstrate reconciliation and rotation.
+nodes[0]!.sourceEndpoint = "/applications?$select=requiredResourceAccess,passwordCredentials,keyCredentials";
+nodes[0]!.requestedPermissions = [
+  { resourceAppId: nodes[3]!.appId!, permissionId: "sample-read", kind: "application" },
+  { resourceAppId: nodes[3]!.appId!, permissionId: "sample-export", kind: "application" },
+];
+nodes[0]!.credentials = [
+  { id: "sample-old-key", kind: "password", label: "Retired deployment key", startsAt: "2025-01-01T00:00:00Z", expiresAt: "2026-08-01T00:00:00Z", sourceEndpoint: "/applications" },
+  { id: "sample-new-key", kind: "certificate", label: "Replacement certificate", startsAt: "2026-07-15T00:00:00Z", expiresAt: "2027-04-15T00:00:00Z", sourceEndpoint: "/applications" },
+];
+nodes[1]!.requestedPermissions = [];
+nodes[1]!.credentials = [];
+nodes[3]!.permissionDefinitions = [
+  { id: "sample-read", value: "Api.Read", kind: "application" },
+  { id: "sample-write", value: "Api.Write", kind: "application" },
+  { id: "sample-export", value: "Api.Export", kind: "application" },
+  { id: "sample-read-scope", value: "Api.Read", kind: "delegated" },
+];
+edges[2]!.permissionIds = ["sample-read", "sample-write"];
+edges[3]!.consent = { audience: "all-users", principalId: null };
+
 export const cleanProjectFixture: TenantSnapshot = {
   id: "80000000-0000-4000-8000-000000000001",
   tenant: { tenantId: fixtureTenantId, tenantLabel: "Clean Project · synthetic tenant" },
@@ -196,6 +219,7 @@ export const cleanProjectFixture: TenantSnapshot = {
   completion: {
     status: "complete",
     collectedEndpoints: [
+      `/servicePrincipals/${nodes[3]!.id}/appRoleAssignedTo`,
       "/applications",
       "/servicePrincipals",
       "/servicePrincipals/{id}/appRoleAssignedTo",
@@ -211,7 +235,17 @@ export const cleanProjectFixture: TenantSnapshot = {
     ],
     skippedEndpoints: ["/auditLogs/signIns"],
     errors: [],
+    collectors: COLLECTORS.map(c => ({ id: c.id, state: c.id === "activity" || c.id === "directoryAudits" ? "not-enabled" : c.id === "groupMemberships" ? "not-enabled" : "complete", reason: c.id === "activity" || c.id === "directoryAudits" ? "Optional activity is not included in this synthetic sample." : c.id === "groupMemberships" ? "Membership collection is not included in this synthetic example." : "Synthetic collection record; no Microsoft Graph request was made.", collectedAt: fixtureScannedAt, endpoints: [], failedEndpoints: [], itemCount: 0, scope: c.scope })),
   },
   nodes,
   edges,
+};
+
+/** A second synthetic point in time, used only by the demo timeline. */
+export const cleanProjectPreviousFixture: TenantSnapshot = {
+  ...cleanProjectFixture,
+  id: "80000000-0000-4000-8000-000000000000",
+  scannedAt: "2026-08-25T10:00:00Z",
+  nodes: nodes.map(n => n.id === nodes[0]!.id ? { ...n, credentials: n.credentials!.filter(c => c.id !== "sample-new-key") } : n),
+  edges: edges.map(e => e.id === edges[2]!.id ? { ...e, permissions: ["Api.Read"], permissionIds: ["sample-read"] } : e.id === edges[3]!.id ? { ...e, consent: { audience: "single-user", principalId: nodes[5]!.id } } : e),
 };

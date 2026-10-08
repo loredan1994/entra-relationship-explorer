@@ -142,3 +142,5 @@ for (const row of rows.slice(0, 10)) {
   console.log(`  CRAP ${row.crap.toFixed(1).padStart(7)}  comp ${String(row.complexity).padStart(3)}  cov ${pct(row.coverage).padStart(4)}  ${row.fn}  (${row.file}:${row.line})`);
 }
 console.log(`\nFull report: ${path.relative(ROOT, outFile)}`);
+
+if (risky.length > 0) process.exitCode = 1;

@@ -113,14 +113,15 @@ describe("ERE-IAM-001 privileged application control path", () => {
     const graph = node({ id: "graph", kind: "servicePrincipal", label: "Microsoft Graph" });
     const baseEdges = [edge("MEMBER_OF", person, group), edge("OWNS", group, application), edge("INSTANTIATES_AS", application, workload)];
     const applicationAccess = snapshot([person, group, application, workload, graph], [...baseEdges, edge("CAN_CALL_AS_APP", workload, graph, { permissions: ["Application.ReadWrite.All"] })]);
-    expect(analyzeTenantIntelligence(applicationAccess).findings.find((item) => item.rule?.id === "ERE-IAM-001" && item.title.startsWith("Person "))!.title).toBe("Person can control privileged access through Controlled app");
+    expect(analyzeTenantIntelligence(applicationAccess).findings.some((item) => item.rule?.id === "ERE-IAM-001" && item.title.startsWith("Person "))).toBe(false);
+    expect(analyzeTenantIntelligence(applicationAccess).findings.find((item) => item.rule?.id === "ERE-IAM-001" && item.title.startsWith("Operators "))!.title).toBe("Operators can control privileged access through Controlled app");
     const delegatedAccess = snapshot([person, group, application, workload, graph], [...baseEdges, edge("CAN_CALL_DELEGATED", workload, graph, { permissions: ["Application.ReadWrite.All"] })]);
     expectNoRule(analyzeTenantIntelligence(delegatedAccess), "ERE-IAM-001");
     const assigned = snapshot([person, workload, graph], [edge("ASSIGNED_TO", person, workload), edge("CAN_CALL_AS_APP", workload, graph, { permissions: ["Application.ReadWrite.All"] })]);
     expectNoRule(analyzeTenantIntelligence(assigned), "ERE-IAM-001");
     const policy = node({ id: "policy", kind: "policy", label: "Policy" });
     const indirect = snapshot([person, policy, application, workload, graph], [edge("OWNS", person, policy), edge("OWNS", policy, application), edge("INSTANTIATES_AS", application, workload), edge("CAN_CALL_AS_APP", workload, graph, { permissions: ["Application.ReadWrite.All"] })]);
-    expect(analyzeTenantIntelligence(indirect).findings.find((item) => item.rule?.id === "ERE-IAM-001")!.title).toBe("Person can control privileged access through Controlled app");
+    expectNoRule(analyzeTenantIntelligence(indirect), "ERE-IAM-001");
   });
 });
 
@@ -405,4 +406,64 @@ describe("history safety and determinism", () => {
     const current = analyzeTenantIntelligence(history[0]!);
     expect(ENTRA_CONTROL_PATH_RULES[1]!.evaluate({ current: history[0]!, previous: null, paths: current.paths, previousPaths: current.paths })).toEqual([]);
   });
+});
+
+it("keeps accountable ownership separate from an expired credential that makes a workload reviewable", () => {
+  const sp = node({ kind: "servicePrincipal", label: "Owned", ownerIds: ["owner"], credential: { status: "expired", expiresAt: "2026-01-01" }, metadata: { ownershipExpected: true } });
+  const role = node({ kind: "directoryRole", label: "Global Administrator" });
+  const result = analyzeTenantIntelligence(snapshot([sp, role], [edge("ACTIVE_IN_ROLE", sp, role)]));
+  expect(result.paths).toHaveLength(1);
+  expectNoRule(result, "ERE-IAM-004");
+});
+it("does not assign workload accountability to a person carrying legacy ownership metadata", () => {
+  const person = node({ kind: "user", label: "Person", metadata: { ownershipExpected: true } }); const role = node({ kind: "directoryRole", label: "Global Administrator" });
+  expectNoRule(analyzeTenantIntelligence(snapshot([person, role], [edge("ACTIVE_IN_ROLE", person, role)])), "ERE-IAM-004");
+});
+it("uses only a real application as the registration when reviewing an unowned identity", () => {
+  for (const includeParent of [true, false]) {
+    const parent = node({ kind: "policy", label: "Invalid parent" }); const sp = node({ kind: "servicePrincipal", label: "Identity" }); const role = node({ kind: "directoryRole", label: "Global Administrator" });
+    const s = snapshot([...(includeParent ? [parent] : []), sp, role], [edge("INSTANTIATES_AS", parent, sp), edge("ACTIVE_IN_ROLE", sp, role)]);
+    expectNoRule(analyzeTenantIntelligence(s), "ERE-IAM-004");
+  }
+});
+it("rule evaluators reject non-workload control targets and a changed object that is no longer a federated credential", () => {
+  const current = federatedPath("https://new.example", "2026-08-27T10:00:00.000Z");
+  const previous = federatedPath("https://old.example", "2026-08-26T10:00:00.000Z");
+  const paths = analyzeTenantIntelligence(current).paths;
+  current.nodes[0]!.kind = "user";
+  expect(ENTRA_CONTROL_PATH_RULES[2]!.evaluate({ current, previous, paths, previousPaths: [] })).toEqual([]);
+  current.nodes[1]!.kind = "group";
+  expect(ENTRA_CONTROL_PATH_RULES[0]!.evaluate({ current, previous, paths, previousPaths: [] })).toEqual([]);
+});
+it("returns no synthetic placeholder when privileged federation did not change", () => {
+  const current = federatedPath("https://issuer.example", "2026-08-27T10:00:00.000Z");
+  const previous = federatedPath("https://issuer.example", "2026-08-26T10:00:00.000Z");
+  expect(ENTRA_CONTROL_PATH_RULES[2]!.evaluate({ current, previous, paths: analyzeTenantIntelligence(current).paths, previousPaths: [] })).toEqual([]);
+});
+
+it("keeps finding IDs at eight lowercase hexadecimal digits even when the hash needs leading zeros", () => {
+  const current = ownedApplicationPath();
+  const source = analyzeTenantIntelligence(current).paths.find(p => p.source.id === "user-owner")!;
+  const ids = Array.from({ length: 256 }, (_, i) => ENTRA_CONTROL_PATH_RULES[0]!.evaluate({ current, previous: null, paths: [{ ...source, id: `path-${i}` }], previousPaths: [] })[0]!.id);
+  expect(ids.some(id => id.startsWith("finding-ere-iam-001-0"))).toBe(true);
+  expect(ids.every(id => /^finding-ere-iam-001-[0-9a-f]{8}$/.test(id))).toBe(true);
+});
+
+it("requires a previous snapshot even when callers supply earlier path data", () => {
+  const current = ownedApplicationPath("Mail.ReadWrite"), earlier = ownedApplicationPath("Data.Read.All");
+  expect(ENTRA_CONTROL_PATH_RULES[1]!.evaluate({ current, previous: null, paths: analyzeTenantIntelligence(current).paths, previousPaths: analyzeTenantIntelligence(earlier).paths })).toEqual([]);
+});
+
+it("never cites an invalid registration link as evidence for the tenant identity's own ownership gap", () => {
+  const parent = node({ kind: "policy", label: "Not a registration" });
+  const sp = node({ kind: "servicePrincipal", label: "Identity", metadata: { ownershipExpected: true } });
+  const role = node({ kind: "directoryRole", label: "Global Administrator" });
+  const s = snapshot([parent, sp, role], [edge("INSTANTIATES_AS", parent, sp, { id: "invalid-link" }), edge("ACTIVE_IN_ROLE", sp, role, { id: "valid-role" })]);
+  const finding = analyzeTenantIntelligence(s).findings.find(f => f.rule?.id === "ERE-IAM-004")!;
+  expect(finding.edgeIds).toEqual(["valid-role"]);
+});
+
+it("requires an earlier snapshot before comparing privileged federation", () => {
+  const current = federatedPath("https://issuer.example", "2026-08-27T10:00:00.000Z");
+  expect(ENTRA_CONTROL_PATH_RULES[2]!.evaluate({ current, previous: null, paths: analyzeTenantIntelligence(current).paths, previousPaths: [] })).toEqual([]);
 });

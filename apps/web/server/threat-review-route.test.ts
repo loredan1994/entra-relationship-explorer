@@ -20,7 +20,7 @@ const session = { id: "session-1", tenantId: snapshot.tenant.tenantId };
 const prior = { findingId, snapshotId: "snap-prior", tenantId: snapshot.tenant.tenantId, disposition: "resolved" as const, owner: "IAM", expiresAt: null, assumption: "Removed by approved change", flowDraft: [], updatedAt: "2026-08-26T00:00:00.000Z" };
 
 function request(body: unknown, origin = "http://127.0.0.1:3200") {
-  return new NextRequest(`http://127.0.0.1:3200/api/v1/threat-reviews/${findingId}`, { method: "POST", headers: { origin, "content-type": "application/json", cookie: "entra_explorer_session=session-cookie" }, body: JSON.stringify(body) });
+  return new NextRequest(`http://127.0.0.1:3200/api/v1/threat-reviews/${findingId}?snapshot=${snapshot.id}`, { method: "POST", headers: { origin, "content-type": "application/json", cookie: "entra_explorer_session=session-cookie" }, body: JSON.stringify({ expectedRevision: null, ...(body as object) }) });
 }
 
 beforeEach(() => {
@@ -49,7 +49,7 @@ describe("threat review revalidation route", () => {
   it("creates a current snapshot review, reopens resolved context, and audits revalidation", async () => {
     const response = (await route.POST!(request({ sourceSnapshotId: prior.snapshotId }), { params: Promise.resolve({ id: findingId }) }))!;
     expect(response.status).toBe(200);
-    expect(upsertThreatReview).toHaveBeenCalledWith(expect.objectContaining({ findingId, snapshotId: snapshot.id, disposition: "open", owner: "IAM" }), session.id);
+    expect(upsertThreatReview).toHaveBeenCalledWith(expect.objectContaining({ findingId, snapshotId: snapshot.id, disposition: "open", owner: "IAM" }), session.id, null);
     expect(recordAccess).toHaveBeenCalledWith(snapshot.tenant.tenantId, session.id, "revalidate", "threat_review", findingId);
     expect(recentSnapshots).toHaveBeenCalledWith(snapshot.tenant.tenantId, 20);
   });
@@ -60,4 +60,26 @@ describe("threat review revalidation route", () => {
     expect(await response.json()).toMatchObject({ review: { snapshotId: snapshot.id }, priorReview: { snapshotId: prior.snapshotId } });
     expect(upsertThreatReview).not.toHaveBeenCalled();
   });
+});
+
+
+describe("snapshot-bound decision writes", () => {
+  it("rejects a decision submitted from a previous scan even when the finding ID still exists", async () => {
+    recentSnapshots.mockResolvedValue([{ ...snapshot, id: "newer-snapshot" }, snapshot]);
+    const response = await route.PUT(request({ disposition: "open" }), { params: Promise.resolve({ id: findingId }) });
+    expect(response!.status).toBe(409);
+    expect(upsertThreatReview).not.toHaveBeenCalled();
+  });
+  it("returns a review conflict without claiming a concurrent edit was saved", async () => {
+    upsertThreatReview.mockRejectedValue(new Error("Review conflict: another decision was saved."));
+    const response = await route.PUT(request({ disposition: "open", expectedRevision: "old-revision" }), { params: Promise.resolve({ id: findingId }) });
+    expect(response!.status).toBe(409);
+    expect(upsertThreatReview).toHaveBeenCalledWith(expect.objectContaining({ snapshotId: snapshot.id }), session.id, "old-revision");
+  });
+});
+
+it.each(["2026-02-30", "2026-13-01", "2026-00-10"])("rejects impossible acceptance date %s", async expiresAt => {
+  const response = await route.PUT(request({ disposition: "accepted", owner: "IAM", assumption: "Reviewed", expiresAt }), { params: Promise.resolve({ id: findingId }) });
+  expect(response!.status).toBe(400);
+  expect(upsertThreatReview).not.toHaveBeenCalled();
 });

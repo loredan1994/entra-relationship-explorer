@@ -153,14 +153,14 @@ describe("counts and ordering", () => {
       before([person(), gone], []),
       after([{ ...person(), label: "Renamed" }, fresh], []),
     );
-    expect(diff.counts).toEqual({ added: 1, removed: 1, changed: 1 });
+    expect(diff.counts).toEqual({ added: 1, removed: 1, changed: 1, unconfirmed: 0 });
     expect(diff.changes).toHaveLength(3);
   });
 
   it("reports no change and zero counts for an unchanged snapshot", () => {
     const diff = compareSnapshots(before([person(), app()], [link()]), after([person(), app()], [link()]));
     expect(diff.changes).toEqual([]);
-    expect(diff.counts).toEqual({ added: 0, removed: 0, changed: 0 });
+    expect(diff.counts).toEqual({ added: 0, removed: 0, changed: 0, unconfirmed: 0 });
   });
 
   it("groups objects before relationships and sorts within each group", () => {

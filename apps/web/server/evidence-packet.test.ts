@@ -33,6 +33,7 @@ describe("evidence packet request boundary", () => {
       const result = await loadEvidencePacket(request(query), "evidence_packet_json");
       expect(result).toBeInstanceOf(Response);
       expect((result as Response).status).toBe(400);
+      expect(await (result as Response).text()).toBe("Choose one finding or attack path to export.");
     }
     expect(loadExportSnapshotHistory).not.toHaveBeenCalled();
   });
@@ -104,4 +105,29 @@ describe("evidence packet request boundary", () => {
     loadExportSnapshotHistory.mockResolvedValue([current, other]);
     await expect(loadEvidencePacket(request("?kind=finding&id=x"), "evidence_packet_json")).rejects.toThrow("same tenant");
   });
+});
+
+ it("does not load private review context for a fixture packet", async () => {
+    const id = analyzeTenantIntelligenceHistory([snapshot()]).findings[0]!.id;
+    expect(await loadEvidencePacket(request(`?kind=finding&id=${id}`), "evidence_packet_json")).toMatchObject({ review: null });
+    expect(getServerSession).not.toHaveBeenCalled();
+    expect(getThreatReview).not.toHaveBeenCalled();
+  });
+  it("tolerates a missing cookie during the second session check", async () => {
+    const current = snapshot();
+    const id = analyzeTenantIntelligenceHistory([current]).findings[0]!.id;
+    getEntraConfig.mockReturnValue({ enabled: true, tenantId: current.tenant.tenantId });
+    getServerSession.mockResolvedValue(null);
+    const req = request(`?kind=finding&id=${id}`);
+    req.cookies.get = (() => undefined) as typeof req.cookies.get;
+    expect(await loadEvidencePacket(req, "evidence_packet_json")).toMatchObject({ review: null });
+    expect(getServerSession).toHaveBeenCalledWith(undefined, expect.anything());
+    expect(getThreatReview).not.toHaveBeenCalled();
+  });
+
+it("does not query reviews using an unknown path ID in live mode", async () => {
+  getEntraConfig.mockReturnValue({ enabled: true, tenantId: cleanProjectFixture.tenant.tenantId });
+  const result = await loadEvidencePacket(request("?kind=path&id=missing-path"), "evidence_packet_json");
+  expect((result as Response).status).toBe(404);
+  expect(getThreatReview).not.toHaveBeenCalled();
 });

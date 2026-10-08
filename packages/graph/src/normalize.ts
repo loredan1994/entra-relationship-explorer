@@ -46,6 +46,7 @@ export function normalizeTenantScan(raw: RawTenantScan, options: NormalizeOption
     scannedAt: raw.scannedAt,
     mode: "tenant",
     completion: scanCompletion(raw),
+    auditEvents: raw.auditEvents,
     nodes: Array.from(nodes.values()),
     edges,
   };
@@ -71,11 +72,11 @@ function collectNodes(raw: RawTenantScan): Map<string, DirectoryNode> {
 function addApplicationNodes(nodes: Map<string, DirectoryNode>, raw: RawTenantScan): void {
   const applicationOwners = ownerIndex(raw.applicationOwners);
   const servicePrincipalOwners = ownerIndex(raw.servicePrincipalOwners);
-  for (const { record } of raw.applications) {
-    nodes.set(record.id, applicationNode(record, raw, applicationOwners.get(record.id) ?? []));
+  for (const { record, endpoint } of raw.applications) {
+    nodes.set(record.id, applicationNode(record, raw, applicationOwners.get(record.id) ?? [], endpoint));
   }
-  for (const { record } of raw.servicePrincipals) {
-    nodes.set(record.id, servicePrincipalNode(record, raw, servicePrincipalOwners.get(record.id) ?? []));
+  for (const { record, endpoint } of raw.servicePrincipals) {
+    nodes.set(record.id, servicePrincipalNode(record, raw, servicePrincipalOwners.get(record.id) ?? [], endpoint));
     for (const role of record.appRoles) {
       const node = appRoleNode(record, role, raw.tenantId);
       nodes.set(node.id, node);
@@ -149,10 +150,11 @@ function collectEdges(raw: RawTenantScan, nodes: Map<string, DirectoryNode>): Re
 
 function scanCompletion(raw: RawTenantScan): TenantSnapshot["completion"] {
   return {
-    status: raw.errors.length > 0 ? "partial" : "complete",
+    status: raw.errors.length > 0 || raw.coverage?.some(c => ["partial", "denied", "unavailable"].includes(c.state)) ? "partial" : "complete",
     collectedEndpoints: unique(raw.collectedEndpoints),
     skippedEndpoints: unique(raw.skippedEndpoints),
     errors: raw.errors.map((error) => `${error.endpoint}: ${error.code}`),
+    collectors: raw.coverage,
   };
 }
 
@@ -202,14 +204,18 @@ function federatedCredentialNode(record: GraphFederatedIdentityCredential, paren
 }
 
 function authorizationPolicyNode(record: GraphAuthorizationPolicy, tenantId: string): DirectoryNode {
+  const known = Array.isArray(record.defaultUserRolePermissions?.permissionGrantPoliciesAssigned);
   const assignments = record.defaultUserRolePermissions?.permissionGrantPoliciesAssigned ?? [];
-  return { id: record.id, tenantId, kind: "policy", label: record.displayName, description: "Tenant authorization policy collected from Microsoft Graph.", ownerIds: [], metadata: { policyType: "authorization", allowInvitesFrom: record.allowInvitesFrom ?? null, emailVerifiedUsersCanJoin: record.allowEmailVerifiedUsersToJoinOrganization ?? null, blockMsolPowerShell: record.blockMsolPowerShell ?? null, allowedToCreateApps: record.defaultUserRolePermissions?.allowedToCreateApps ?? null, allowedToCreateSecurityGroups: record.defaultUserRolePermissions?.allowedToCreateSecurityGroups ?? null, allowedToCreateTenants: record.defaultUserRolePermissions?.allowedToCreateTenants ?? null, allowedToReadBitlockerKeysForOwnedDevice: record.defaultUserRolePermissions?.allowedToReadBitlockerKeysForOwnedDevice ?? null, allowedToReadOtherUsers: record.defaultUserRolePermissions?.allowedToReadOtherUsers ?? null, permissionGrantPoliciesAssigned: assignments.join(", "), userConsentState: assignments.length === 0 ? "disabled" : "configured" }, risk: { level: assignments.some((item) => item === "ManagePermissionGrantsForSelf.microsoft-user-default-legacy") ? "high" : "low", reason: assignments.length === 0 ? "User consent is disabled by the default authorization policy." : "User consent policy assignments require review in context." } };
+  return { id: record.id, tenantId, kind: "policy", label: record.displayName, description: "Tenant authorization policy collected from Microsoft Graph.", ownerIds: [], metadata: { policyType: "authorization", allowInvitesFrom: record.allowInvitesFrom ?? null, emailVerifiedUsersCanJoin: record.allowEmailVerifiedUsersToJoinOrganization ?? null, blockMsolPowerShell: record.blockMsolPowerShell ?? null, allowedToCreateApps: record.defaultUserRolePermissions?.allowedToCreateApps ?? null, allowedToCreateSecurityGroups: record.defaultUserRolePermissions?.allowedToCreateSecurityGroups ?? null, allowedToCreateTenants: record.defaultUserRolePermissions?.allowedToCreateTenants ?? null, allowedToReadBitlockerKeysForOwnedDevice: record.defaultUserRolePermissions?.allowedToReadBitlockerKeysForOwnedDevice ?? null, allowedToReadOtherUsers: record.defaultUserRolePermissions?.allowedToReadOtherUsers ?? null, permissionGrantPoliciesAssigned: assignments.join(", "), userConsentState: !known ? "unknown" : assignments.length === 0 ? "disabled" : "configured" }, risk: { level: !known ? "review" : assignments.some((item) => item === "ManagePermissionGrantsForSelf.microsoft-user-default-legacy") ? "high" : "low", reason: !known ? "User consent policy assignments were not collected." : assignments.length === 0 ? "User consent is disabled by the default authorization policy." : "User consent policy assignments require review in context." } };
 }
 
 function permissionGrantPolicyNode(record: GraphPermissionGrantPolicy, raw: RawTenantScan): DirectoryNode {
+  // Stryker disable next-line ArrayDeclaration: a seeded string has no policyId and is filtered out.
   const includes = (raw.permissionGrantPolicyIncludes ?? []).filter((item) => item.policyId === record.id);
+  // Stryker disable next-line ArrayDeclaration: a seeded string has no policyId and is filtered out.
   const excludes = (raw.permissionGrantPolicyExcludes ?? []).filter((item) => item.policyId === record.id);
-  return { id: record.id, tenantId: raw.tenantId, kind: "policy", label: record.displayName, description: record.description?.trim() || "Permission grant policy (consent policy) collected from Microsoft Graph.", ownerIds: [], metadata: { policyType: "permissionGrant", includeCount: includes.length, excludeCount: excludes.length, permissionClassifications: unique(includes.map((item) => item.record.permissionClassification).filter((item): item is string => Boolean(item))).join(", ") || "none", permissionTypes: unique(includes.map((item) => item.record.permissionType).filter((item): item is string => Boolean(item))).join(", ") || "none", verifiedPublishersOnly: includes.length > 0 && includes.every((item) => item.record.clientApplicationsFromVerifiedPublisherOnly === true), coverage: "complete" }, risk: { level: record.id === "microsoft-user-default-legacy" ? "high" : "low", reason: record.id === "microsoft-user-default-legacy" ? "This built-in policy permits broad user consent when assigned." : "Consent policy conditions require contextual review." } };
+  const covered = ["includes", "excludes"].every(part => raw.collectedEndpoints.some(endpoint => endpoint.split("?")[0] === `/policies/permissionGrantPolicies/${encodeURIComponent(record.id)}/${part}`) && !raw.skippedEndpoints.some(endpoint => endpoint.split("?")[0] === `/policies/permissionGrantPolicies/${encodeURIComponent(record.id)}/${part}`));
+  return { id: record.id, tenantId: raw.tenantId, kind: "policy", label: record.displayName, description: record.description?.trim() || "Permission grant policy (consent policy) collected from Microsoft Graph.", ownerIds: [], metadata: { policyType: "permissionGrant", includeCount: includes.length, excludeCount: excludes.length, permissionClassifications: unique(includes.map((item) => item.record.permissionClassification).filter((item): item is string => Boolean(item))).join(", ") || "none", permissionTypes: unique(includes.map((item) => item.record.permissionType).filter((item): item is string => Boolean(item))).join(", ") || "none", verifiedPublishersOnly: includes.length > 0 && includes.every((item) => item.record.clientApplicationsFromVerifiedPublisherOnly === true), coverage: covered ? "complete" : "partial" }, risk: { level: !covered ? "review" : record.id === "microsoft-user-default-legacy" ? "high" : "low", reason: !covered ? "Consent conditions are unavailable or incomplete; zero collected conditions is not assurance." : record.id === "microsoft-user-default-legacy" ? "This built-in policy permits broad user consent when assigned." : "Consent policy conditions require contextual review." } };
 }
 
 function unresolvedPermissionGrantPolicyNode(id: string, tenantId: string): DirectoryNode {
@@ -326,7 +332,7 @@ function policyEdges(raw: RawTenantScan, nodes: Map<string, DirectoryNode>): Rel
   return (raw.conditionalAccessPolicies ?? []).flatMap(({ record, endpoint }) => {
     // Stryker disable next-line ArrayDeclaration: a seeded id matches no collected object, so it is dropped by the `nodes.has` test below.
     const ids = [...(record.conditions?.users?.includeUsers ?? []), ...(record.conditions?.users?.includeGroups ?? []), ...(record.conditions?.applications?.includeApplications ?? []).map((id) => appObjectByAppId.get(id) ?? id)].filter((id) => !["All", "None", "GuestsOrExternalUsers", "Office365"].includes(id));
-    return unique(ids).flatMap((id) => nodes.has(id) ? [{ id: stableId("policy", `${id}:${record.id}`), tenantId: raw.tenantId, type: "GOVERNED_BY" as const, sourceId: id, targetId: record.id, plainLabel: "Governed by", permissions: record.grantControls?.builtInControls ?? [], evidence: { configured: true, observed: null, scannedAt: raw.scannedAt, sourceEndpoint: endpoint, sourceRecordIds: [record.id], sourceObjectId: id, targetObjectId: record.id, completeness: "complete" as const } }] : []);
+    return unique(ids).flatMap((id) => nodes.has(id) ? [{ id: stableId("policy", `${id}:${record.id}`), tenantId: raw.tenantId, type: "GOVERNED_BY" as const, sourceId: id, targetId: record.id, plainLabel: "Included by policy (applicability unknown)", permissions: record.grantControls?.builtInControls ?? [], evidence: { configured: true, observed: null, scannedAt: raw.scannedAt, sourceEndpoint: endpoint, sourceRecordIds: [record.id], sourceObjectId: id, targetObjectId: record.id, completeness: "partial" as const } }] : []);
   });
 }
 
@@ -334,7 +340,7 @@ function consentPolicyEdges(raw: RawTenantScan, nodes: Map<string, DirectoryNode
   return (raw.authorizationPolicies ?? []).flatMap(({ record, endpoint }) => (record.defaultUserRolePermissions?.permissionGrantPoliciesAssigned ?? []).flatMap((assignment) => {
     const policyId = consentPolicyId(assignment);
     const target = nodes.get(policyId)!;
-    const resolved = target.metadata?.coverage !== "unresolved";
+    const resolved = target.metadata?.coverage === "complete";
     return [{ id: stableId("consent-policy", `${record.id}:${policyId}`), tenantId: raw.tenantId, type: "ASSIGNS_CONSENT_POLICY" as const, sourceId: record.id, targetId: policyId, plainLabel: "Assigns consent policy", permissions: [], evidence: { configured: true, observed: null, scannedAt: raw.scannedAt, sourceEndpoint: endpoint, sourceRecordIds: [record.id, policyId], sourceObjectId: record.id, targetObjectId: policyId, completeness: resolved ? "complete" as const : "unresolved" as const } }];
   }));
 }
@@ -347,14 +353,16 @@ function consentPolicyId(assignment: string): string {
 function activityEdges(raw: RawTenantScan, nodes: Map<string, DirectoryNode>): RelationshipEdge[] {
   return (raw.signIns ?? []).flatMap(({ record, endpoint }) => {
     if (record.status?.errorCode !== 0) return [];
-    if (!record.servicePrincipalId || !record.resourceServicePrincipalId) return [];
-    ensureMissingTarget(nodes, record.servicePrincipalId, record.appDisplayName, raw.tenantId);
-    ensureMissingTarget(nodes, record.resourceServicePrincipalId, record.resourceDisplayName, raw.tenantId);
-    return [{ id: stableId("activity", record.id), tenantId: raw.tenantId, type: "OBSERVED_CALL" as const, sourceId: record.servicePrincipalId, targetId: record.resourceServicePrincipalId, plainLabel: "Called recently", permissions: [], evidence: { configured: false, observed: { lastSeenAt: record.createdDateTime, windowStartsAt: new Date(new Date(raw.scannedAt).getTime() - 30 * 86_400_000).toISOString() }, scannedAt: raw.scannedAt, sourceEndpoint: endpoint, sourceRecordIds: [record.id], sourceObjectId: record.servicePrincipalId, targetObjectId: record.resourceServicePrincipalId, completeness: "complete" as const } }];
+    const sourceId = record.servicePrincipalId ?? raw.servicePrincipals.find(item => item.record.appId === record.appId)?.record.id;
+    const targetId = record.resourceServicePrincipalId ?? raw.servicePrincipals.find(item => item.record.appId === record.resourceId || item.record.id === record.resourceId)?.record.id;
+    if (!sourceId || !targetId) return [];
+    ensureMissingTarget(nodes, sourceId, record.appDisplayName, raw.tenantId);
+    ensureMissingTarget(nodes, targetId, record.resourceDisplayName, raw.tenantId);
+    return [{ id: stableId("activity", record.id), tenantId: raw.tenantId, type: "OBSERVED_CALL" as const, sourceId, targetId, plainLabel: "Successful sign-in to resource", permissions: [], evidence: { configured: false, observed: { lastSeenAt: record.createdDateTime, windowStartsAt: new Date(new Date(raw.scannedAt).getTime() - 30 * 86_400_000).toISOString() }, scannedAt: raw.scannedAt, sourceEndpoint: endpoint, sourceRecordIds: [record.id], sourceObjectId: sourceId, targetObjectId: targetId, completeness: "complete" as const } }];
   });
 }
 
-function applicationNode(record: GraphApplication, raw: RawTenantScan, ownerIds: string[]): DirectoryNode {
+function applicationNode(record: GraphApplication, raw: RawTenantScan, ownerIds: string[], endpoint: string): DirectoryNode {
   return {
     id: record.id,
     tenantId: raw.tenantId,
@@ -363,13 +371,17 @@ function applicationNode(record: GraphApplication, raw: RawTenantScan, ownerIds:
     description: "Reusable application blueprint (app registration) collected from Microsoft Graph.",
     appId: record.appId,
     publisher: record.publisherDomain ?? undefined,
+    sourceEndpoint: endpoint,
+    applicationProfile: { signInAudience: record.signInAudience ?? null, verifiedPublisherId: record.verifiedPublisher?.verifiedPublisherId ?? null, verifiedPublisherName: record.verifiedPublisher?.displayName ?? null },
+    requestedPermissions: record.requiredResourceAccess?.flatMap(resource => resource.resourceAccess.map(permission => ({ resourceAppId: resource.resourceAppId, permissionId: permission.id, kind: permission.type === "Role" ? "application" as const : "delegated" as const }))),
+    credentials: credentialInventory(record, endpoint),
     ownerIds,
     credential: credentialState([...record.passwordCredentials, ...record.keyCredentials], raw.scannedAt),
     risk: entityRisk(ownerIds, [...record.passwordCredentials, ...record.keyCredentials], raw.scannedAt),
   };
 }
 
-function servicePrincipalNode(record: GraphServicePrincipal, raw: RawTenantScan, ownerIds: string[]): DirectoryNode {
+function servicePrincipalNode(record: GraphServicePrincipal, raw: RawTenantScan, ownerIds: string[], endpoint: string): DirectoryNode {
   const managedIdentity = record.servicePrincipalType?.toLocaleLowerCase() === "managedidentity";
   const ownershipExpected = managedIdentity || raw.applications.some(({ record: application }) => application.appId === record.appId);
   const credentials = [...record.passwordCredentials, ...record.keyCredentials];
@@ -381,11 +393,22 @@ function servicePrincipalNode(record: GraphServicePrincipal, raw: RawTenantScan,
     description: record.servicePrincipalType?.toLocaleLowerCase() === "managedidentity" ? "Managed workload identity collected from Microsoft Graph." : "Tenant-local application identity (service principal) collected from Microsoft Graph.",
     appId: record.appId,
     publisher: record.publisherName ?? undefined,
+    sourceEndpoint: endpoint,
+    applicationProfile: { signInAudience: record.signInAudience ?? null, verifiedPublisherId: record.verifiedPublisher?.verifiedPublisherId ?? null, verifiedPublisherName: record.verifiedPublisher?.displayName ?? null, accountEnabled: record.accountEnabled ?? null, assignmentRequired: record.appRoleAssignmentRequired ?? null, homeTenantId: record.appOwnerOrganizationId ?? null, preferredSsoMode: record.preferredSingleSignOnMode ?? null },
+    permissionDefinitions: [...record.appRoles.map(role => ({ id: role.id, value: role.value || role.displayName || role.id, kind: "application" as const })), ...(record.oauth2PermissionScopes ?? []).map(scope => ({ id: scope.id, value: scope.value || scope.id, kind: "delegated" as const }))],
+    credentials: credentialInventory(record, endpoint),
     metadata: { servicePrincipalType: record.servicePrincipalType ?? "Application", ownershipExpected },
     ownerIds,
     credential: credentialState(credentials, raw.scannedAt),
     risk: ownershipExpected ? entityRisk(ownerIds, credentials, raw.scannedAt) : { level: "low", reason: "This tenant-local enterprise application is publisher-managed; a local owner is not expected." },
   };
+}
+
+function credentialInventory(record: GraphApplication | GraphServicePrincipal, endpoint: string): NonNullable<DirectoryNode["credentials"]> {
+  return [
+    ...record.passwordCredentials.map(item => ({ item, kind: "password" as const })),
+    ...record.keyCredentials.map(item => ({ item, kind: "certificate" as const })),
+  ].map(({ item, kind }) => ({ id: item.keyId, kind, label: item.displayName ?? null, startsAt: item.startDateTime ?? null, expiresAt: item.endDateTime ?? null, sourceEndpoint: endpoint }));
 }
 
 function credentialState(credentials: GraphCredentialMetadata[], scannedAt: string): NonNullable<DirectoryNode["credential"]> {
@@ -397,8 +420,8 @@ function credentialState(credentials: GraphCredentialMetadata[], scannedAt: stri
     .sort((a, b) => a.getTime() - b.getTime());
   // Stryker disable next-line ConditionalExpression: no credentials also means no expirations, so the second test already covers this one.
   if (credentials.length === 0 || expirations.length === 0) return { status: "none", expiresAt: null };
-  const next = expirations[0]!;
   const scanTime = new Date(scannedAt).getTime();
+  const next = expirations.find(expiry => expiry.getTime() > scanTime) ?? expirations[0]!;
   const remaining = next.getTime() - scanTime;
   if (remaining <= 0) return { status: "expired", expiresAt: next.toISOString() };
   if (remaining <= 90 * 24 * 60 * 60 * 1_000) return { status: "expiring", expiresAt: next.toISOString() };
@@ -532,8 +555,9 @@ function assignmentEdges(raw: RawTenantScan, nodes: Map<string, DirectoryNode>):
     const resource = services.get(record.resourceId);
     // Stryker disable next-line ArrayDeclaration: a seeded entry indexes under an undefined id, which no assignment can look up.
     const roleIndex = new Map((resource?.appRoles ?? []).map((role) => [role.id, role]));
-    const permissions = unique(assignments.map(({ record: item }) => roleIndex.get(item.appRoleId)?.value || roleIndex.get(item.appRoleId)?.displayName || `Unresolved role ${item.appRoleId}`));
-    const unresolved = !resource || assignments.some(({ record: item }) => !roleIndex.has(item.appRoleId));
+    const isDefaultAssignment = (id: string) => id === "00000000-0000-0000-0000-000000000000" && resource?.appRolesCollected === true && resource.appRoles.length === 0;
+    const permissions = unique(assignments.map(({ record: item }) => isDefaultAssignment(item.appRoleId) ? "Default access (no specific app role)" : roleIndex.get(item.appRoleId)?.value || roleIndex.get(item.appRoleId)?.displayName || `Unresolved role ${item.appRoleId}`));
+    const unresolved = !resource || assignments.some(({ record: item }) => !roleIndex.has(item.appRoleId) && !isDefaultAssignment(item.appRoleId));
     const type: RelationshipType = record.principalType.toLocaleLowerCase() === "serviceprincipal" ? "CAN_CALL_AS_APP" : "ASSIGNED_TO";
     return {
       id: stableId("assignment", key),
@@ -543,6 +567,7 @@ function assignmentEdges(raw: RawTenantScan, nodes: Map<string, DirectoryNode>):
       targetId: record.resourceId,
       plainLabel: type === "CAN_CALL_AS_APP" ? "Can call" : "Assigned to use",
       permissions,
+      permissionIds: unique(assignments.map(({ record: item }) => item.appRoleId)),
       evidence: {
         configured: true,
         observed: null,
@@ -567,6 +592,7 @@ function delegatedGrantEdges(raw: RawTenantScan, nodes: Map<string, DirectoryNod
       id: stableId("delegated", record.id),
       tenantId: raw.tenantId,
       type: "CAN_CALL_DELEGATED",
+      consent: { audience: record.consentType === "AllPrincipals" ? "all-users" : record.consentType === "Principal" ? "single-user" : "unknown", principalId: record.principalId ?? null },
       sourceId: record.clientId,
       targetId: record.resourceId,
       plainLabel: "Can call with a signed-in person",

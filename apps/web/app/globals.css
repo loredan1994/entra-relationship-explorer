@@ -658,3 +658,28 @@ button, a, input { -webkit-tap-highlight-color: transparent; }
 @media (max-width: 700px) {
   .grant-row-head { flex-direction: column; gap: 8px; }
 }
+
+/* Investigation tools reuse the shared palette, panels and typography. */
+.investigation-tabs { display:flex; flex-wrap:wrap; gap:8px; margin:20px 0; }
+.investigation-tabs a { padding:10px 14px; border:1px solid var(--line-light); border-radius:8px; }
+.investigation-tabs a[aria-current="page"] { background:var(--surface-soft); font-weight:700; }
+.investigation-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,360px),1fr)); gap:16px; }
+.investigation-card { padding:24px; min-width:0; }
+.investigation-card p, .investigation-card dd { overflow-wrap:anywhere; }
+.investigation-card code { overflow-wrap:anywhere; white-space:pre-wrap; }
+.investigation-card details code { display:block; margin:8px 0; }
+.investigation-card dl { display:grid; gap:6px; margin:16px 0; }
+.investigation-card dt { font-weight:600; }
+.investigation-card dd { margin:0 0 8px; }
+.investigation-card h3 { margin:16px 0 8px; }
+.investigation-card th, .investigation-card td { padding:12px; text-align:left; vertical-align:top; border-bottom:1px solid var(--line-light); }
+.investigation-card table { width:100%; border-collapse:collapse; }
+.investigation-card .table-scroll { overflow:auto; }
+.investigation-search { display:flex; flex-wrap:wrap; align-items:center; gap:12px; margin:20px 0; }
+.investigation-search input { min-width:180px; padding:10px; border:1px solid var(--line-light); border-radius:6px; }
+.scenario-choices { max-height:420px; overflow:auto; margin:16px 0; }
+.scenario-choices label { display:flex; align-items:flex-start; gap:12px; padding:14px 0; border-bottom:1px solid var(--line-light); }
+.credential-list { padding-left:20px; }
+.review-panel fieldset { border:0; padding:0; margin:0; min-width:0; }
+
+.rule-laboratory textarea { width: 100%; font-family: var(--font-mono); resize: vertical; }

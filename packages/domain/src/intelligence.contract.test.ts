@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { analyzeTenantIntelligence, type IamFinding } from "./intelligence";
-import { edge, node, snapshot } from "./test-support";
+import { edge, node, snapshot, syntheticWorkloadActivity } from "./test-support";
 import type { DirectoryNode, TenantSnapshot } from "./types";
 
 const graph = () => node({ id: "sp-graph", kind: "servicePrincipal", label: "Microsoft Graph" });
@@ -27,7 +27,7 @@ function richSnapshot(): TenantSnapshot {
       edge("ELIGIBLE_FOR_ROLE", person, role),
     ],
     {
-      completion: {
+      completion: { collectors: syntheticWorkloadActivity,
         status: "partial",
         collectedEndpoints: ["/applications", "/servicePrincipals", "/auditLogs/signIns"],
         skippedEndpoints: ["/identity/conditionalAccess/policies"],
@@ -216,7 +216,7 @@ describe("path uncertainty", () => {
       evidence: options.observed ? { observed: { lastSeenAt: "2026-08-20T00:00:00.000Z", windowStartsAt: "2026-07-21T00:00:00.000Z" } } : {},
     });
     const snap = snapshot([origin, api], [call], options.partial ? {
-      completion: { status: "partial", collectedEndpoints: [], skippedEndpoints: [], errors: ["throttled"] },
+      completion: { collectors: syntheticWorkloadActivity, status: "partial", collectedEndpoints: [], skippedEndpoints: [], errors: ["throttled"] },
     } : {});
     return analyzeTenantIntelligence(snap).paths[0]!;
   }
@@ -339,7 +339,7 @@ describe("finding provenance", () => {
       ],
       {
         id: "snapshot-fixed",
-        completion: {
+        completion: { collectors: syntheticWorkloadActivity,
           status: "partial",
           collectedEndpoints: ["/applications", "/auditLogs/signIns?$top=250"],
           skippedEndpoints: ["/identity/conditionalAccess/policies"],
@@ -479,7 +479,7 @@ describe("which objects raise which finding", () => {
 
   it("raises a coverage finding for a recorded error even when nothing was skipped", () => {
     const withError = snapshot([], [], {
-      completion: { status: "complete", collectedEndpoints: ["/applications"], skippedEndpoints: [], errors: ["/applications: throttled"] },
+      completion: { collectors: syntheticWorkloadActivity, status: "complete", collectedEndpoints: ["/applications"], skippedEndpoints: [], errors: ["/applications: throttled"] },
     });
     const finding = analyzeTenantIntelligence(withError).findings.find((item) => item.category === "coverage")!;
     expect(finding.severity).toBe("low");

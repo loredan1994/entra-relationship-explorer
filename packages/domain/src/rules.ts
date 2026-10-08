@@ -237,7 +237,6 @@ function stableId(ruleId: EntraRuleId, parts: string[]): string {
   const value = `${ruleId}:${parts.join(":")}`;
   let hash = 2166136261;
   for (let index = 0; index < value.length; index += 1) { hash ^= value.charCodeAt(index); hash = Math.imul(hash, 16777619); }
-  // Stryker disable next-line StringLiteral: the padding character is observable only for a short hash; all durable rule fixtures currently exercise eight-digit hashes.
   return `finding-${ruleId.toLocaleLowerCase()}-${(hash >>> 0).toString(16).padStart(8, "0")}`;
 }
 

@@ -13,3 +13,15 @@ coverage
 exports
 snapshots
 tenant-data
+
+# Local verification outputs and tool sandboxes are not runtime assets.
+**/coverage
+**/test-results
+**/playwright-report
+**/reports
+**/.stryker-tmp
+**/stryker-incremental.json
+**/stryker.log
+**/*.tsbuildinfo
+quality-reports
+.gstack

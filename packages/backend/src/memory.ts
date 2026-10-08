@@ -25,6 +25,24 @@ export class MemoryBackend implements Backend {
   async migrate(): Promise<void> {}
   async health(): Promise<BackendHealth> { return { ok: true, database: "memory" }; }
 
+  async pruneExpiredData(tenantId: string, retainAfter: Date): Promise<void> {
+  // Stryker disable next-line ArrayDeclaration: a seeded string has no matching ID or finite scannedAt and is discarded by the retention predicate.
+    const retained = (this.snapshots.get(tenantId) ?? []).filter(s => Date.parse(s.scannedAt) >= retainAfter.getTime());
+    this.snapshots.set(tenantId, retained);
+    const ids = new Set(retained.map(s => s.id));
+    for (const [key, review] of this.threatReviews) if (review.tenantId === tenantId && !ids.has(review.snapshotId)) this.threatReviews.delete(key);
+    for (const job of this.jobs.values()) if (job.tenantId === tenantId && job.snapshotId && !ids.has(job.snapshotId)) job.snapshotId = null;
+    for (const [id, flow] of this.flows) if (flow.tenantId === tenantId && flow.expiresAt <= Date.now()) this.flows.delete(id);
+    for (const [id, session] of this.sessions) if (session.tenantId === tenantId && session.sessionExpiresAt <= Date.now()) this.sessions.delete(id);
+  }
+
+  async heartbeatJob(id: string, workerId: string): Promise<boolean> {
+    const job = this.jobs.get(id);
+    if (!job || job.workerId !== workerId || !["running", "cancel_requested"].includes(job.status)) return false;
+    job.updatedAt = new Date().toISOString();
+    return true;
+  }
+
   async createAuthFlow(flow: DurableAuthFlow): Promise<void> { this.flows.set(flow.id, copy(flow)); }
 
   async consumeAuthFlow(id: string, tenantId: string, state: string): Promise<DurableAuthFlow | null> {
@@ -163,10 +181,11 @@ export class MemoryBackend implements Backend {
   async isScanCancellationRequested(id: string, workerId: string): Promise<boolean> { const job = this.jobs.get(id); return job?.workerId === workerId && job.status === "cancel_requested"; }
   async cancelJob(id: string, workerId: string): Promise<void> { const job = this.jobs.get(id); if (!job || job.workerId !== workerId || job.status !== "cancel_requested") throw new Error("The scan job is not cancellable by this worker."); job.status = "cancelled"; job.detail = "Scan cancelled safely; no partial snapshot was published"; job.finishedAt = new Date().toISOString(); job.updatedAt = job.finishedAt; job.workerId = null; this.scanCheckpoints.delete(id); }
   async getScanCheckpoint(id: string, tenantId: string): Promise<ScanCheckpoint | null> { const value = this.scanCheckpoints.get(id); return value?.tenantId === tenantId ? copy(value) : null; }
-  async saveScanCheckpoint(checkpoint: ScanCheckpoint, workerId: string): Promise<void> { this.ownedRunningJob(checkpoint.jobId, workerId); this.scanCheckpoints.set(checkpoint.jobId, { ...copy(checkpoint), updatedAt: new Date().toISOString() }); }
+  async saveScanCheckpoint(checkpoint: ScanCheckpoint, workerId: string): Promise<void> { const job = this.ownedRunningJob(checkpoint.jobId, workerId); if (checkpoint.tenantId !== job.tenantId) throw new Error("Checkpoint and job tenant boundaries do not match."); this.scanCheckpoints.set(checkpoint.jobId, { ...copy(checkpoint), updatedAt: new Date().toISOString() }); }
 
   async recentSnapshots(tenantId: string, limit = 20): Promise<TenantSnapshot[]> {
-    return copy((this.snapshots.get(tenantId) ?? []).slice(0, Math.max(1, Math.min(limit, 100))));
+  // Stryker disable next-line ArrayDeclaration: a seeded string has no matching ID or finite scannedAt and is discarded by the retention predicate.
+    return copy((this.snapshots.get(tenantId) ?? []).filter(s => Date.parse(s.scannedAt) >= Date.now() - 30 * 86_400_000).slice(0, Math.max(1, Math.min(limit, 100))));
   }
 
   async recordAccess(tenantId: string, sessionId: string | null, action: string, resourceType: string, resourceId?: string): Promise<void> {
@@ -177,12 +196,14 @@ export class MemoryBackend implements Backend {
     const bounded = Math.max(1, Math.min(limit, 100));
     return copy(this.accessEvents.filter((event) => event.tenantId === tenantId).sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, bounded));
   }
-  async getThreatReview(tenantId: string, snapshotId: string, findingId: string): Promise<ThreatReview | null> { const value = this.threatReviews.get(`${tenantId}:${snapshotId}:${findingId}`); return value ? copy(value) : null; }
+  // Stryker disable next-line ArrayDeclaration: a seeded string has no matching ID or finite scannedAt and is discarded by the retention predicate.
+  async getThreatReview(tenantId: string, snapshotId: string, findingId: string): Promise<ThreatReview | null> { const retained = (this.snapshots.get(tenantId) ?? []).some(s => s.id === snapshotId && Date.parse(s.scannedAt) >= Date.now() - 30 * 86_400_000); const value = retained ? this.threatReviews.get(`${tenantId}:${snapshotId}:${findingId}`) : null; return value ? copy(value) : null; }
   async priorThreatReviews(tenantId: string, currentSnapshotId: string, findingIds: string[]): Promise<ThreatReview[]> {
-    const history = this.snapshots.get(tenantId) ?? [];
+  // Stryker disable next-line ArrayDeclaration: a seeded string has no matching ID or finite scannedAt and is discarded by the retention predicate.
+    const history = (this.snapshots.get(tenantId) ?? []).filter(s => Date.parse(s.scannedAt) >= Date.now() - 30 * 86_400_000);
     const currentIndex = history.findIndex((snapshot) => snapshot.id === currentSnapshotId);
-    if (currentIndex < 0 || findingIds.length === 0) return [];
-    const wanted = new Set(findingIds);
+    if (currentIndex < 0) return [];
+    const wanted = new Set([...new Set(findingIds)].slice(0, 5_000));
     const found = new Map<string, ThreatReview>();
     for (const snapshot of history.slice(currentIndex + 1)) {
       for (const findingId of wanted) {
@@ -193,7 +214,17 @@ export class MemoryBackend implements Backend {
     }
     return copy([...found.values()]);
   }
-  async upsertThreatReview(review: ThreatReview, sessionId: string | null): Promise<ThreatReview> { const value = { ...copy(review), updatedAt: new Date().toISOString() }; this.threatReviews.set(`${value.tenantId}:${value.snapshotId}:${value.findingId}`, value); await this.recordAccess(value.tenantId, sessionId, "update", "threat_review", value.findingId); return copy(value); }
+  async upsertThreatReview(review: ThreatReview, sessionId: string | null, expectedRevision?: string | null): Promise<ThreatReview> {
+    const key = `${review.tenantId}:${review.snapshotId}:${review.findingId}`;
+  // Stryker disable next-line ArrayDeclaration: a seeded string has no matching ID or finite scannedAt and is discarded by the retention predicate.
+    if (!(this.snapshots.get(review.tenantId) ?? []).some(s => s.id === review.snapshotId && Date.parse(s.scannedAt) >= Date.now() - 30 * 86400000)) throw new Error("Review conflict: the snapshot expired or is unavailable.");
+    const existing = this.threatReviews.get(key);
+    if (expectedRevision !== undefined && (existing ? existing.revision : null) !== expectedRevision) throw new Error("Review conflict: another decision was saved. Reload before saving.");
+    const value = { ...copy(review), revision: randomUUID(), updatedAt: new Date().toISOString() };
+    this.threatReviews.set(key, value);
+    await this.recordAccess(value.tenantId, sessionId, "update", "threat_review", value.findingId);
+    return copy(value);
+  }
   async close(): Promise<void> {}
 
   private ownedRunningJob(id: string, workerId: string): ScanJob {

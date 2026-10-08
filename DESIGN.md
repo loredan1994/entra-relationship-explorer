@@ -78,7 +78,7 @@ Color never carries meaning alone. Every state also has a label, icon, shape, or
 | User/group/device → administrative unit | Solid arrow | “In administrative unit” |
 | Principal → directory role | Solid arrow | “Active in role” / “Eligible for role” |
 | Authorization policy → permission-grant policy | Solid arrow | “Assigns consent policy” |
-| Observed activity | Animated-looking double line, static in reduced motion | “Called recently” |
+| Observed activity | Animated-looking double line, static in reduced motion | “Successful sign-in to resource” |
 
 ## Core components
 

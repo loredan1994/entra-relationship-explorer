@@ -1,4 +1,6 @@
 import { GraphRequestError, ReadOnlyGraphClient } from "./client";
+import { recordStageCoverage } from "./coverage";
+import type { DirectoryAuditEvent } from "@entra-explorer/domain";
 import type {
   GraphAppRoleAssignment,
   GraphApplication,
@@ -33,6 +35,7 @@ export interface ScanTenantOptions {
   onProgress?: (event: ScanProgressEvent) => void;
   shouldCancel?: () => Promise<boolean>;
   enabledScopes?: readonly string[];
+  collectDirectoryAudits?: boolean;
   resumeFrom?: RawTenantScan;
   onCheckpoint?: (scan: RawTenantScan) => Promise<void>;
 }
@@ -50,8 +53,8 @@ interface ScanRun {
   readonly completedStages: ScanStage[];
 }
 
-const APPLICATIONS_ENDPOINT = "/applications?$select=id,appId,displayName,publisherDomain,appRoles,passwordCredentials,keyCredentials";
-const SERVICE_PRINCIPALS_ENDPOINT = "/servicePrincipals?$select=id,appId,displayName,publisherName,servicePrincipalType,appRoles,passwordCredentials,keyCredentials";
+const APPLICATIONS_ENDPOINT = "/applications?$select=id,appId,displayName,publisherDomain,appRoles,passwordCredentials,keyCredentials,requiredResourceAccess,signInAudience,verifiedPublisher";
+const SERVICE_PRINCIPALS_ENDPOINT = "/servicePrincipals?$select=id,appId,displayName,publisherName,servicePrincipalType,appRoles,passwordCredentials,keyCredentials,oauth2PermissionScopes,signInAudience,verifiedPublisher,accountEnabled,appRoleAssignmentRequired,appOwnerOrganizationId,preferredSingleSignOnMode";
 const SERVICE_PRINCIPAL_FEDERATION_ENDPOINT = "/servicePrincipals?$select=id,servicePrincipalType&$expand=federatedIdentityCredentials($select=id,name,issuer,subject,audiences,description)";
 const USERS_ENDPOINT = "/users?$select=id,displayName,userType,externalUserState";
 const GROUPS_ENDPOINT = "/groups?$select=id,displayName,securityEnabled";
@@ -102,6 +105,7 @@ export async function scanTenant(
   await runStage(run, "permissionGrantPolicies", () => collectPermissionGrantPolicies(run));
   await runStage(run, "crossTenantAccess", () => collectCrossTenantAccess(run));
   await runStage(run, "activity", () => collectActivity(run));
+  await runStage(run, "directoryAudits", () => collectDirectoryAudits(run));
 
   return scan;
 }
@@ -164,6 +168,10 @@ async function runStage(run: ScanRun, stage: ScanStage, work: () => Promise<void
 }
 
 async function completeStage(run: ScanRun, stage: ScanStage): Promise<void> {
+  recordStageCoverage(run.scan, stage, run.options.enabledScopes, run.options.collectDirectoryAudits);
+  // Every scanner stage has just recorded its collector coverage.
+  const coverage = run.scan.coverage!.find(c => c.id === stage)!;
+  coverage.limits = run.client.collectionLimits;
   run.completedStages.push(stage);
   await run.options.onCheckpoint?.(run.scan);
 }
@@ -365,9 +373,26 @@ async function collectActivity(run: ScanRun): Promise<void> {
   await ensureActive(run);
   const { scan } = run;
   const since = new Date(Date.parse(scan.scannedAt) - ACTIVITY_WINDOW_MS).toISOString();
-  const endpoint = `/auditLogs/signIns?$top=250&$filter=createdDateTime%20ge%20${encodeURIComponent(since)}&$select=id,createdDateTime,servicePrincipalId,resourceServicePrincipalId,appDisplayName,resourceDisplayName,status`;
+  const endpoint = `/auditLogs/signIns?$top=250&$filter=${encodeURIComponent(`createdDateTime ge ${since} and createdDateTime le ${scan.scannedAt}`)}&$select=id,createdDateTime,appId,resourceId,appDisplayName,resourceDisplayName,status`;
   scan.signIns!.push(...await read(run, endpoint, sanitizeSignIn));
   report(run, "activity", scan.signIns!.length, "Time-bounded sign-in activity collected");
+}
+
+async function collectDirectoryAudits(run: ScanRun): Promise<void> {
+  if (!run.options.collectDirectoryAudits) return;
+  const startsAt = new Date(Date.parse(run.scan.scannedAt) - ACTIVITY_WINDOW_MS).toISOString();
+  const endpoint = `/auditLogs/directoryAudits?$top=250&$filter=${encodeURIComponent(`activityDateTime ge ${startsAt} and activityDateTime le ${run.scan.scannedAt}`)}&$select=id,activityDateTime,activityDisplayName,result,initiatedBy,targetResources`;
+  const events = await read(run, endpoint, (record: Record<string, unknown>): DirectoryAuditEvent => {
+    const actor = record.initiatedBy as { user?: { id?: unknown }; app?: { servicePrincipalId?: unknown } } | undefined;
+    const targetIds = Array.isArray(record.targetResources) ? record.targetResources.flatMap((target: unknown) => {
+      const id = stringOrNull(recordValue(target)?.id);
+      return id ? [id] : [];
+    }) : [];
+    // Never retain modifiedProperties, credential values, UPNs, IPs or raw audit bodies.
+    return { id: requiredString(record.id), tenantId: run.scan.tenantId, occurredAt: requiredString(record.activityDateTime), activity: requiredString(record.activityDisplayName).slice(0, 300), result: stringOrNull(record.result) ?? "unknown", actor: { id: stringOrNull(actor?.user?.id ?? actor?.app?.servicePrincipalId), kind: actor?.user ? "user" : actor?.app ? "application" : "unknown" }, targetIds, sourceEndpoint: endpoint };
+  });
+  run.scan.auditEvents = events.map(e => e.record);
+  report(run, "directoryAudits", events.length, "Time-bounded directory change evidence collected");
 }
 
 async function collect<TInput, TOutput>(
@@ -430,18 +455,31 @@ function credentialMetadata(value: unknown): GraphCredentialMetadata[] {
 function sanitizeApplication(value: GraphApplication): GraphApplication {
   return {
     id: requiredString(value.id), appId: requiredString(value.appId), displayName: requiredString(value.displayName),
+    signInAudience: stringOrNull(value.signInAudience), verifiedPublisher: sanitizePublisher(value.verifiedPublisher),
     publisherDomain: stringOrNull(value.publisherDomain), appRoles: sanitizeRoles(value.appRoles),
     passwordCredentials: credentialMetadata(value.passwordCredentials), keyCredentials: credentialMetadata(value.keyCredentials),
+    requiredResourceAccess: Array.isArray(value.requiredResourceAccess) ? value.requiredResourceAccess.map(resource => ({ resourceAppId: requiredString(resource.resourceAppId), resourceAccess: Array.isArray(resource.resourceAccess) ? resource.resourceAccess.filter(p => p.type === "Role" || p.type === "Scope").map(p => ({ id: requiredString(p.id), type: p.type })) : [] })) : undefined,
   };
 }
 
 function sanitizeServicePrincipal(value: GraphServicePrincipal): GraphServicePrincipal {
   return {
     id: requiredString(value.id), appId: requiredString(value.appId), displayName: requiredString(value.displayName),
+    signInAudience: stringOrNull(value.signInAudience), verifiedPublisher: sanitizePublisher(value.verifiedPublisher),
+    accountEnabled: booleanOrNull(value.accountEnabled), appRoleAssignmentRequired: booleanOrNull(value.appRoleAssignmentRequired),
+    appOwnerOrganizationId: stringOrNull(value.appOwnerOrganizationId), preferredSingleSignOnMode: stringOrNull(value.preferredSingleSignOnMode),
     publisherName: stringOrNull(value.publisherName), servicePrincipalType: stringOrNull(value.servicePrincipalType),
+    appRolesCollected: Array.isArray(value.appRoles),
     appRoles: sanitizeRoles(value.appRoles), passwordCredentials: credentialMetadata(value.passwordCredentials),
     keyCredentials: credentialMetadata(value.keyCredentials),
+    oauth2PermissionScopes: Array.isArray(value.oauth2PermissionScopes) ? value.oauth2PermissionScopes.map(p => ({ id: requiredString(p.id), value: stringOrNull(p.value) })) : undefined,
   };
+}
+
+function sanitizePublisher(value: unknown): GraphServicePrincipal["verifiedPublisher"] {
+  const publisher = recordValue(value);
+  if (!publisher) return null;
+  return { verifiedPublisherId: stringOrNull(publisher.verifiedPublisherId), displayName: stringOrNull(publisher.displayName) };
 }
 
 function sanitizeFederatedIdentityCredential(value: GraphFederatedIdentityCredential): GraphFederatedIdentityCredential {
@@ -493,9 +531,9 @@ function sanitizeRoleSchedule(value: GraphRoleSchedule): GraphRoleSchedule { ret
 // truthy non-objects are strings, numbers, and true — none carry the properties read below, so the
 // type guards and the truthiness checks always agree.
 function sanitizeConditionalAccessPolicy(value: GraphConditionalAccessPolicy): GraphConditionalAccessPolicy { const conditions = value.conditions && typeof value.conditions === "object" ? value.conditions : {}; const users = conditions.users && typeof conditions.users === "object" ? conditions.users : {}; const applications = conditions.applications && typeof conditions.applications === "object" ? conditions.applications : {}; const strings = (item: unknown) => Array.isArray(item) ? item.filter((entry): entry is string => typeof entry === "string") : []; return { id: requiredString(value.id), displayName: requiredString(value.displayName), state: requiredString(value.state), conditions: { users: { includeUsers: strings(users.includeUsers), includeGroups: strings(users.includeGroups) }, applications: { includeApplications: strings(applications.includeApplications) } }, grantControls: value.grantControls && typeof value.grantControls === "object" ? { builtInControls: strings(value.grantControls.builtInControls), operator: stringOrNull(value.grantControls.operator) } : null }; }
-function sanitizeSignIn(value: GraphSignIn): GraphSignIn { return { id: requiredString(value.id), createdDateTime: requiredString(value.createdDateTime), servicePrincipalId: stringOrNull(value.servicePrincipalId), resourceServicePrincipalId: stringOrNull(value.resourceServicePrincipalId), appDisplayName: stringOrNull(value.appDisplayName), resourceDisplayName: stringOrNull(value.resourceDisplayName), status: value.status && typeof value.status === "object" ? { errorCode: typeof value.status.errorCode === "number" ? value.status.errorCode : null } : null }; }
+function sanitizeSignIn(value: GraphSignIn): GraphSignIn { return { id: requiredString(value.id), createdDateTime: requiredString(value.createdDateTime), appId: stringOrNull(value.appId), resourceId: stringOrNull(value.resourceId), appDisplayName: stringOrNull(value.appDisplayName), resourceDisplayName: stringOrNull(value.resourceDisplayName), status: value.status && typeof value.status === "object" ? { errorCode: typeof value.status.errorCode === "number" ? value.status.errorCode : null } : null }; }
 function sanitizeCrossTenantPartner(value: GraphCrossTenantPartner): GraphCrossTenantPartner { return { tenantId: requiredString(value.tenantId), inboundTrust: value.inboundTrust ? { isMfaAccepted: value.inboundTrust.isMfaAccepted === true, isCompliantDeviceAccepted: value.inboundTrust.isCompliantDeviceAccepted === true, isHybridAzureADJoinedDeviceAccepted: value.inboundTrust.isHybridAzureADJoinedDeviceAccepted === true } : null, isInMultiTenantOrganization: value.isInMultiTenantOrganization === true }; }
-function sanitizeAuthorizationPolicy(value: GraphAuthorizationPolicy): GraphAuthorizationPolicy { const permissions = value.defaultUserRolePermissions && typeof value.defaultUserRolePermissions === "object" ? value.defaultUserRolePermissions : {}; return { id: requiredString(value.id), displayName: requiredString(value.displayName), allowInvitesFrom: stringOrNull(value.allowInvitesFrom), allowEmailVerifiedUsersToJoinOrganization: booleanOrNull(value.allowEmailVerifiedUsersToJoinOrganization), blockMsolPowerShell: booleanOrNull(value.blockMsolPowerShell), defaultUserRolePermissions: { allowedToCreateApps: booleanOrNull(permissions.allowedToCreateApps), allowedToCreateSecurityGroups: booleanOrNull(permissions.allowedToCreateSecurityGroups), allowedToCreateTenants: booleanOrNull(permissions.allowedToCreateTenants), allowedToReadBitlockerKeysForOwnedDevice: booleanOrNull(permissions.allowedToReadBitlockerKeysForOwnedDevice), allowedToReadOtherUsers: booleanOrNull(permissions.allowedToReadOtherUsers), permissionGrantPoliciesAssigned: stringArray(permissions.permissionGrantPoliciesAssigned) } }; }
+function sanitizeAuthorizationPolicy(value: GraphAuthorizationPolicy): GraphAuthorizationPolicy { const permissions = recordValue(value.defaultUserRolePermissions) ?? {}; return { id: requiredString(value.id), displayName: requiredString(value.displayName), allowInvitesFrom: stringOrNull(value.allowInvitesFrom), allowEmailVerifiedUsersToJoinOrganization: booleanOrNull(value.allowEmailVerifiedUsersToJoinOrganization), blockMsolPowerShell: booleanOrNull(value.blockMsolPowerShell), defaultUserRolePermissions: { allowedToCreateApps: booleanOrNull(permissions.allowedToCreateApps), allowedToCreateSecurityGroups: booleanOrNull(permissions.allowedToCreateSecurityGroups), allowedToCreateTenants: booleanOrNull(permissions.allowedToCreateTenants), allowedToReadBitlockerKeysForOwnedDevice: booleanOrNull(permissions.allowedToReadBitlockerKeysForOwnedDevice), allowedToReadOtherUsers: booleanOrNull(permissions.allowedToReadOtherUsers), permissionGrantPoliciesAssigned: Array.isArray(permissions.permissionGrantPoliciesAssigned) ? stringArray(permissions.permissionGrantPoliciesAssigned) : undefined } }; }
 function sanitizePermissionGrantPolicy(value: GraphPermissionGrantPolicy): GraphPermissionGrantPolicy { return { id: requiredString(value.id), displayName: requiredString(value.displayName), description: stringOrNull(value.description) }; }
 function sanitizePermissionGrantConditionSet(value: GraphPermissionGrantConditionSet): GraphPermissionGrantConditionSet { return { id: requiredString(value.id), permissionClassification: stringOrNull(value.permissionClassification), permissionType: stringOrNull(value.permissionType), resourceApplication: stringOrNull(value.resourceApplication), permissions: stringArray(value.permissions), clientApplicationIds: stringArray(value.clientApplicationIds), clientApplicationTenantIds: stringArray(value.clientApplicationTenantIds), clientApplicationPublisherIds: stringArray(value.clientApplicationPublisherIds), clientApplicationsFromVerifiedPublisherOnly: booleanOrNull(value.clientApplicationsFromVerifiedPublisherOnly) }; }
 
@@ -514,3 +552,7 @@ function stringOrNull(value: unknown): string | null {
 
 function booleanOrNull(value: unknown): boolean | null { return typeof value === "boolean" ? value : null; }
 function stringArray(value: unknown): string[] { return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : []; }
+
+function recordValue(value: unknown): Record<string, unknown> | null {
+  return typeof value === "object" ? value as Record<string, unknown> | null : null;
+}

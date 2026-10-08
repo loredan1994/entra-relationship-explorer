@@ -214,7 +214,7 @@ describe("snapshot comparison", () => {
       { id: "after", scannedAt: "2026-08-02T00:00:00.000Z" },
     );
     const diff = compareSnapshots(base(), after);
-    expect(diff.counts).toEqual({ added: 2, removed: 2, changed: 1 });
+    expect(diff.counts).toEqual({ added: 2, removed: 2, changed: 1, unconfirmed: 0 });
     expect(diff.beforeSnapshotId).toBe("before");
     expect(diff.afterSnapshotId).toBe("after");
     expect(diff.tenantId).toBe(TENANT);
@@ -227,7 +227,7 @@ describe("snapshot comparison", () => {
     const after = snapshot([a, b], [edge("OWNS", a, b, same)], { id: "after", scannedAt: "2026-08-02T00:00:00.000Z" });
     const diff = compareSnapshots(before, after);
     expect(diff.changes).toEqual([]);
-    expect(diff.counts).toEqual({ added: 0, removed: 0, changed: 0 });
+    expect(diff.counts).toEqual({ added: 0, removed: 0, changed: 0, unconfirmed: 0 });
   });
 
   it("ignores owner and permission ordering, which Graph does not guarantee", () => {

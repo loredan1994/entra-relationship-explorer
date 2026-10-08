@@ -17,10 +17,13 @@
     "test:e2e": "pnpm --filter @entra-explorer/web test:e2e",
     "test:security": "pnpm --filter @entra-explorer/domain test && pnpm --filter @entra-explorer/graph test && pnpm --filter @entra-explorer/backend test && pnpm --filter @entra-explorer/web test:unit",
     "security:compose": "node scripts/validate-compose-security.mjs",
-    "verify": "pnpm security:compose && pnpm lint && pnpm typecheck && pnpm test && pnpm build && pnpm test:e2e",
+    "security:dependencies": "pnpm audit",
+    "verify": "pnpm security:compose && pnpm lint && pnpm typecheck && pnpm test && pnpm build && pnpm test:e2e && pnpm test:persistence",
     "test:coverage": "pnpm -r --if-present test:coverage",
     "test:mutation": "pnpm -r --workspace-concurrency=1 --if-present test:mutation",
-    "quality:crap": "pnpm test:coverage && node scripts/crap-report.mjs"
+    "quality:crap": "pnpm test:coverage && node scripts/crap-report.mjs",
+    "rule:lab": "pnpm --filter @entra-explorer/web exec node --import tsx ../../scripts/rule-lab.mts",
+    "test:persistence": "node scripts/persistence-tests.mjs"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",

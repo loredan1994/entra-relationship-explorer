@@ -208,7 +208,7 @@ describe("relationship wording", () => {
       signIns: [sourced({ id: "s-1", createdDateTime: "2026-08-20T09:00:00Z", servicePrincipalId: "sp-1", resourceServicePrincipalId: "sp-2", status: { errorCode: 0 } })],
       crossTenantPartners: [sourced(crossTenantPartner({ tenantId: PARTNER_TENANT }))],
     }));
-    expect(snapshot.edges.find((edge) => edge.type === "OBSERVED_CALL")?.plainLabel).toBe("Called recently");
+    expect(snapshot.edges.find((edge) => edge.type === "OBSERVED_CALL")?.plainLabel).toBe("Successful sign-in to resource");
     expect(snapshot.edges.find((edge) => edge.type === "CROSS_TENANT_ACCESS")?.plainLabel).toBe("Has partner access settings");
   });
 });
@@ -360,8 +360,8 @@ describe("edge identity and evidence", () => {
     ["MEMBER_OF", "member", "user-1", "group-1", "/groups/group-1/members", [], ["user-1", "group-1"], "complete", "Member of"],
     ["ACTIVE_IN_ROLE", "role", "user-1", "role-def-1", "/roleManagement/directory/roleAssignments", ["/"], ["ra-1"], "complete", "Active in role"],
     ["ELIGIBLE_FOR_ROLE", "role", "user-1", "role-def-1", "/roleManagement/directory/roleEligibilitySchedules", [], ["re-1"], "complete", "Eligible for role"],
-    ["GOVERNED_BY", "policy", "user-1", "policy-1", "/identity/conditionalAccess/policies", ["mfa"], ["policy-1"], "complete", "Governed by"],
-    ["OBSERVED_CALL", "activity", "sp-caller", "sp-api", "/auditLogs/signIns", [], ["signin-1"], "complete", "Called recently"],
+    ["GOVERNED_BY", "policy", "user-1", "policy-1", "/identity/conditionalAccess/policies", ["mfa"], ["policy-1"], "partial", "Included by policy (applicability unknown)"],
+    ["OBSERVED_CALL", "activity", "sp-caller", "sp-api", "/auditLogs/signIns", [], ["signin-1"], "complete", "Successful sign-in to resource"],
     ["CROSS_TENANT_ACCESS", "cross-tenant", `external-tenant:${PARTNER_TENANT}`, `cross-tenant-policy:${PARTNER_TENANT}`, "/policies/crossTenantAccessPolicy/partners", ["MFA"], [PARTNER_TENANT], "complete", "Has partner access settings"],
   ])("carries full provenance on a %s edge", (type, prefix, sourceId, targetId, endpoint, permissions, recordIds, completeness, plainLabel) => {
     const edge = edgeOf(type);

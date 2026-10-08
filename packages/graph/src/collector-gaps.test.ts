@@ -61,6 +61,7 @@ describe("new collector normalization", () => {
     const legacy = "ManagePermissionGrantsForSelf.microsoft-user-default-legacy";
     const snapshot = normalizeTenantScan(rawScan({
       authorizationPolicies: [sourced({ id: "authorizationPolicy", displayName: "Authorization policy", defaultUserRolePermissions: { permissionGrantPoliciesAssigned: [legacy] } }, "/policies/authorizationPolicy")],
+      collectedEndpoints: ["/policies/permissionGrantPolicies/microsoft-user-default-legacy/includes", "/policies/permissionGrantPolicies/microsoft-user-default-legacy/excludes"],
       permissionGrantPolicies: [sourced({ id: "microsoft-user-default-legacy", displayName: "Legacy user consent" })],
       permissionGrantPolicyIncludes: [{ ...sourced({ id: "include-1", permissionType: "delegated", permissions: ["all"] }), policyId: "microsoft-user-default-legacy" }],
     }));
@@ -100,6 +101,7 @@ describe("new collector normalization", () => {
         sourced({ id: "auth-empty", displayName: "Default authorization" }),
         sourced({ id: "auth-custom", displayName: "Custom authorization", allowInvitesFrom: "adminsAndGuestInviters", allowEmailVerifiedUsersToJoinOrganization: true, blockMsolPowerShell: false, defaultUserRolePermissions: { allowedToCreateApps: true, allowedToCreateSecurityGroups: false, allowedToCreateTenants: true, allowedToReadBitlockerKeysForOwnedDevice: false, allowedToReadOtherUsers: true, permissionGrantPoliciesAssigned: ["custom-policy"] } }),
       ],
+      collectedEndpoints: ["/policies/permissionGrantPolicies/custom-policy/includes", "/policies/permissionGrantPolicies/custom-policy/excludes"],
       permissionGrantPolicies: [sourced({ id: "custom-policy", displayName: "Custom consent", description: "Restricted policy" })],
       permissionGrantPolicyIncludes: [
         { ...sourced({ id: "include-1", permissionClassification: "low", permissionType: "delegated", clientApplicationsFromVerifiedPublisherOnly: true }), policyId: "custom-policy" },
@@ -121,7 +123,7 @@ describe("new collector normalization", () => {
     });
     expect(snapshot.nodes.find((node) => node.id === "nested-au")?.kind).toBe("administrativeUnit");
     expect(snapshot.nodes.find((node) => node.id === "directory-device")?.kind).toBe("device");
-    expect(snapshot.nodes.find((node) => node.id === "auth-empty")?.metadata?.userConsentState).toBe("disabled");
+    expect(snapshot.nodes.find((node) => node.id === "auth-empty")?.metadata?.userConsentState).toBe("unknown");
     expect(snapshot.nodes.find((node) => node.id === "auth-custom")).toEqual({
       id: "auth-custom", tenantId: TENANT, kind: "policy", label: "Custom authorization", description: "Tenant authorization policy collected from Microsoft Graph.", ownerIds: [],
       metadata: { policyType: "authorization", allowInvitesFrom: "adminsAndGuestInviters", emailVerifiedUsersCanJoin: true, blockMsolPowerShell: false, allowedToCreateApps: true, allowedToCreateSecurityGroups: false, allowedToCreateTenants: true, allowedToReadBitlockerKeysForOwnedDevice: false, allowedToReadOtherUsers: true, permissionGrantPoliciesAssigned: "custom-policy", userConsentState: "configured" },
