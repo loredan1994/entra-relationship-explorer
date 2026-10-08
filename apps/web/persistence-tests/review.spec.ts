@@ -29,7 +29,7 @@ test("two analysts cannot overwrite each other or save a stale decision onto a n
   const findingId = analyzeTenantIntelligence(initial).findings[0]!.id;
   await context.addCookies([{ name: "entra_explorer_session", value: sessionId, url: "http://127.0.0.1:3101", httpOnly: true, sameSite: "Lax" }]);
   const forbiddenCalls: string[] = [];
-  await context.route(/https:\/\/(graph\.microsoft\.com|login\.microsoftonline\.com)/, async route => { forbiddenCalls.push(route.request().url()); await route.abort(); });
+  await context.route(url => ["graph.microsoft.com", "login.microsoftonline.com"].includes(url.hostname), async route => { forbiddenCalls.push(route.request().url()); await route.abort(); });
   let release!: () => void;
   const pending = new Promise<void>(resolve => { release = resolve; });
   await page.route("**/api/v1/threat-reviews/**", async route => { if (route.request().method() === "GET") await pending; await route.continue(); });

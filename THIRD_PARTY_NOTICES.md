@@ -33,4 +33,6 @@ MITRE ATT&CK® is a registered trademark of The MITRE Corporation. Its inclusion
 
 ## Excluded components
 
+Next.js optional `sharp` and its `libvips` binaries are omitted from the resolved dependency graph through a scoped pnpm override. The application does not use image optimization, and `images.unoptimized` disables its endpoint. Reintroducing native image processing requires license review and updated notices; the dependency-review license policy is unchanged. See [pnpm dependency removal](https://pnpm.io/settings/dependency-resolution#overrides) and [Next.js unoptimized images](https://nextjs.org/docs/app/api-reference/components/image#unoptimized).
+
 No BloodHound, AzureHound, Maester test pack, Threat Dragon, Threagile, ZAP, Trivy, Gitleaks, Security Copilot, Sentinel, or IriusRisk code is embedded or redistributed in the application. AWS Threat Composer was evaluated as a conceptual reference only. MITRE Attack Flow is used solely as an Apache-2.0 interoperability specification through original serializer code.

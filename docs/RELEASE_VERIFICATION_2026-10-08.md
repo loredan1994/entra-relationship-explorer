@@ -12,13 +12,14 @@ The tenant cannot exercise every optional feature: group membership remains part
 
 ## Executed verification
 
-- Full `pnpm verify` passed: Compose security, ESLint, TypeScript, production build, 1,406 unit/contract/database tests, 46 desktop/mobile browser checks and two real PostgreSQL browser persistence flows. Two desktop cases are intentionally covered by the mobile project; the opt-in Graph live test is not part of the synthetic run.
-- The final coverage run passed **1,408 tests**: domain 552, Graph 419, backend 208 (including eight real PostgreSQL tests), web server 229. The two additional domain cases exercise standalone rule evaluation without prior evidence and policy-type validation.
+- Full `pnpm verify` passed: Compose security, ESLint, TypeScript, production build, **1,408 unit/contract/database tests and 50 browser checks** (48 desktop/mobile checks and two real PostgreSQL persistence flows). Two desktop cases are intentionally covered by the mobile project; the opt-in Graph live test is not part of the synthetic run.
+- Both the full verification and final coverage run passed: domain 552, Graph 419, backend 208 (including eight real PostgreSQL tests), web server 229. This includes standalone rule evaluation without prior evidence and policy-type validation.
 - Maintainability: **734 functions measured; zero above CRAP 30**. Permission reconciliation, collector coverage and rule-lab validation now pass without lowering the threshold.
 - Fresh release image built and restarted the existing local stack successfully, preserving encrypted history. A fresh GET-only worker scan completed with **1,522 objects, 1,100 relationships and 451 enterprise-application profiles**.
 - Independent Azure CLI verification: **19 GET requests, 5,136 comparisons, zero mismatches and zero unavailable reads**. All 17 registrations and 451 enterprise applications were compared; owner checks covered four of each kind, assignment checks covered four resources, and all 14 collected delegated grants were checked.
 - Read-only browser validation on the rebuilt image: **100 displayed field comparisons across 50 rendered identities**, HTTP 200, zero page errors, zero write requests, zero accessibility violations.
 - Current dependency audit: **zero known vulnerabilities** across runtime and development packages.
+- The unused Next.js image optimizer is disabled and its optional `sharp`/`libvips` packages are removed. Desktop/mobile and live checks return HTTP 404 for the endpoint; the final image runs as UID 65532 and contains no native image-processing packages. The dependency license policy remains unchanged.
 
 ## Scoped coverage
 

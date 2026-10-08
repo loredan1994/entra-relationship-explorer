@@ -52,6 +52,7 @@ Breaking changes are always called out under **Changed** with a migration note.
 
 ### Security
 
+- Disable the unused image-optimization endpoint and remove optional `sharp`/`libvips` binaries from the lockfile and runtime, preserving the existing dependency license gate.
 - All Microsoft Graph operations remain GET-only. New application fields use existing permissions; directory audits require an explicit opt-in under an existing read scope.
 - Updated dependency overrides and the lockfile to resolve the advisories found during verification. Tenant data, secret values and certificate material remain excluded from Git and evidence exports.
 

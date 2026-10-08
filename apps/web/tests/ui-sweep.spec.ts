@@ -101,3 +101,8 @@ test("new collector objects, policy subtypes, and role scope remain inspectable"
   await expect(inspector).toContainText("Authorization policy");
   await expect(inspector).toContainText("Permission grant policy (consent policy)");
 });
+
+test("the unused image optimization endpoint stays disabled", async ({ request }) => {
+  const response = await request.get("/_next/image?url=%2Ffavicon.ico&w=64&q=75");
+  expect(response.status()).toBe(404);
+});

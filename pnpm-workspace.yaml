@@ -2,6 +2,8 @@ packages:
   - "apps/*"
   - "packages/*"
 overrides:
+  # The app does not use Next image optimization; omit its optional native runtime.
+  "next>sharp": "-"
   qs: 6.16.0
 allowBuilds:
   esbuild: true

@@ -26,5 +26,8 @@
     { "name": "MITRE ATT&CK", "use": "Technique identifiers and names", "terms": "https://attack.mitre.org/resources/terms-of-use/", "endorsement": false },
     { "name": "MITRE Attack Flow", "use": "STIX 2.1 extension format", "terms": "https://github.com/center-for-threat-informed-defense/attack-flow/blob/main/LICENSE", "endorsement": false }
   ],
-  "excludedCopyleftFoundations": ["BloodHound", "AzureHound"]
+  "excludedCopyleftFoundations": ["BloodHound", "AzureHound"],
+  "buildExclusions": [
+    { "name": "sharp and @img/sharp-libvips-*", "reason": "Unused Next.js image optimization is disabled; optional native dependencies are removed with next>sharp override.", "policy": "Reintroduction requires license review and updated notices." }
+  ]
 }

@@ -21,7 +21,7 @@ New snapshot fields are optional for compatibility with retained encrypted snaps
 
 ## Verification completed
 
-- Full `pnpm verify` with an isolated PostgreSQL 17 database: **1,408 unit/contract/database tests passed** in the final coverage run, **48 browser checks passed** (46 desktop/mobile product checks plus two real PostgreSQL persistence flows). Full `pnpm verify` also passed; the final coverage run includes two additional rule guards.
+- Full `pnpm verify` with an isolated PostgreSQL 17 database: **1,408 unit/contract/database tests and 50 browser checks passed** (48 desktop/mobile checks plus two real PostgreSQL persistence flows). The final coverage run also passed all 1,408 tests.
 - The synthetic suite skips one optional real-Entra test; a separate owner-authorized live acceptance run passed. Two desktop-only skips cover behavior tested on the mobile project. Live tenant material remains outside Git.
 - Lint, TypeScript, production build, Compose isolation and `git diff --check` passed.
 - Rule-lab scaffold and replay were executed successfully without a tenant connection.
