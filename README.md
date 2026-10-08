@@ -102,12 +102,15 @@ For database and browser persistence tests, set `TEST_DATABASE_URL` to an isolat
 | Install, operate or upgrade | [Local operations](docs/LOCAL_OPERATIONS.md) · [Changelog](CHANGELOG.md) |
 | Data and authentication boundaries | [Security and privacy](docs/SECURITY_PRIVACY.md) · [Security reporting](SECURITY.md) |
 | Architecture and integration | [Architecture](docs/ARCHITECTURE.md) · [OpenAPI](docs/openapi.yaml) · [Research sources](docs/RESEARCH_NOTES.md) |
+| Proposed product direction | [Ten custom-engine features and market comparison](docs/CUSTOM_ENGINE_ROADMAP.md) — proposals, not released capabilities |
 | Submit a change | [Contributing](CONTRIBUTING.md) · [Code of conduct](CODE_OF_CONDUCT.md) · [Design system](DESIGN.md) |
 | Add an investigation rule | [Rule laboratory](docs/RULE_LAB.md) · [Rule catalog](docs/RULE_CATALOG.md) · [Fixture template](docs/RULE_TEMPLATE.md) |
 
 Diagrams: [relationship model](diagrams/entra-object-model.png), [local architecture](diagrams/system-architecture.png), [scan flow](diagrams/scan-flow.png). Editable Mermaid sources are beside each image.
 
 Contributions require behavioral tests, source evidence, tenant isolation and a signed-off commit. Never commit credentials or real tenant data. Report security defects through [SECURITY.md](SECURITY.md), not a public issue.
+
+The [dependency follow-up verification](docs/DEPENDENCY_FOLLOWUP_2026-10-08.md) records the SDK/toolchain migrations, real authentication checks and resolutions from the PR review.
 
 ## License
 

@@ -5,7 +5,13 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
+    ignore:
+      # Build, CI and production use Node 24. Move declarations with the runtime.
+      - dependency-name: "@types/node"
+        versions: [">=25"]
     groups:
+      vitest-toolchain:
+        patterns: ["vitest", "@vitest/*"]
       # One pull request per ecosystem area keeps review load sane on a
       # solo-maintained project. Security updates still arrive individually.
       development-dependencies:
@@ -32,5 +38,9 @@ updates:
     directory: "/"
     schedule:
       interval: weekly
+    ignore:
+      # A runtime-major migration must update build, distroless and CI together.
+      - dependency-name: "node"
+        versions: [">=25"]
     commit-message:
       prefix: "chore"

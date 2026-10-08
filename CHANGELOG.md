@@ -13,6 +13,7 @@ Breaking changes are always called out under **Changed** with a migration note.
 
 ### Added
 
+- Real MSAL integration contracts for PKCE, authorization-code exchange, cache restoration, refresh-token rotation and revoked refresh credentials using a synthetic network transport.
 - Question-based overview shortcuts and an in-app Guide covering investigation workflows, evidence meaning, local data handling and contributor tools; reorganized README and a dedicated operator user guide.
 
 - Investigation workspace with collector coverage, permission reconciliation, credential and federation review, local access scenarios, and a synthetic rule laboratory.
@@ -32,6 +33,8 @@ Breaking changes are always called out under **Changed** with a migration note.
 
 ### Changed
 
+- Upgrade MSAL Node to 6.0.0; align Vitest and its coverage provider at 5.0.3; update Playwright, lint tooling and Node 24 declarations. Update Cytoscape, tsx and PostgreSQL client patches, with matching dependency notices.
+- Update dependency review and pnpm setup actions; pin CodeQL initialization and analysis to the same 4.38.2 revision. Group future Vitest updates and keep Node runtime/type major updates coordinated.
 - **Review API migration:** review GET/PUT/POST requests require the displayed `snapshot` query parameter. PUT/POST require `expectedRevision` (`null` for a new decision, the loaded revision for an existing one). Stale snapshots and competing writes return HTTP 409. Update external API clients with the application.
 - The database adds a review `revision` column automatically during the existing startup migration. Existing encrypted records remain readable; legacy revisions use the empty-string value until the next save. Restart the web and worker services together after upgrading.
 - New snapshot metadata remains optional. Older scans display unknown coverage and unconfirmed differences until a fresh read-only scan supplies evidence.
@@ -44,6 +47,7 @@ Breaking changes are always called out under **Changed** with a migration note.
 
 ### Fixed
 
+- Browser verification always starts the current build on a dedicated port instead of silently reusing an older local preview server.
 - Keep future CodeQL action updates together to avoid incompatible `init`/`analyze` versions, and prevent repeated mutation-test summaries from exceeding GitHub's upload limit.
 
 - Prevent group membership and API access from being mistaken for control of application credentials; disclose bounded or incomplete path analysis.

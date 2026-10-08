@@ -16,15 +16,15 @@
   },
   "dependencies": {
     "@entra-explorer/domain": "workspace:*",
-    "pg": "8.23.0"
+    "pg": "8.23.1"
   },
   "devDependencies": {
     "@stryker-mutator/core": "^10.0.0",
     "@stryker-mutator/vitest-runner": "^10.0.0",
-    "@types/node": "24.3.0",
+    "@types/node": "24.19.1",
     "@types/pg": "8.23.1",
-    "@vitest/coverage-v8": "4.1.11",
+    "@vitest/coverage-v8": "5.0.3",
     "typescript": "5.9.2",
-    "vitest": "4.1.11"
+    "vitest": "5.0.3"
   }
 }

@@ -1,5 +1,7 @@
 # Open pull-request review — 8 October 2026
 
+This is the original review checkpoint. [The follow-up implementation and verification](DEPENDENCY_FOLLOWUP_2026-10-08.md) resolves the upgrade work after #42, including the regenerated CodeQL and production-patch PRs.
+
 All 15 open pull requests were reviewed: their proposed file diffs, dependency relationships, release information and hosted checks. Failed job logs were inspected. Recommendations below are relative to the investigation release in #42; existing green checks on older branches do not verify their combination with that release. This review did not merge, close, approve or post comments on dependency PRs.
 
 ## Findings that block merging unchanged

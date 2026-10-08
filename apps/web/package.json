@@ -15,27 +15,27 @@
     "test:mutation": "stryker run"
   },
   "dependencies": {
-    "@azure/msal-node": "5.6.0",
+    "@azure/msal-node": "6.0.0",
     "@entra-explorer/backend": "workspace:*",
     "@entra-explorer/domain": "workspace:*",
     "@entra-explorer/graph": "workspace:*",
-    "cytoscape": "3.34.1",
+    "cytoscape": "3.34.3",
     "next": "16.3.8",
     "react": "19.2.8",
     "react-dom": "19.2.8",
     "server-only": "0.0.1",
-    "tsx": "4.23.12"
+    "tsx": "4.23.15"
   },
   "devDependencies": {
     "@axe-core/playwright": "4.13.0",
-    "@playwright/test": "1.62.1",
+    "@playwright/test": "1.63.0",
     "@stryker-mutator/core": "^10.0.0",
     "@stryker-mutator/vitest-runner": "^10.0.0",
-    "@types/node": "24.3.0",
+    "@types/node": "24.19.1",
     "@types/react": "19.2.18",
     "@types/react-dom": "19.2.5",
-    "@vitest/coverage-v8": "4.1.11",
+    "@vitest/coverage-v8": "5.0.3",
     "typescript": "5.9.2",
-    "vitest": "4.1.11"
+    "vitest": "5.0.3"
   }
 }
