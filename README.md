@@ -36,6 +36,7 @@ Open [the overview](http://localhost:3000/overview), then **Guide** for a short 
 | What changed between scans? | Changes | Selectable retained snapshots, field differences and credential history |
 | What if a relationship were removed? | Investigations → What-if planner | Local path comparison and tenant/snapshot-bound review-plan import/export |
 | Which possible paths should we investigate? | Threat workspace | Bounded control paths, findings, lifecycle and saved review decisions |
+| Can I prove, test and plan configured access? | Evidence engine | Ten local workflows: proofs, access compilation, temporal paths, change planning, policy counterexamples, federation, rotation, evidence gaps, contracts and offline replay |
 | How can I contribute a tested rule? | Investigations → Rule laboratory | Synthetic declarative cases with positive and negative expectations |
 
 The [user guide](docs/USER_GUIDE.md) explains a complete investigation. The [investigation reference](docs/INVESTIGATIONS.md) documents collection bounds, optional audit context and edge cases.
@@ -89,7 +90,7 @@ pnpm quality:crap           # coverage and maintainability gate
 pnpm test:mutation --force --concurrency 2
 ```
 
-Run coverage and mutation checks sequentially. Mutation testing enforces a 95% floor per package; maintainability fails above CRAP 30. The [release verification report](docs/RELEASE_VERIFICATION_2026-10-08.md) records measured results, read-only Azure CLI comparisons and their limits.
+Run coverage and mutation checks sequentially. Mutation testing enforces a 95% floor per package; maintainability fails above CRAP 30. The [custom engine validation report](docs/CUSTOM_ENGINE_VALIDATION_2026-10-09.md) records the current tests, mutation scores, read-only Azure CLI comparisons and their limits. The [earlier release report](docs/RELEASE_VERIFICATION_2026-10-08.md) covers the investigation workspace.
 
 For database and browser persistence tests, set `TEST_DATABASE_URL` to an isolated loopback PostgreSQL database named `entra_review_test`. Without it, those tests explicitly skip. CI provisions this service and runs the full suite; [reproduction instructions](docs/INVESTIGATIONS.md#verification). No real tenant is needed for deterministic tests.
 
@@ -102,7 +103,7 @@ For database and browser persistence tests, set `TEST_DATABASE_URL` to an isolat
 | Install, operate or upgrade | [Local operations](docs/LOCAL_OPERATIONS.md) · [Changelog](CHANGELOG.md) |
 | Data and authentication boundaries | [Security and privacy](docs/SECURITY_PRIVACY.md) · [Security reporting](SECURITY.md) |
 | Architecture and integration | [Architecture](docs/ARCHITECTURE.md) · [OpenAPI](docs/openapi.yaml) · [Research sources](docs/RESEARCH_NOTES.md) |
-| Proposed product direction | [Ten custom-engine features and market comparison](docs/CUSTOM_ENGINE_ROADMAP.md) — proposals, not released capabilities |
+| Custom engine | [Ten implemented workflows, support matrix and CLI](docs/CUSTOM_ENGINE.md) · [roadmap and market comparison](docs/CUSTOM_ENGINE_ROADMAP.md) |
 | Submit a change | [Contributing](CONTRIBUTING.md) · [Code of conduct](CODE_OF_CONDUCT.md) · [Design system](DESIGN.md) |
 | Add an investigation rule | [Rule laboratory](docs/RULE_LAB.md) · [Rule catalog](docs/RULE_CATALOG.md) · [Fixture template](docs/RULE_TEMPLATE.md) |
 

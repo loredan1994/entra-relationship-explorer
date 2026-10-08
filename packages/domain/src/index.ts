@@ -15,3 +15,4 @@ export * from "./timeline";
 export * from "./rule-lab";
 export * from "./credential-history";
 export * from "./application-access";
+export type { FederationTrust, ConditionalAccessDefinition } from "./types";

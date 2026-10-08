@@ -52,3 +52,9 @@ The activity collector covers user sign-ins, not complete service-principal/work
 - No hosted multi-tenancy, notification delivery, unattended scan schedule or remediation is provided.
 
 For rule contributions, use the **Rule laboratory** with synthetic declarative cases and follow [RULE_LAB.md](RULE_LAB.md). For deployment and upgrade procedures, use [LOCAL_OPERATIONS.md](LOCAL_OPERATIONS.md) and [CHANGELOG.md](../CHANGELOG.md).
+
+## Use the custom evidence engine
+
+Open **Evidence engine** to reproduce an access proof, inspect time-consistent paths, propose constrained local changes, search policy counterexamples, compare federation trusts, simulate declared credential rotation, plan missing reads, evaluate an access contract, or verify an offline investigation. Every result shows its version, assumptions, missing facts and search limits. Start with a recorded application grant and inspect its exact permission ID. Then export a pseudonymized investigation and import it into the verifier to replay the result without a tenant connection.
+
+Rotation dates and policy scenarios are supplied assumptions. Protected integrations constrain proposed plans. The engine cannot consent, execute a proposed read, or apply changes. Older snapshots and unavailable optional scopes produce unknown where appropriate. See the [engine guide and support matrix](CUSTOM_ENGINE.md) for all ten workflows, schema examples and CLI commands.

@@ -13,6 +13,10 @@ Breaking changes are always called out under **Changed** with a migration note.
 
 ### Added
 
+- Original tenant-bound evidence engine with reproducible proofs, typed access evaluation, temporal path reconstruction, weighted change planning, policy counterexamples, federation overlap analysis, credential continuity simulation, evidence-gap planning, access contracts, and portable offline replay.
+- Evidence engine UI with ten workflows, visible support limits, sensitive export acknowledgment, and a standalone offline CLI.
+- Independent exhaustive planning oracles, semantic decision tables, package-tamper tests, desktop/mobile engine workflows, and reproducible generated benchmarks.
+
 - Real MSAL integration contracts for PKCE, authorization-code exchange, cache restoration, refresh-token rotation and revoked refresh credentials using a synthetic network transport.
 - Question-based overview shortcuts and an in-app Guide covering investigation workflows, evidence meaning, local data handling and contributor tools; reorganized README and a dedicated operator user guide.
 
@@ -32,6 +36,10 @@ Breaking changes are always called out under **Changed** with a migration note.
   or failed review write can no longer look like a saved decision.
 
 ### Changed
+
+- Refresh the pinned Node 24 Alpine build image to the reviewed digest from dependency PR #46.
+- Resolve delegated consent scopes to exact resource-specific permission IDs; missing and ambiguous mappings remain unknown.
+- Preserve structured federation audiences and supported Conditional Access inputs. Read session-control metadata through the existing optional policy permission; unsupported conditions remain unknown. Historical snapshots remain compatible and require a fresh read-only scan for missing structured fields.
 
 - Upgrade MSAL Node to 6.0.0; align Vitest and its coverage provider at 5.0.3; update Playwright, lint tooling and Node 24 declarations. Update Cytoscape, tsx and PostgreSQL client patches, with matching dependency notices.
 - Update dependency review and pnpm setup actions; pin CodeQL initialization and analysis to the same 4.38.2 revision. Group future Vitest updates and keep Node runtime/type major updates coordinated.

@@ -1,4 +1,4 @@
-import type { CollectorCoverage, DirectoryAuditEvent } from "@entra-explorer/domain";
+import type { CollectorCoverage, DirectoryAuditEvent, ConditionalAccessDefinition } from "@entra-explorer/domain";
 
 export interface GraphCredentialMetadata {
   keyId: string;
@@ -102,7 +102,7 @@ export interface GraphGroupMembership extends Sourced<GraphDirectoryObject> { gr
 export interface GraphAdministrativeUnitMembership extends Sourced<GraphDirectoryObject> { administrativeUnitId: string; }
 export interface GraphRoleDefinition { id: string; displayName: string; templateId?: string | null; isBuiltIn?: boolean | null; }
 export interface GraphRoleSchedule { id: string; principalId: string; roleDefinitionId: string; directoryScopeId?: string | null; }
-export interface GraphConditionalAccessPolicy { id: string; displayName: string; state: string; conditions?: { users?: { includeUsers?: string[]; includeGroups?: string[] }; applications?: { includeApplications?: string[] } }; grantControls?: { builtInControls?: string[]; operator?: string | null } | null; }
+export interface GraphConditionalAccessPolicy { id: string; displayName: string; state: string; conditions?: { users?: { includeUsers?: string[]; includeGroups?: string[] }; applications?: { includeApplications?: string[] } }; grantControls?: { builtInControls?: string[]; operator?: string | null } | null; enginePolicy?: ConditionalAccessDefinition; }
 export interface GraphSignIn { id: string; createdDateTime: string; appId?: string | null; resourceId?: string | null; servicePrincipalId?: string | null; resourceServicePrincipalId?: string | null; appDisplayName?: string | null; resourceDisplayName?: string | null; status?: { errorCode?: number | null } | null; }
 export interface GraphCrossTenantPartner { tenantId: string; inboundTrust?: { isMfaAccepted?: boolean | null; isCompliantDeviceAccepted?: boolean | null; isHybridAzureADJoinedDeviceAccepted?: boolean | null } | null; isInMultiTenantOrganization?: boolean | null; }
 export interface GraphAuthorizationPolicy { id: string; displayName: string; allowInvitesFrom?: string | null; allowEmailVerifiedUsersToJoinOrganization?: boolean | null; blockMsolPowerShell?: boolean | null; defaultUserRolePermissions?: { allowedToCreateApps?: boolean | null; allowedToCreateSecurityGroups?: boolean | null; allowedToCreateTenants?: boolean | null; allowedToReadBitlockerKeysForOwnedDevice?: boolean | null; allowedToReadOtherUsers?: boolean | null; permissionGrantPoliciesAssigned?: string[] } | null; }

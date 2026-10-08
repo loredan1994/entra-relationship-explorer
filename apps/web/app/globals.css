@@ -718,3 +718,23 @@ button, a, input { -webkit-tap-highlight-color: transparent; }
 .review-panel fieldset { border:0; padding:0; margin:0; min-width:0; }
 
 .rule-laboratory textarea { width: 100%; font-family: var(--font-mono); resize: vertical; }
+
+/* Custom evidence engine: readable forms and evidence, using the shared design tokens. */
+.engine-query { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(260px, 100%), 1fr)); gap: 16px; align-items: end; margin: 24px 0; }
+.engine-query label, .engine-field { display: flex; flex-direction: column; gap: 8px; font-weight: 600; }
+.engine-query input, .engine-query select, .engine-field input, .engine-field select, .engine-field textarea, .engine-costs input { width: 100%; min-width: 0; min-height: 44px; border: 1px solid #DCE3EC; border-radius: 4px; padding: 10px 12px; background: #fff; color: #172033; font: inherit; }
+.engine-field { margin: 20px 0; }
+.engine-field textarea { font-family: var(--font-mono), monospace; font-size: 12px; line-height: 1.6; resize: vertical; }
+.engine-result { border-top: 1px solid #DCE3EC; padding: 20px 0; margin-top: 20px; }
+.engine-result p, .engine-workspace td, .engine-workspace code { overflow-wrap: anywhere; }
+.engine-json { margin: 16px 0; }
+.engine-json pre { max-height: 420px; overflow: auto; padding: 16px; border: 1px solid #DCE3EC; background: #F5F7FA; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 12px; }
+.engine-paths > li { margin: 16px 0; }
+.engine-paths ol > li { padding: 8px 0; }
+.engine-costs { display: grid; gap: 8px; margin: 16px 0; }
+.engine-costs label { display: grid; grid-template-columns: minmax(0, 1fr) 100px; gap: 16px; align-items: center; padding: 12px 0; border-bottom: 1px solid #DCE3EC; }
+.engine-checkbox { display: flex; gap: 12px; align-items: flex-start; margin: 16px 0; padding: 8px 0; }
+.engine-checkbox input { margin-top: 4px; }
+.engine-workspace summary { cursor: pointer; min-height: 44px; padding: 10px 0; }
+.engine-workspace h4 { margin-top: 20px; }
+@media (max-width: 640px) { .engine-costs label { grid-template-columns: minmax(0, 1fr) 80px; } .engine-tabs { max-width: 100%; } }

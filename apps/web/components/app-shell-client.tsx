@@ -11,6 +11,7 @@ const navItems = [
   { href: "/permissions", label: "Permissions" },
   { href: "/changes", label: "Changes" },
   { href: "/investigations", label: "Investigations" },
+  { href: "/engine", label: "Evidence engine" },
   { href: "/security", label: "Threat workspace" },
   { href: "/settings", label: "Settings" },
   { href: "/guide", label: "Guide" },

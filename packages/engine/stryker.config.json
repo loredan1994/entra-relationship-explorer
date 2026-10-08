@@ -1,0 +1,12 @@
+{
+  "$schema": "https://raw.githubusercontent.com/stryker-mutator/stryker-js/master/packages/api/schema/stryker-core.json",
+  "testRunner": "vitest",
+  "mutate": ["src/**/*.ts", "!src/**/*.test.ts", "!src/index.ts", "!src/test-support.ts"],
+  "reporters": ["clear-text", "html", "json"],
+  "thresholds": { "high": 100, "low": 95, "break": 95 },
+  "coverageAnalysis": "perTest",
+  "incremental": true,
+  "incrementalFile": "stryker-incremental.json",
+  "tempDirName": ".stryker-tmp",
+  "plugins": ["@stryker-mutator/vitest-runner"]
+}

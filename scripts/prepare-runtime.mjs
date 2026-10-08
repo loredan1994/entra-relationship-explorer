@@ -4,6 +4,7 @@ const manifests = [
   "apps/web/package.json",
   "packages/backend/package.json",
   "packages/domain/package.json",
+  "packages/engine/package.json",
   "packages/graph/package.json",
 ];
 

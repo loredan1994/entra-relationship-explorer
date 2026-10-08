@@ -135,6 +135,7 @@ describe("new collector normalization", () => {
       risk: { level: "low", reason: "Consent policy conditions require contextual review." },
     });
     expect(snapshot.nodes.find((node) => node.id === "federated-credential:missing-parent:orphan")).toEqual({
+      federationTrust: { issuer: "https://issuer", subject: "subject", audiences: [], unsupported: [] },
       id: "federated-credential:missing-parent:orphan", tenantId: TENANT, kind: "federatedCredential", label: "orphan", description: "Federated identity credential (workload trust) collected from Microsoft Graph.", ownerIds: [],
       metadata: { credentialId: "orphan", parentId: "missing-parent", parentType: "application", issuer: "https://issuer", subject: "subject", audiences: "", description: null },
       risk: { level: "review", reason: "A matching external token can authenticate as the configured workload identity; configured trust does not prove token issuance or use." },

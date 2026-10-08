@@ -1,4 +1,5 @@
 export const workspaceTools = [
+  { id: "engine", title: "Evidence engine", question: "Can we prove, test and plan this access?", href: "/engine", description: "Ten custom workflows for reproducible proofs, semantic contracts, time, policy, trust and local planning." },
   { id: "coverage", title: "Evidence coverage", question: "What did this scan actually collect?", href: "/investigations?view=coverage", description: "Check successful, partial, denied and disabled reads before drawing conclusions." },
   { id: "map", title: "Relationship map", question: "How are these identities connected?", href: "/map", description: "Follow a relationship to its object IDs, permission and source endpoint. Switch to the table for a list view." },
   { id: "applications", title: "Application access", question: "Who has access to this application?", href: "/investigations?view=applications", description: "Review sign-in controls, owners, direct assignments and consent. Observed sign-ins stay separate." },

@@ -1,0 +1,149 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`publishes read-only prerequisites for every supported collector 1`] = `
+[
+  {
+    "cost": 1,
+    "endpoints": [
+      "/applications",
+    ],
+    "id": "applications",
+    "requirement": "Directory reader access. All pages and object instances must succeed; a read may still be denied or partial.",
+    "resolves": [
+      "coverage:applications",
+    ],
+    "scopes": [
+      "Application.Read.All",
+    ],
+  },
+  {
+    "cost": 1,
+    "endpoints": [
+      "/servicePrincipals",
+    ],
+    "id": "servicePrincipals",
+    "requirement": "Directory reader access. All pages and object instances must succeed; a read may still be denied or partial.",
+    "resolves": [
+      "coverage:servicePrincipals",
+    ],
+    "scopes": [
+      "Application.Read.All",
+    ],
+  },
+  {
+    "cost": 1,
+    "endpoints": [
+      "/applications/{id}/federatedIdentityCredentials",
+    ],
+    "id": "federatedIdentityCredentials",
+    "requirement": "Application reader access. All pages and object instances must succeed; a read may still be denied or partial.",
+    "resolves": [
+      "coverage:federatedIdentityCredentials",
+    ],
+    "scopes": [
+      "Application.Read.All",
+    ],
+  },
+  {
+    "cost": 2,
+    "endpoints": [
+      "/users",
+      "/groups",
+    ],
+    "id": "usersAndGroups",
+    "requirement": "Directory reader access. All pages and object instances must succeed; a read may still be denied or partial.",
+    "resolves": [
+      "coverage:usersAndGroups",
+    ],
+    "scopes": [
+      "Directory.Read.All",
+    ],
+  },
+  {
+    "cost": 1,
+    "endpoints": [
+      "/groups/{group-id}/members",
+    ],
+    "id": "groupMemberships",
+    "requirement": "Hidden memberships can require additional authorization. All pages and object instances must succeed; a read may still be denied or partial.",
+    "resolves": [
+      "coverage:groupMemberships",
+    ],
+    "scopes": [
+      "Directory.Read.All",
+    ],
+  },
+  {
+    "cost": 1,
+    "endpoints": [
+      "/oauth2PermissionGrants",
+    ],
+    "id": "delegatedPermissionGrants",
+    "requirement": "Directory reader access. All pages and object instances must succeed; a read may still be denied or partial.",
+    "resolves": [
+      "coverage:delegatedPermissionGrants",
+    ],
+    "scopes": [
+      "Directory.Read.All",
+    ],
+  },
+  {
+    "cost": 1,
+    "endpoints": [
+      "/servicePrincipals/{resource-id}/appRoleAssignedTo",
+    ],
+    "id": "appRoleAssignments",
+    "requirement": "Application reader access. All pages and object instances must succeed; a read may still be denied or partial.",
+    "resolves": [
+      "coverage:appRoleAssignments",
+    ],
+    "scopes": [
+      "Application.Read.All",
+    ],
+  },
+  {
+    "cost": 2,
+    "endpoints": [
+      "/applications/{id}/owners",
+      "/servicePrincipals/{id}/owners",
+    ],
+    "id": "owners",
+    "requirement": "Application reader access. All pages and object instances must succeed; a read may still be denied or partial.",
+    "resolves": [
+      "coverage:owners",
+    ],
+    "scopes": [
+      "Application.Read.All",
+    ],
+  },
+  {
+    "cost": 2,
+    "endpoints": [
+      "/roleManagement/directory/roleAssignments",
+      "/roleManagement/directory/roleEligibilitySchedules",
+    ],
+    "id": "roles",
+    "requirement": "Supported Entra role, such as Global Reader. All pages and object instances must succeed; a read may still be denied or partial.",
+    "resolves": [
+      "coverage:roles",
+    ],
+    "scopes": [
+      "RoleManagement.Read.Directory",
+    ],
+  },
+  {
+    "cost": 1,
+    "endpoints": [
+      "/identity/conditionalAccess/policies",
+    ],
+    "id": "conditionalAccess",
+    "requirement": "Supported role, such as Security Reader. All pages and object instances must succeed; a read may still be denied or partial.",
+    "resolves": [
+      "coverage:conditionalAccess",
+    ],
+    "scopes": [
+      "Policy.Read.All",
+    ],
+  },
+]
+`;

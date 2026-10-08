@@ -159,6 +159,7 @@ describe("optional-scope stages", () => {
       id: "policy-1",
       displayName: "Require MFA",
       state: "enabled",
+      enginePolicy: { state: "enabled", users: { include: ["user-1"], exclude: [], includeGroups: ["group-1"], excludeGroups: [] }, applications: { include: ["All"], exclude: [] }, platforms: null, locations: null, clientAppTypes: [], grant: { operator: "OR", controls: ["mfa"] }, unsupported: ["sessionControls.not-collected"] },
       conditions: { users: { includeUsers: ["user-1"], includeGroups: ["group-1"] }, applications: { includeApplications: ["All"] } },
       grantControls: { builtInControls: ["mfa"], operator: "OR" },
     });
@@ -230,6 +231,7 @@ describe("Conditional Access sanitization", () => {
       id: "policy-2",
       displayName: "Broken",
       state: "disabled",
+      enginePolicy: { state: "disabled", users: { include: [], exclude: [], includeGroups: [], excludeGroups: [] }, applications: { include: [], exclude: [] }, platforms: null, locations: null, clientAppTypes: [], grant: null, unsupported: ["conditions.required-targets", "sessionControls.not-collected"] },
       conditions: { users: { includeUsers: [], includeGroups: [] }, applications: { includeApplications: [] } },
       grantControls: null,
     });

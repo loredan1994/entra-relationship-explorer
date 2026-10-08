@@ -1,6 +1,6 @@
 # Custom engine roadmap
 
-Proposal researched on 8 October 2026. These are ten proposed capabilities, not features available in the current release.
+Roadmap researched on 8 October 2026; implementation started 9 October 2026. All ten workflows now have engine, UI and offline verification implementations. Measured results are recorded in the [validation report](CUSTOM_ENGINE_VALIDATION_2026-10-09.md); consult the [implementation and support matrix](CUSTOM_ENGINE.md) for exact supported semantics. The original product rationale and acceptance criteria remain below.
 
 The product opportunity is a local Entra reasoning workspace where an analyst can reproduce each conclusion, see the assumptions that would change it, and compare a proposed change with both security goals and operational constraints. Our intellectual property should be the Entra semantics, evidence model, query evaluator, temporal analysis and planning algorithms. Keep PostgreSQL, MSAL, established cryptography, React and layout libraries for their existing jobs.
 

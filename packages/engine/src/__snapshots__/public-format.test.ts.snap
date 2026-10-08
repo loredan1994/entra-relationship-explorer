@@ -1,0 +1,3348 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`version 1 evidence format compatibility > preserves contract failures and complete semantic additions 1`] = `
+{
+  "assumptions": [
+    "Contract pass concerns only recorded configuration and supported control semantics. It requires complete relevant collection.",
+    "Each violation displays a shortest recorded witness. No imported code runs and no tenant change is applied.",
+  ],
+  "collectedAt": [
+    "2026-10-08T12:00:00.000Z",
+  ],
+  "contractId": "only-production",
+  "engineVersion": "1.0.0",
+  "limits": {
+    "exhausted": false,
+    "maxSteps": 250000,
+    "steps": 2,
+  },
+  "missing": [],
+  "queries": 1,
+  "ruleVersion": "entra-configured/1",
+  "snapshotIds": [
+    "synthetic-snapshot",
+  ],
+  "status": "fail",
+  "tenantId": "synthetic-tenant",
+  "verdict": "refuted",
+  "witnesses": [
+    {
+      "assumptions": [
+        "This conclusion describes recorded configuration under the published rule subset, not effective access or observed use.",
+      ],
+      "collectedAt": [
+        "2026-10-08T12:00:00.000Z",
+      ],
+      "conflicts": [],
+      "dependencies": [
+        "collection:appRoleAssignments",
+        "collection:servicePrincipals",
+        "coverage:appRoleAssignments",
+        "coverage:servicePrincipals",
+        "object:resource",
+        "object:rogue",
+        "relationship:rogue-grant",
+      ],
+      "derivation": [
+        {
+          "conclusion": "Recorded CAN_CALL_AS_APP: rogue → resource.",
+          "id": "path:0:step:0",
+          "inputs": [
+            "relationship:rogue-grant",
+          ],
+          "rule": "entra-configured/1/CAN_CALL_AS_APP",
+        },
+        {
+          "conclusion": "supported",
+          "id": "query",
+          "inputs": [
+            "path:0:step:0",
+            "coverage:appRoleAssignments",
+            "coverage:servicePrincipals",
+            "object:resource",
+            "object:rogue",
+          ],
+          "rule": "entra-configured/1/application-permission",
+        },
+      ],
+      "engineVersion": "1.0.0",
+      "evidenceClass": "configured",
+      "facts": [
+        {
+          "collectedAt": "2026-10-08T12:00:00.000Z",
+          "completeness": "complete",
+          "id": "coverage:appRoleAssignments",
+          "kind": "coverage",
+          "sourceEndpoint": "/appRoleAssignments",
+          "sourceEndpoints": [
+            "/appRoleAssignments",
+          ],
+          "sourceObjectId": "appRoleAssignments",
+          "sourceRecordIds": [],
+          "targetObjectId": "appRoleAssignments",
+        },
+        {
+          "collectedAt": "2026-10-08T12:00:00.000Z",
+          "completeness": "complete",
+          "id": "coverage:servicePrincipals",
+          "kind": "coverage",
+          "sourceEndpoint": "/servicePrincipals",
+          "sourceEndpoints": [
+            "/servicePrincipals",
+          ],
+          "sourceObjectId": "servicePrincipals",
+          "sourceRecordIds": [],
+          "targetObjectId": "servicePrincipals",
+        },
+        {
+          "collectedAt": "2026-10-08T12:00:00.000Z",
+          "completeness": "recorded",
+          "id": "object:resource",
+          "kind": "object",
+          "sourceEndpoint": "/servicePrincipals",
+          "sourceObjectId": "resource",
+          "sourceRecordIds": [
+            "resource",
+          ],
+          "targetObjectId": "resource",
+        },
+        {
+          "collectedAt": "2026-10-08T12:00:00.000Z",
+          "completeness": "recorded",
+          "id": "object:rogue",
+          "kind": "object",
+          "sourceEndpoint": "/servicePrincipals",
+          "sourceObjectId": "rogue",
+          "sourceRecordIds": [
+            "rogue",
+          ],
+          "targetObjectId": "rogue",
+        },
+        {
+          "collectedAt": "2026-10-08T12:00:00.000Z",
+          "completeness": "complete",
+          "id": "relationship:rogue-grant",
+          "kind": "relationship",
+          "relationshipType": "CAN_CALL_AS_APP",
+          "sourceEndpoint": "/servicePrincipals/resource/appRoleAssignedTo",
+          "sourceObjectId": "rogue",
+          "sourceRecordIds": [
+            "rogue-grant",
+          ],
+          "targetObjectId": "resource",
+        },
+      ],
+      "limits": {
+        "exhausted": false,
+        "maxDepth": 12,
+        "maxPaths": 128,
+        "maxSteps": 50000,
+        "steps": 1,
+      },
+      "missing": [],
+      "paths": [
+        [
+          "rogue-grant",
+        ],
+      ],
+      "query": {
+        "kind": "application-permission",
+        "permissionId": "read-id",
+        "principalId": "rogue",
+        "resourceId": "resource",
+        "tenantId": "synthetic-tenant",
+      },
+      "ruleVersion": "entra-configured/1",
+      "snapshotIds": [
+        "synthetic-snapshot",
+      ],
+      "tenantId": "synthetic-tenant",
+      "verdict": "supported",
+    },
+  ],
+}
+`;
+
+exports[`version 1 evidence format compatibility > preserves contract failures and complete semantic additions 2`] = `
+{
+  "addedPaths": [
+    "[{"permissionIds":["read-id"],"sourceId":"rogue","targetId":"resource","type":"CAN_CALL_AS_APP"}]",
+  ],
+  "after": {
+    "assumptions": [
+      "Contract pass concerns only recorded configuration and supported control semantics. It requires complete relevant collection.",
+      "Each violation displays a shortest recorded witness. No imported code runs and no tenant change is applied.",
+    ],
+    "collectedAt": [
+      "2026-10-08T12:00:00.000Z",
+    ],
+    "contractId": "only-production",
+    "engineVersion": "1.0.0",
+    "limits": {
+      "exhausted": false,
+      "maxSteps": 250000,
+      "steps": 2,
+    },
+    "missing": [],
+    "queries": 1,
+    "ruleVersion": "entra-configured/1",
+    "snapshotIds": [
+      "synthetic-snapshot",
+    ],
+    "status": "fail",
+    "tenantId": "synthetic-tenant",
+    "verdict": "refuted",
+    "witnesses": [
+      {
+        "assumptions": [
+          "This conclusion describes recorded configuration under the published rule subset, not effective access or observed use.",
+        ],
+        "collectedAt": [
+          "2026-10-08T12:00:00.000Z",
+        ],
+        "conflicts": [],
+        "dependencies": [
+          "collection:appRoleAssignments",
+          "collection:servicePrincipals",
+          "coverage:appRoleAssignments",
+          "coverage:servicePrincipals",
+          "object:resource",
+          "object:rogue",
+          "relationship:rogue-grant",
+        ],
+        "derivation": [
+          {
+            "conclusion": "Recorded CAN_CALL_AS_APP: rogue → resource.",
+            "id": "path:0:step:0",
+            "inputs": [
+              "relationship:rogue-grant",
+            ],
+            "rule": "entra-configured/1/CAN_CALL_AS_APP",
+          },
+          {
+            "conclusion": "supported",
+            "id": "query",
+            "inputs": [
+              "path:0:step:0",
+              "coverage:appRoleAssignments",
+              "coverage:servicePrincipals",
+              "object:resource",
+              "object:rogue",
+            ],
+            "rule": "entra-configured/1/application-permission",
+          },
+        ],
+        "engineVersion": "1.0.0",
+        "evidenceClass": "configured",
+        "facts": [
+          {
+            "collectedAt": "2026-10-08T12:00:00.000Z",
+            "completeness": "complete",
+            "id": "coverage:appRoleAssignments",
+            "kind": "coverage",
+            "sourceEndpoint": "/appRoleAssignments",
+            "sourceEndpoints": [
+              "/appRoleAssignments",
+            ],
+            "sourceObjectId": "appRoleAssignments",
+            "sourceRecordIds": [],
+            "targetObjectId": "appRoleAssignments",
+          },
+          {
+            "collectedAt": "2026-10-08T12:00:00.000Z",
+            "completeness": "complete",
+            "id": "coverage:servicePrincipals",
+            "kind": "coverage",
+            "sourceEndpoint": "/servicePrincipals",
+            "sourceEndpoints": [
+              "/servicePrincipals",
+            ],
+            "sourceObjectId": "servicePrincipals",
+            "sourceRecordIds": [],
+            "targetObjectId": "servicePrincipals",
+          },
+          {
+            "collectedAt": "2026-10-08T12:00:00.000Z",
+            "completeness": "recorded",
+            "id": "object:resource",
+            "kind": "object",
+            "sourceEndpoint": "/servicePrincipals",
+            "sourceObjectId": "resource",
+            "sourceRecordIds": [
+              "resource",
+            ],
+            "targetObjectId": "resource",
+          },
+          {
+            "collectedAt": "2026-10-08T12:00:00.000Z",
+            "completeness": "recorded",
+            "id": "object:rogue",
+            "kind": "object",
+            "sourceEndpoint": "/servicePrincipals",
+            "sourceObjectId": "rogue",
+            "sourceRecordIds": [
+              "rogue",
+            ],
+            "targetObjectId": "rogue",
+          },
+          {
+            "collectedAt": "2026-10-08T12:00:00.000Z",
+            "completeness": "complete",
+            "id": "relationship:rogue-grant",
+            "kind": "relationship",
+            "relationshipType": "CAN_CALL_AS_APP",
+            "sourceEndpoint": "/servicePrincipals/resource/appRoleAssignedTo",
+            "sourceObjectId": "rogue",
+            "sourceRecordIds": [
+              "rogue-grant",
+            ],
+            "targetObjectId": "resource",
+          },
+        ],
+        "limits": {
+          "exhausted": false,
+          "maxDepth": 12,
+          "maxPaths": 128,
+          "maxSteps": 50000,
+          "steps": 1,
+        },
+        "missing": [],
+        "paths": [
+          [
+            "rogue-grant",
+          ],
+        ],
+        "query": {
+          "kind": "application-permission",
+          "permissionId": "read-id",
+          "principalId": "rogue",
+          "resourceId": "resource",
+          "tenantId": "synthetic-tenant",
+        },
+        "ruleVersion": "entra-configured/1",
+        "snapshotIds": [
+          "synthetic-snapshot",
+        ],
+        "tenantId": "synthetic-tenant",
+        "verdict": "supported",
+      },
+    ],
+  },
+  "before": {
+    "assumptions": [
+      "Contract pass concerns only recorded configuration and supported control semantics. It requires complete relevant collection.",
+      "Each violation displays a shortest recorded witness. No imported code runs and no tenant change is applied.",
+    ],
+    "collectedAt": [
+      "2026-10-08T12:00:00.000Z",
+    ],
+    "contractId": "only-production",
+    "engineVersion": "1.0.0",
+    "limits": {
+      "exhausted": false,
+      "maxSteps": 250000,
+      "steps": 0,
+    },
+    "missing": [],
+    "queries": 0,
+    "ruleVersion": "entra-configured/1",
+    "snapshotIds": [
+      "synthetic-snapshot",
+    ],
+    "status": "pass",
+    "tenantId": "synthetic-tenant",
+    "verdict": "supported",
+    "witnesses": [],
+  },
+  "complete": true,
+  "explanation": "Display names, timestamps and input ordering do not create semantic drift. Added alternative derivations do. Missing evidence leaves removals unconfirmed.",
+  "removedPaths": [],
+}
+`;
+
+exports[`version 1 evidence format compatibility > preserves minimized policy scenarios and report-only applicability 1`] = `
+{
+  "assumptions": [
+    "Counterexamples violate the supplied intent within a finite user-sign-in model. They do not establish an actual successful sign-in.",
+    "Supported: exact user/group/resource selectors, platform, named-location IDs with supplied trust state, client type, AND/OR MFA, compliant-device and hybrid-join controls, and block. Workload policy, risk, device filters, authentication strengths, session controls, aliases and service dependencies remain unknown.",
+    "Up to 100 distinct minimized witnesses are shown. A no-counterexample result applies only to the declared finite domain.",
+  ],
+  "checked": 16,
+  "collectedAt": [
+    "2026-10-08T12:00:00.000Z",
+  ],
+  "domainSize": 16,
+  "engineVersion": "1.0.0",
+  "limits": {
+    "exhausted": false,
+    "maxSteps": 10000,
+    "steps": 16,
+  },
+  "missing": [],
+  "ruleVersion": "entra-configured/1",
+  "snapshotIds": [
+    "synthetic-snapshot",
+  ],
+  "tenantId": "synthetic-tenant",
+  "unknown": 0,
+  "verdict": "supported",
+  "witnesses": [
+    {
+      "evaluation": {
+        "decision": "permits-under-model",
+        "policies": [
+          {
+            "applies": true,
+            "id": "policy",
+            "mode": "report-only",
+            "satisfied": false,
+            "unsupported": [],
+          },
+        ],
+      },
+      "scenario": {
+        "applicationId": "api",
+        "clientAppType": null,
+        "compliantDevice": null,
+        "groups": null,
+        "hybridJoinedDevice": null,
+        "location": null,
+        "mfa": false,
+        "platform": null,
+        "trustedLocation": null,
+        "userId": "person",
+      },
+    },
+  ],
+}
+`;
+
+exports[`version 1 evidence format compatibility > preserves planning alternatives, bounds, protected paths and costs 1`] = `
+{
+  "assumptions": [
+    "Costs and protected integrations are operator-supplied. Proposed exclusions remain local and are not applied to Entra.",
+    "The solver covers supplied modeled paths; incomplete evidence can hide additional paths.",
+  ],
+  "collectedAt": [
+    "2026-10-08T12:00:00.000Z",
+  ],
+  "engineVersion": "1.0.0",
+  "limits": {
+    "exhausted": false,
+    "maxSteps": 100000,
+    "steps": 5,
+  },
+  "lowerBound": 3,
+  "missing": [],
+  "plans": [
+    {
+      "brokenPaths": [
+        "one",
+        "two",
+      ],
+      "changes": [
+        "shared",
+      ],
+      "cost": 3,
+      "preservedIntegrations": [
+        "protected",
+      ],
+      "residualPaths": [],
+    },
+    {
+      "brokenPaths": [
+        "one",
+        "two",
+      ],
+      "changes": [
+        "a",
+        "b",
+      ],
+      "cost": 4,
+      "preservedIntegrations": [
+        "protected",
+      ],
+      "residualPaths": [],
+    },
+  ],
+  "ruleVersion": "entra-configured/1",
+  "snapshotIds": [
+    "synthetic-snapshot",
+  ],
+  "status": "optimal",
+  "tenantId": "synthetic-tenant",
+  "upperBound": 3,
+  "verdict": "supported",
+}
+`;
+
+exports[`version 1 evidence format compatibility > preserves pseudonymized offline replay format and identity-map separation 1`] = `
+{
+  "package": {
+    "budget": {
+      "maxDepth": 12,
+      "maxPaths": 128,
+      "maxSteps": 50000,
+    },
+    "format": "entra-investigation/1",
+    "manifest": {
+      "algorithm": "SHA-256",
+      "dependencies": [
+        "collection:appRoleAssignments",
+        "collection:servicePrincipals",
+        "coverage:appRoleAssignments",
+        "coverage:servicePrincipals",
+        "object:p000001",
+        "object:p000004",
+        "relationship:p000002",
+      ],
+      "digest": "d1eda19eaedb4153ae9acfd3de74a3a3cc7ece35b6738afe3346b0897006f7ad",
+      "engineVersion": "1.0.0",
+      "ruleVersion": "entra-configured/1",
+    },
+    "proof": {
+      "assumptions": [
+        "This conclusion describes recorded configuration under the published rule subset, not effective access or observed use.",
+      ],
+      "collectedAt": [
+        "2026-10-08T12:00:00.000Z",
+      ],
+      "conflicts": [],
+      "dependencies": [
+        "collection:appRoleAssignments",
+        "collection:servicePrincipals",
+        "coverage:appRoleAssignments",
+        "coverage:servicePrincipals",
+        "object:p000001",
+        "object:p000004",
+        "relationship:p000002",
+      ],
+      "derivation": [
+        {
+          "conclusion": "Recorded CAN_CALL_AS_APP: p000001 → p000004.",
+          "id": "path:0:step:0",
+          "inputs": [
+            "relationship:p000002",
+          ],
+          "rule": "entra-configured/1/CAN_CALL_AS_APP",
+        },
+        {
+          "conclusion": "supported",
+          "id": "query",
+          "inputs": [
+            "path:0:step:0",
+            "coverage:appRoleAssignments",
+            "coverage:servicePrincipals",
+            "object:p000001",
+            "object:p000004",
+          ],
+          "rule": "entra-configured/1/application-permission",
+        },
+      ],
+      "engineVersion": "1.0.0",
+      "evidenceClass": "configured",
+      "facts": [
+        {
+          "collectedAt": "2026-10-08T12:00:00.000Z",
+          "completeness": "complete",
+          "id": "coverage:appRoleAssignments",
+          "kind": "coverage",
+          "sourceEndpoint": "/appRoleAssignments",
+          "sourceEndpoints": [
+            "/appRoleAssignments",
+          ],
+          "sourceObjectId": "appRoleAssignments",
+          "sourceRecordIds": [],
+          "targetObjectId": "appRoleAssignments",
+        },
+        {
+          "collectedAt": "2026-10-08T12:00:00.000Z",
+          "completeness": "complete",
+          "id": "coverage:servicePrincipals",
+          "kind": "coverage",
+          "sourceEndpoint": "/servicePrincipals",
+          "sourceEndpoints": [
+            "/servicePrincipals",
+          ],
+          "sourceObjectId": "servicePrincipals",
+          "sourceRecordIds": [],
+          "targetObjectId": "servicePrincipals",
+        },
+        {
+          "collectedAt": "2026-10-08T12:00:00.000Z",
+          "completeness": "recorded",
+          "id": "object:p000001",
+          "kind": "object",
+          "sourceEndpoint": "/servicePrincipals",
+          "sourceObjectId": "p000001",
+          "sourceRecordIds": [
+            "p000001",
+          ],
+          "targetObjectId": "p000001",
+        },
+        {
+          "collectedAt": "2026-10-08T12:00:00.000Z",
+          "completeness": "recorded",
+          "id": "object:p000004",
+          "kind": "object",
+          "sourceEndpoint": "/servicePrincipals",
+          "sourceObjectId": "p000004",
+          "sourceRecordIds": [
+            "p000004",
+          ],
+          "targetObjectId": "p000004",
+        },
+        {
+          "collectedAt": "2026-10-08T12:00:00.000Z",
+          "completeness": "complete",
+          "id": "relationship:p000002",
+          "kind": "relationship",
+          "relationshipType": "CAN_CALL_AS_APP",
+          "sourceEndpoint": "/servicePrincipals/p000004/appRoleAssignedTo",
+          "sourceObjectId": "p000001",
+          "sourceRecordIds": [
+            "p000002",
+          ],
+          "targetObjectId": "p000004",
+        },
+      ],
+      "limits": {
+        "exhausted": false,
+        "maxDepth": 12,
+        "maxPaths": 128,
+        "maxSteps": 50000,
+        "steps": 1,
+      },
+      "missing": [],
+      "paths": [
+        [
+          "p000002",
+        ],
+      ],
+      "query": {
+        "kind": "application-permission",
+        "permissionId": "p000003",
+        "principalId": "p000001",
+        "resourceId": "p000004",
+        "tenantId": "p000006",
+      },
+      "ruleVersion": "entra-configured/1",
+      "snapshotIds": [
+        "p000005",
+      ],
+      "tenantId": "p000006",
+      "verdict": "supported",
+    },
+    "query": {
+      "kind": "application-permission",
+      "permissionId": "p000003",
+      "principalId": "p000001",
+      "resourceId": "p000004",
+      "tenantId": "p000006",
+    },
+    "sharing": "pseudonymized",
+    "snapshot": {
+      "completion": {
+        "collectedEndpoints": [],
+        "collectors": [
+          {
+            "collectedAt": "2026-10-08T12:00:00.000Z",
+            "endpoints": [
+              "/appRoleAssignments",
+            ],
+            "failedEndpoints": [],
+            "id": "appRoleAssignments",
+            "itemCount": 1,
+            "reason": "Recorded collection boundary.",
+            "scope": "Application.Read.All",
+            "state": "complete",
+          },
+          {
+            "collectedAt": "2026-10-08T12:00:00.000Z",
+            "endpoints": [
+              "/servicePrincipals",
+            ],
+            "failedEndpoints": [],
+            "id": "servicePrincipals",
+            "itemCount": 1,
+            "reason": "Recorded collection boundary.",
+            "scope": "Application.Read.All",
+            "state": "complete",
+          },
+        ],
+        "errors": [],
+        "skippedEndpoints": [],
+        "status": "partial",
+      },
+      "edges": [
+        {
+          "evidence": {
+            "completeness": "complete",
+            "configured": true,
+            "observed": null,
+            "scannedAt": "2026-10-08T12:00:00.000Z",
+            "sourceEndpoint": "/servicePrincipals/p000004/appRoleAssignedTo",
+            "sourceObjectId": "p000001",
+            "sourceRecordIds": [
+              "p000002",
+            ],
+            "targetObjectId": "p000004",
+          },
+          "id": "p000002",
+          "permissionIds": [
+            "p000003",
+          ],
+          "permissions": [],
+          "plainLabel": "CAN_CALL_AS_APP",
+          "sourceId": "p000001",
+          "targetId": "p000004",
+          "tenantId": "p000006",
+          "type": "CAN_CALL_AS_APP",
+        },
+      ],
+      "id": "p000005",
+      "mode": "tenant",
+      "nodes": [
+        {
+          "description": "",
+          "id": "p000001",
+          "kind": "servicePrincipal",
+          "label": "p000001",
+          "ownerIds": [],
+          "risk": {
+            "level": "low",
+            "reason": "No score exported.",
+          },
+          "sourceEndpoint": "/servicePrincipals",
+          "tenantId": "p000006",
+        },
+        {
+          "description": "",
+          "id": "p000004",
+          "kind": "servicePrincipal",
+          "label": "p000004",
+          "ownerIds": [],
+          "risk": {
+            "level": "low",
+            "reason": "No score exported.",
+          },
+          "sourceEndpoint": "/servicePrincipals",
+          "tenantId": "p000006",
+        },
+      ],
+      "scannedAt": "2026-10-08T12:00:00.000Z",
+      "tenant": {
+        "tenantId": "p000006",
+        "tenantLabel": "Investigation projection",
+      },
+    },
+  },
+  "privateMapping": {
+    "client": "p000001",
+    "grant": "p000002",
+    "read-id": "p000003",
+    "resource": "p000004",
+    "synthetic-snapshot": "p000005",
+    "synthetic-tenant": "p000006",
+  },
+}
+`;
+
+exports[`version 1 evidence format compatibility > preserves the public proof fields for active-role 1`] = `
+{
+  "assumptions": [
+    "This conclusion describes recorded configuration under the published rule subset, not effective access or observed use.",
+  ],
+  "collectedAt": [
+    "2026-10-08T12:00:00.000Z",
+  ],
+  "conflicts": [],
+  "dependencies": [
+    "collection:groupMemberships",
+    "collection:roles",
+    "collection:usersAndGroups",
+    "coverage:groupMemberships",
+    "coverage:roles",
+    "coverage:usersAndGroups",
+    "object:person",
+    "object:role",
+    "relationship:role-link",
+  ],
+  "derivation": [
+    {
+      "conclusion": "Recorded ACTIVE_IN_ROLE: person → role.",
+      "id": "path:0:step:0",
+      "inputs": [
+        "relationship:role-link",
+      ],
+      "rule": "entra-configured/1/ACTIVE_IN_ROLE",
+    },
+    {
+      "conclusion": "supported",
+      "id": "query",
+      "inputs": [
+        "path:0:step:0",
+        "coverage:groupMemberships",
+        "coverage:roles",
+        "coverage:usersAndGroups",
+        "object:person",
+        "object:role",
+      ],
+      "rule": "entra-configured/1/active-role",
+    },
+  ],
+  "engineVersion": "1.0.0",
+  "evidenceClass": "configured",
+  "facts": [
+    {
+      "collectedAt": "2026-10-08T12:00:00.000Z",
+      "completeness": "complete",
+      "id": "coverage:groupMemberships",
+      "kind": "coverage",
+      "sourceEndpoint": "/groupMemberships",
+      "sourceEndpoints": [
+        "/groupMemberships",
+      ],
+      "sourceObjectId": "groupMemberships",
+      "sourceRecordIds": [],
+      "targetObjectId": "groupMemberships",
+    },
+    {
+      "collectedAt": "2026-10-08T12:00:00.000Z",
+      "completeness": "complete",
+      "id": "coverage:roles",
+      "kind": "coverage",
+      "sourceEndpoint": "/roles",
+      "sourceEndpoints": [
+        "/roles",
+      ],
+      "sourceObjectId": "roles",
+      "sourceRecordIds": [],
+      "targetObjectId": "roles",
+    },
+    {
+      "collectedAt": "2026-10-08T12:00:00.000Z",
+      "completeness": "complete",
+      "id": "coverage:usersAndGroups",
+      "kind": "coverage",
+      "sourceEndpoint": "/usersAndGroups",
+      "sourceEndpoints": [
+        "/usersAndGroups",
+      ],
+      "sourceObjectId": "usersAndGroups",
+      "sourceRecordIds": [],
+      "targetObjectId": "usersAndGroups",
+    },
+    {
+      "collectedAt": "2026-10-08T12:00:00.000Z",
+      "completeness": "recorded",
+      "id": "object:person",
+      "kind": "object",
+      "sourceEndpoint": "/servicePrincipals",
+      "sourceObjectId": "person",
+      "sourceRecordIds": [
+        "person",
+      ],
+      "targetObjectId": "person",
+    },
+    {
+      "collectedAt": "2026-10-08T12:00:00.000Z",
+      "completeness": "recorded",
+      "id": "object:role",
+      "kind": "object",
+      "sourceEndpoint": "/servicePrincipals",
+      "sourceObjectId": "role",
+      "sourceRecordIds": [
+        "role",
+      ],
+      "targetObjectId": "role",
+    },
+    {
+      "collectedAt": "2026-10-08T12:00:00.000Z",
+      "completeness": "complete",
+      "id": "relationship:role-link",
+      "kind": "relationship",
+      "relationshipType": "ACTIVE_IN_ROLE",
+      "sourceEndpoint": "/servicePrincipals/role/appRoleAssignedTo",
+      "sourceObjectId": "person",
+      "sourceRecordIds": [
+        "role-link",
+      ],
+      "targetObjectId": "role",
+    },
+  ],
+  "limits": {
+    "exhausted": false,
+    "maxDepth": 12,
+    "maxPaths": 128,
+    "maxSteps": 50000,
+    "steps": 1,
+  },
+  "missing": [],
+  "paths": [
+    [
+      "role-link",
+    ],
+  ],
+  "query": {
+    "directoryScopeId": "/",
+    "kind": "active-role",
+    "permissionId": undefined,
+    "principalId": "person",
+    "resourceId": "role",
+    "tenantId": "synthetic-tenant",
+  },
+  "ruleVersion": "entra-configured/1",
+  "snapshotIds": [
+    "synthetic-snapshot",
+  ],
+  "tenantId": "synthetic-tenant",
+  "verdict": "supported",
+}
+`;
+
+exports[`version 1 evidence format compatibility > preserves the public proof fields for application grant 1`] = `
+{
+  "assumptions": [
+    "This conclusion describes recorded configuration under the published rule subset, not effective access or observed use.",
+  ],
+  "collectedAt": [
+    "2026-10-08T12:00:00.000Z",
+  ],
+  "conflicts": [],
+  "dependencies": [
+    "collection:appRoleAssignments",
+    "collection:servicePrincipals",
+    "coverage:appRoleAssignments",
+    "coverage:servicePrincipals",
+    "object:client",
+    "object:resource",
+    "relationship:grant",
+  ],
+  "derivation": [
+    {
+      "conclusion": "Recorded CAN_CALL_AS_APP: client → resource.",
+      "id": "path:0:step:0",
+      "inputs": [
+        "relationship:grant",
+      ],
+      "rule": "entra-configured/1/CAN_CALL_AS_APP",
+    },
+    {
+      "conclusion": "supported",
+      "id": "query",
+      "inputs": [
+        "path:0:step:0",
+        "coverage:appRoleAssignments",
+        "coverage:servicePrincipals",
+        "object:client",
+        "object:resource",
+      ],
+      "rule": "entra-configured/1/application-permission",
+    },
+  ],
+  "engineVersion": "1.0.0",
+  "evidenceClass": "configured",
+  "facts": [
+    {
+      "collectedAt": "2026-10-08T12:00:00.000Z",
+      "completeness": "complete",
+      "id": "coverage:appRoleAssignments",
+      "kind": "coverage",
+      "sourceEndpoint": "/appRoleAssignments",
+      "sourceEndpoints": [
+        "/appRoleAssignments",
+      ],
+      "sourceObjectId": "appRoleAssignments",
+      "sourceRecordIds": [],
+      "targetObjectId": "appRoleAssignments",
+    },
+    {
+      "collectedAt": "2026-10-08T12:00:00.000Z",
+      "completeness": "complete",
+      "id": "coverage:servicePrincipals",
+      "kind": "coverage",
+      "sourceEndpoint": "/servicePrincipals",
+      "sourceEndpoints": [
+        "/servicePrincipals",
+      ],
+      "sourceObjectId": "servicePrincipals",
+      "sourceRecordIds": [],
+      "targetObjectId": "servicePrincipals",
+    },
+    {
+      "collectedAt": "2026-10-08T12:00:00.000Z",
+      "completeness": "recorded",
+      "id": "object:client",
+      "kind": "object",
+      "sourceEndpoint": "/servicePrincipals",
+      "sourceObjectId": "client",
+      "sourceRecordIds": [
+        "client",
+      ],
+      "targetObjectId": "client",
+    },
+    {
+      "collectedAt": "2026-10-08T12:00:00.000Z",
+      "completeness": "recorded",
+      "id": "object:resource",
+      "kind": "object",
+      "sourceEndpoint": "/servicePrincipals",
+      "sourceObjectId": "resource",
+      "sourceRecordIds": [
+        "resource",
+      ],
+      "targetObjectId": "resource",
+    },
+    {
+      "collectedAt": "2026-10-08T12:00:00.000Z",
+      "completeness": "complete",
+      "id": "relationship:grant",
+      "kind": "relationship",
+      "relationshipType": "CAN_CALL_AS_APP",
+      "sourceEndpoint": "/servicePrincipals/resource/appRoleAssignedTo",
+      "sourceObjectId": "client",
+      "sourceRecordIds": [
+        "grant",
+      ],
+      "targetObjectId": "resource",
+    },
+  ],
+  "limits": {
+    "exhausted": false,
+    "maxDepth": 12,
+    "maxPaths": 128,
+    "maxSteps": 50000,
+    "steps": 1,
+  },
+  "missing": [],
+  "paths": [
+    [
+      "grant",
+    ],
+  ],
+  "query": {
+    "kind": "application-permission",
+    "permissionId": "read-id",
+    "principalId": "client",
+    "resourceId": "resource",
+    "tenantId": "synthetic-tenant",
+  },
+  "ruleVersion": "entra-configured/1",
+  "snapshotIds": [
+    "synthetic-snapshot",
+  ],
+  "tenantId": "synthetic-tenant",
+  "verdict": "supported",
+}
+`;
+
+exports[`version 1 evidence format compatibility > preserves the public proof fields for complete absence 1`] = `
+{
+  "assumptions": [
+    "This conclusion describes recorded configuration under the published rule subset, not effective access or observed use.",
+  ],
+  "collectedAt": [
+    "2026-10-08T12:00:00.000Z",
+  ],
+  "conflicts": [],
+  "dependencies": [
+    "collection:appRoleAssignments",
+    "collection:servicePrincipals",
+    "coverage:appRoleAssignments",
+    "coverage:servicePrincipals",
+    "object:client",
+    "object:resource",
+  ],
+  "derivation": [
+    {
+      "conclusion": "refuted",
+      "id": "query",
+      "inputs": [
+        "coverage:appRoleAssignments",
+        "coverage:servicePrincipals",
+        "object:client",
+        "object:resource",
+      ],
+      "rule": "entra-configured/1/application-permission",
+    },
+  ],
+  "engineVersion": "1.0.0",
+  "evidenceClass": "configured",
+  "facts": [
+    {
+      "collectedAt": "2026-10-08T12:00:00.000Z",
+      "completeness": "complete",
+      "id": "coverage:appRoleAssignments",
+      "kind": "coverage",
+      "sourceEndpoint": "/appRoleAssignments",
+      "sourceEndpoints": [
+        "/appRoleAssignments",
+      ],
+      "sourceObjectId": "appRoleAssignments",
+      "sourceRecordIds": [],
+      "targetObjectId": "appRoleAssignments",
+    },
+    {
+      "collectedAt": "2026-10-08T12:00:00.000Z",
+      "completeness": "complete",
+      "id": "coverage:servicePrincipals",
+      "kind": "coverage",
+      "sourceEndpoint": "/servicePrincipals",
+      "sourceEndpoints": [
+        "/servicePrincipals",
+      ],
+      "sourceObjectId": "servicePrincipals",
+      "sourceRecordIds": [],
+      "targetObjectId": "servicePrincipals",
+    },
+    {
+      "collectedAt": "2026-10-08T12:00:00.000Z",
+      "completeness": "recorded",
+      "id": "object:client",
+      "kind": "object",
+      "sourceEndpoint": "/servicePrincipals",
+      "sourceObjectId": "client",
+      "sourceRecordIds": [
+        "client",
+      ],
+      "targetObjectId": "client",
+    },
+    {
+      "collectedAt": "2026-10-08T12:00:00.000Z",
+      "completeness": "recorded",
+      "id": "object:resource",
+      "kind": "object",
+      "sourceEndpoint": "/servicePrincipals",
+      "sourceObjectId": "resource",
+      "sourceRecordIds": [
+        "resource",
+      ],
+      "targetObjectId": "resource",
+    },
+  ],
+  "limits": {
+    "exhausted": false,
+    "maxDepth": 12,
+    "maxPaths": 128,
+    "maxSteps": 50000,
+    "steps": 0,
+  },
+  "missing": [],
+  "paths": [],
+  "query": {
+    "kind": "application-permission",
+    "permissionId": "read-id",
+    "principalId": "client",
+    "resourceId": "resource",
+    "tenantId": "synthetic-tenant",
+  },
+  "ruleVersion": "entra-configured/1",
+  "snapshotIds": [
+    "synthetic-snapshot",
+  ],
+  "tenantId": "synthetic-tenant",
+  "verdict": "refuted",
+}
+`;
+
+exports[`version 1 evidence format compatibility > preserves the public proof fields for conflicting source 1`] = `
+{
+  "assumptions": [
+    "This conclusion describes recorded configuration under the published rule subset, not effective access or observed use.",
+  ],
+  "collectedAt": [
+    "2026-10-08T12:00:00.000Z",
+  ],
+  "conflicts": [
+    {
+      "factId": "relationship:grant",
+      "variants": [
+        "{"evidence":{"completeness":"complete","configured":true,"observed":null,"scannedAt":"2026-10-08T12:00:00.000Z","sourceEndpoint":"/servicePrincipals/resource/appRoleAssignedTo","sourceObjectId":"client","sourceRecordIds":["grant"],"targetObjectId":"resource"},"id":"grant","permissionIds":["different"],"permissions":["Disagrees"],"plainLabel":"CAN_CALL_AS_APP","sourceId":"client","targetId":"resource","tenantId":"synthetic-tenant","type":"CAN_CALL_AS_APP"}",
+        "{"evidence":{"completeness":"complete","configured":true,"observed":null,"scannedAt":"2026-10-08T12:00:00.000Z","sourceEndpoint":"/servicePrincipals/resource/appRoleAssignedTo","sourceObjectId":"client","sourceRecordIds":["grant"],"targetObjectId":"resource"},"id":"grant","permissionIds":["read-id"],"permissions":["Read"],"plainLabel":"CAN_CALL_AS_APP","sourceId":"client","targetId":"resource","tenantId":"synthetic-tenant","type":"CAN_CALL_AS_APP"}",
+      ],
+    },
+  ],
+  "dependencies": [
+    "collection:appRoleAssignments",
+    "collection:servicePrincipals",
+    "coverage:appRoleAssignments",
+    "coverage:servicePrincipals",
+    "object:client",
+    "object:resource",
+    "relationship:grant",
+  ],
+  "derivation": [
+    {
+      "conclusion": "conflicting",
+      "id": "query",
+      "inputs": [
+        "coverage:appRoleAssignments",
+        "coverage:servicePrincipals",
+        "object:client",
+        "object:resource",
+      ],
+      "rule": "entra-configured/1/application-permission",
+    },
+  ],
+  "engineVersion": "1.0.0",
+  "evidenceClass": "configured",
+  "facts": [
+    {
+      "collectedAt": "2026-10-08T12:00:00.000Z",
+      "completeness": "complete",
+      "id": "coverage:appRoleAssignments",
+      "kind": "coverage",
+      "sourceEndpoint": "/appRoleAssignments",
+      "sourceEndpoints": [
+        "/appRoleAssignments",
+      ],
+      "sourceObjectId": "appRoleAssignments",
+      "sourceRecordIds": [],
+      "targetObjectId": "appRoleAssignments",
+    },
+    {
+      "collectedAt": "2026-10-08T12:00:00.000Z",
+      "completeness": "complete",
+      "id": "coverage:servicePrincipals",
+      "kind": "coverage",
+      "sourceEndpoint": "/servicePrincipals",
+      "sourceEndpoints": [
+        "/servicePrincipals",
+      ],
+      "sourceObjectId": "servicePrincipals",
+      "sourceRecordIds": [],
+      "targetObjectId": "servicePrincipals",
+    },
+    {
+      "collectedAt": "2026-10-08T12:00:00.000Z",
+      "completeness": "recorded",
+      "id": "object:client",
+      "kind": "object",
+      "sourceEndpoint": "/servicePrincipals",
+      "sourceObjectId": "client",
+      "sourceRecordIds": [
+        "client",
+      ],
+      "targetObjectId": "client",
+    },
+    {
+      "collectedAt": "2026-10-08T12:00:00.000Z",
+      "completeness": "recorded",
+      "id": "object:resource",
+      "kind": "object",
+      "sourceEndpoint": "/servicePrincipals",
+      "sourceObjectId": "resource",
+      "sourceRecordIds": [
+        "resource",
+      ],
+      "targetObjectId": "resource",
+    },
+  ],
+  "limits": {
+    "exhausted": false,
+    "maxDepth": 12,
+    "maxPaths": 128,
+    "maxSteps": 50000,
+    "steps": 1,
+  },
+  "missing": [],
+  "paths": [],
+  "query": {
+    "kind": "application-permission",
+    "permissionId": "read-id",
+    "principalId": "client",
+    "resourceId": "resource",
+    "tenantId": "synthetic-tenant",
+  },
+  "ruleVersion": "entra-configured/1",
+  "snapshotIds": [
+    "synthetic-snapshot",
+  ],
+  "tenantId": "synthetic-tenant",
+  "verdict": "conflicting",
+}
+`;
+
+exports[`version 1 evidence format compatibility > preserves the public proof fields for delegated grant 1`] = `
+{
+  "assumptions": [
+    "This conclusion describes recorded configuration under the published rule subset, not effective access or observed use.",
+    "Delegated use additionally requires successful user authentication, user resource authorization, requested scope, and applicable policy satisfaction.",
+  ],
+  "collectedAt": [
+    "2026-10-08T12:00:00.000Z",
+  ],
+  "conflicts": [],
+  "dependencies": [
+    "collection:delegatedPermissionGrants",
+    "collection:servicePrincipals",
+    "collection:usersAndGroups",
+    "coverage:delegatedPermissionGrants",
+    "coverage:servicePrincipals",
+    "coverage:usersAndGroups",
+    "object:client",
+    "object:person",
+    "object:resource",
+    "relationship:consent",
+  ],
+  "derivation": [
+    {
+      "conclusion": "Recorded CAN_CALL_DELEGATED: client → resource.",
+      "id": "path:0:step:0",
+      "inputs": [
+        "relationship:consent",
+      ],
+      "rule": "entra-configured/1/CAN_CALL_DELEGATED",
+    },
+    {
+      "conclusion": "supported",
+      "id": "query",
+      "inputs": [
+        "path:0:step:0",
+        "coverage:delegatedPermissionGrants",
+        "coverage:servicePrincipals",
+        "coverage:usersAndGroups",
+        "object:client",
+        "object:person",
+        "object:resource",
+      ],
+      "rule": "entra-configured/1/delegated-permission",
+    },
+  ],
+  "engineVersion": "1.0.0",
+  "evidenceClass": "configured",
+  "facts": [
+    {
+      "collectedAt": "2026-10-08T12:00:00.000Z",
+      "completeness": "complete",
+      "id": "coverage:delegatedPermissionGrants",
+      "kind": "coverage",
+      "sourceEndpoint": "/delegatedPermissionGrants",
+      "sourceEndpoints": [
+        "/delegatedPermissionGrants",
+      ],
+      "sourceObjectId": "delegatedPermissionGrants",
+      "sourceRecordIds": [],
+      "targetObjectId": "delegatedPermissionGrants",
+    },
+    {
+      "collectedAt": "2026-10-08T12:00:00.000Z",
+      "completeness": "complete",
+      "id": "coverage:servicePrincipals",
+      "kind": "coverage",
+      "sourceEndpoint": "/servicePrincipals",
+      "sourceEndpoints": [
+        "/servicePrincipals",
+      ],
+      "sourceObjectId": "servicePrincipals",
+      "sourceRecordIds": [],
+      "targetObjectId": "servicePrincipals",
+    },
+    {
+      "collectedAt": "2026-10-08T12:00:00.000Z",
+      "completeness": "complete",
+      "id": "coverage:usersAndGroups",
+      "kind": "coverage",
+      "sourceEndpoint": "/usersAndGroups",
+      "sourceEndpoints": [
+        "/usersAndGroups",
+      ],
+      "sourceObjectId": "usersAndGroups",
+      "sourceRecordIds": [],
+      "targetObjectId": "usersAndGroups",
+    },
+    {
+      "collectedAt": "2026-10-08T12:00:00.000Z",
+      "completeness": "recorded",
+      "id": "object:client",
+      "kind": "object",
+      "sourceEndpoint": "/servicePrincipals",
+      "sourceObjectId": "client",
+      "sourceRecordIds": [
+        "client",
+      ],
+      "targetObjectId": "client",
+    },
+    {
+      "collectedAt": "2026-10-08T12:00:00.000Z",
+      "completeness": "recorded",
+      "id": "object:person",
+      "kind": "object",
+      "sourceEndpoint": "/servicePrincipals",
+      "sourceObjectId": "person",
+      "sourceRecordIds": [
+        "person",
+      ],
+      "targetObjectId": "person",
+    },
+    {
+      "collectedAt": "2026-10-08T12:00:00.000Z",
+      "completeness": "recorded",
+      "id": "object:resource",
+      "kind": "object",
+      "sourceEndpoint": "/servicePrincipals",
+      "sourceObjectId": "resource",
+      "sourceRecordIds": [
+        "resource",
+      ],
+      "targetObjectId": "resource",
+    },
+    {
+      "collectedAt": "2026-10-08T12:00:00.000Z",
+      "completeness": "complete",
+      "id": "relationship:consent",
+      "kind": "relationship",
+      "relationshipType": "CAN_CALL_DELEGATED",
+      "sourceEndpoint": "/servicePrincipals/resource/appRoleAssignedTo",
+      "sourceObjectId": "client",
+      "sourceRecordIds": [
+        "consent",
+      ],
+      "targetObjectId": "resource",
+    },
+  ],
+  "limits": {
+    "exhausted": false,
+    "maxDepth": 12,
+    "maxPaths": 128,
+    "maxSteps": 50000,
+    "steps": 1,
+  },
+  "missing": [],
+  "paths": [
+    [
+      "consent",
+    ],
+  ],
+  "query": {
+    "kind": "delegated-permission",
+    "permissionId": "read-id",
+    "principalId": "client",
+    "resourceId": "resource",
+    "tenantId": "synthetic-tenant",
+    "userId": "person",
+  },
+  "ruleVersion": "entra-configured/1",
+  "snapshotIds": [
+    "synthetic-snapshot",
+  ],
+  "tenantId": "synthetic-tenant",
+  "verdict": "supported",
+}
+`;
+
+exports[`version 1 evidence format compatibility > preserves the public proof fields for direct group assignment 1`] = `
+{
+  "assumptions": [
+    "This conclusion describes recorded configuration under the published rule subset, not effective access or observed use.",
+    "Application assignment expands direct group members only. Nested group assignment is not supported by Entra.",
+  ],
+  "collectedAt": [
+    "2026-10-08T12:00:00.000Z",
+  ],
+  "conflicts": [],
+  "dependencies": [
+    "collection:appRoleAssignments",
+    "collection:groupMemberships",
+    "collection:servicePrincipals",
+    "collection:usersAndGroups",
+    "coverage:appRoleAssignments",
+    "coverage:groupMemberships",
+    "coverage:servicePrincipals",
+    "coverage:usersAndGroups",
+    "object:person",
+    "object:resource",
+    "object:team",
+    "relationship:assignment",
+    "relationship:member",
+  ],
+  "derivation": [
+    {
+      "conclusion": "Recorded MEMBER_OF: person → team.",
+      "id": "path:0:step:0",
+      "inputs": [
+        "relationship:member",
+      ],
+      "rule": "entra-configured/1/MEMBER_OF",
+    },
+    {
+      "conclusion": "Recorded ASSIGNED_TO: team → resource.",
+      "id": "path:0:step:1",
+      "inputs": [
+        "relationship:assignment",
+        "path:0:step:0",
+      ],
+      "rule": "entra-configured/1/ASSIGNED_TO",
+    },
+    {
+      "conclusion": "supported",
+      "id": "query",
+      "inputs": [
+        "path:0:step:1",
+        "coverage:appRoleAssignments",
+        "coverage:groupMemberships",
+        "coverage:servicePrincipals",
+        "coverage:usersAndGroups",
+        "object:person",
+        "object:resource",
+        "object:team",
+      ],
+      "rule": "entra-configured/1/assignment",
+    },
+  ],
+  "engineVersion": "1.0.0",
+  "evidenceClass": "configured",
+  "facts": [
+    {
+      "collectedAt": "2026-10-08T12:00:00.000Z",
+      "completeness": "complete",
+      "id": "coverage:appRoleAssignments",
+      "kind": "coverage",
+      "sourceEndpoint": "/appRoleAssignments",
+      "sourceEndpoints": [
+        "/appRoleAssignments",
+      ],
+      "sourceObjectId": "appRoleAssignments",
+      "sourceRecordIds": [],
+      "targetObjectId": "appRoleAssignments",
+    },
+    {
+      "collectedAt": "2026-10-08T12:00:00.000Z",
+      "completeness": "complete",
+      "id": "coverage:groupMemberships",
+      "kind": "coverage",
+      "sourceEndpoint": "/groupMemberships",
+      "sourceEndpoints": [
+        "/groupMemberships",
+      ],
+      "sourceObjectId": "groupMemberships",
+      "sourceRecordIds": [],
+      "targetObjectId": "groupMemberships",
+    },
+    {
+      "collectedAt": "2026-10-08T12:00:00.000Z",
+      "completeness": "complete",
+      "id": "coverage:servicePrincipals",
+      "kind": "coverage",
+      "sourceEndpoint": "/servicePrincipals",
+      "sourceEndpoints": [
+        "/servicePrincipals",
+      ],
+      "sourceObjectId": "servicePrincipals",
+      "sourceRecordIds": [],
+      "targetObjectId": "servicePrincipals",
+    },
+    {
+      "collectedAt": "2026-10-08T12:00:00.000Z",
+      "completeness": "complete",
+      "id": "coverage:usersAndGroups",
+      "kind": "coverage",
+      "sourceEndpoint": "/usersAndGroups",
+      "sourceEndpoints": [
+        "/usersAndGroups",
+      ],
+      "sourceObjectId": "usersAndGroups",
+      "sourceRecordIds": [],
+      "targetObjectId": "usersAndGroups",
+    },
+    {
+      "collectedAt": "2026-10-08T12:00:00.000Z",
+      "completeness": "recorded",
+      "id": "object:person",
+      "kind": "object",
+      "sourceEndpoint": "/servicePrincipals",
+      "sourceObjectId": "person",
+      "sourceRecordIds": [
+        "person",
+      ],
+      "targetObjectId": "person",
+    },
+    {
+      "collectedAt": "2026-10-08T12:00:00.000Z",
+      "completeness": "recorded",
+      "id": "object:resource",
+      "kind": "object",
+      "sourceEndpoint": "/servicePrincipals",
+      "sourceObjectId": "resource",
+      "sourceRecordIds": [
+        "resource",
+      ],
+      "targetObjectId": "resource",
+    },
+    {
+      "collectedAt": "2026-10-08T12:00:00.000Z",
+      "completeness": "recorded",
+      "id": "object:team",
+      "kind": "object",
+      "sourceEndpoint": "/servicePrincipals",
+      "sourceObjectId": "team",
+      "sourceRecordIds": [
+        "team",
+      ],
+      "targetObjectId": "team",
+    },
+    {
+      "collectedAt": "2026-10-08T12:00:00.000Z",
+      "completeness": "complete",
+      "id": "relationship:assignment",
+      "kind": "relationship",
+      "relationshipType": "ASSIGNED_TO",
+      "sourceEndpoint": "/servicePrincipals/resource/appRoleAssignedTo",
+      "sourceObjectId": "team",
+      "sourceRecordIds": [
+        "assignment",
+      ],
+      "targetObjectId": "resource",
+    },
+    {
+      "collectedAt": "2026-10-08T12:00:00.000Z",
+      "completeness": "complete",
+      "id": "relationship:member",
+      "kind": "relationship",
+      "relationshipType": "MEMBER_OF",
+      "sourceEndpoint": "/servicePrincipals/team/appRoleAssignedTo",
+      "sourceObjectId": "person",
+      "sourceRecordIds": [
+        "member",
+      ],
+      "targetObjectId": "team",
+    },
+  ],
+  "limits": {
+    "exhausted": false,
+    "maxDepth": 12,
+    "maxPaths": 128,
+    "maxSteps": 50000,
+    "steps": 2,
+  },
+  "missing": [],
+  "paths": [
+    [
+      "member",
+      "assignment",
+    ],
+  ],
+  "query": {
+    "kind": "assignment",
+    "permissionId": undefined,
+    "principalId": "person",
+    "resourceId": "resource",
+    "tenantId": "synthetic-tenant",
+  },
+  "ruleVersion": "entra-configured/1",
+  "snapshotIds": [
+    "synthetic-snapshot",
+  ],
+  "tenantId": "synthetic-tenant",
+  "verdict": "supported",
+}
+`;
+
+exports[`version 1 evidence format compatibility > preserves the public proof fields for eligible-role 1`] = `
+{
+  "assumptions": [
+    "This conclusion describes recorded configuration under the published rule subset, not effective access or observed use.",
+    "Eligibility is not activation. Approval, activation conditions, and current role use are not established.",
+  ],
+  "collectedAt": [
+    "2026-10-08T12:00:00.000Z",
+  ],
+  "conflicts": [],
+  "dependencies": [
+    "collection:groupMemberships",
+    "collection:roles",
+    "collection:usersAndGroups",
+    "coverage:groupMemberships",
+    "coverage:roles",
+    "coverage:usersAndGroups",
+    "object:person",
+    "object:role",
+    "relationship:role-link",
+  ],
+  "derivation": [
+    {
+      "conclusion": "Recorded ELIGIBLE_FOR_ROLE: person → role.",
+      "id": "path:0:step:0",
+      "inputs": [
+        "relationship:role-link",
+      ],
+      "rule": "entra-configured/1/ELIGIBLE_FOR_ROLE",
+    },
+    {
+      "conclusion": "supported",
+      "id": "query",
+      "inputs": [
+        "path:0:step:0",
+        "coverage:groupMemberships",
+        "coverage:roles",
+        "coverage:usersAndGroups",
+        "object:person",
+        "object:role",
+      ],
+      "rule": "entra-configured/1/eligible-role",
+    },
+  ],
+  "engineVersion": "1.0.0",
+  "evidenceClass": "configured",
+  "facts": [
+    {
+      "collectedAt": "2026-10-08T12:00:00.000Z",
+      "completeness": "complete",
+      "id": "coverage:groupMemberships",
+      "kind": "coverage",
+      "sourceEndpoint": "/groupMemberships",
+      "sourceEndpoints": [
+        "/groupMemberships",
+      ],
+      "sourceObjectId": "groupMemberships",
+      "sourceRecordIds": [],
+      "targetObjectId": "groupMemberships",
+    },
+    {
+      "collectedAt": "2026-10-08T12:00:00.000Z",
+      "completeness": "complete",
+      "id": "coverage:roles",
+      "kind": "coverage",
+      "sourceEndpoint": "/roles",
+      "sourceEndpoints": [
+        "/roles",
+      ],
+      "sourceObjectId": "roles",
+      "sourceRecordIds": [],
+      "targetObjectId": "roles",
+    },
+    {
+      "collectedAt": "2026-10-08T12:00:00.000Z",
+      "completeness": "complete",
+      "id": "coverage:usersAndGroups",
+      "kind": "coverage",
+      "sourceEndpoint": "/usersAndGroups",
+      "sourceEndpoints": [
+        "/usersAndGroups",
+      ],
+      "sourceObjectId": "usersAndGroups",
+      "sourceRecordIds": [],
+      "targetObjectId": "usersAndGroups",
+    },
+    {
+      "collectedAt": "2026-10-08T12:00:00.000Z",
+      "completeness": "recorded",
+      "id": "object:person",
+      "kind": "object",
+      "sourceEndpoint": "/servicePrincipals",
+      "sourceObjectId": "person",
+      "sourceRecordIds": [
+        "person",
+      ],
+      "targetObjectId": "person",
+    },
+    {
+      "collectedAt": "2026-10-08T12:00:00.000Z",
+      "completeness": "recorded",
+      "id": "object:role",
+      "kind": "object",
+      "sourceEndpoint": "/servicePrincipals",
+      "sourceObjectId": "role",
+      "sourceRecordIds": [
+        "role",
+      ],
+      "targetObjectId": "role",
+    },
+    {
+      "collectedAt": "2026-10-08T12:00:00.000Z",
+      "completeness": "complete",
+      "id": "relationship:role-link",
+      "kind": "relationship",
+      "relationshipType": "ELIGIBLE_FOR_ROLE",
+      "sourceEndpoint": "/servicePrincipals/role/appRoleAssignedTo",
+      "sourceObjectId": "person",
+      "sourceRecordIds": [
+        "role-link",
+      ],
+      "targetObjectId": "role",
+    },
+  ],
+  "limits": {
+    "exhausted": false,
+    "maxDepth": 12,
+    "maxPaths": 128,
+    "maxSteps": 50000,
+    "steps": 1,
+  },
+  "missing": [],
+  "paths": [
+    [
+      "role-link",
+    ],
+  ],
+  "query": {
+    "directoryScopeId": "/",
+    "kind": "eligible-role",
+    "permissionId": undefined,
+    "principalId": "person",
+    "resourceId": "role",
+    "tenantId": "synthetic-tenant",
+  },
+  "ruleVersion": "entra-configured/1",
+  "snapshotIds": [
+    "synthetic-snapshot",
+  ],
+  "tenantId": "synthetic-tenant",
+  "verdict": "supported",
+}
+`;
+
+exports[`version 1 evidence format compatibility > preserves the public proof fields for federated control 1`] = `
+{
+  "assumptions": [
+    "This conclusion describes recorded configuration under the published rule subset, not effective access or observed use.",
+    "Ownership is modeled as a potential configuration-control capability; credential creation, possession, token issuance, policy, and resource enforcement are not proven.",
+  ],
+  "collectedAt": [
+    "2026-10-08T12:00:00.000Z",
+  ],
+  "conflicts": [],
+  "dependencies": [
+    "collection:appRoleAssignments",
+    "collection:applications",
+    "collection:federatedIdentityCredentials",
+    "collection:owners",
+    "collection:servicePrincipals",
+    "coverage:appRoleAssignments",
+    "coverage:applications",
+    "coverage:federatedIdentityCredentials",
+    "coverage:owners",
+    "coverage:servicePrincipals",
+    "object:blueprint",
+    "object:client",
+    "object:resource",
+    "object:trust",
+    "relationship:grant",
+    "relationship:instance",
+    "relationship:trust-to-app",
+  ],
+  "derivation": [
+    {
+      "conclusion": "Recorded FEDERATES_AS: trust → blueprint.",
+      "id": "path:0:step:0",
+      "inputs": [
+        "relationship:trust-to-app",
+      ],
+      "rule": "entra-configured/1/FEDERATES_AS",
+    },
+    {
+      "conclusion": "Recorded INSTANTIATES_AS: blueprint → client.",
+      "id": "path:0:step:1",
+      "inputs": [
+        "relationship:instance",
+        "path:0:step:0",
+      ],
+      "rule": "entra-configured/1/INSTANTIATES_AS",
+    },
+    {
+      "conclusion": "Recorded CAN_CALL_AS_APP: client → resource.",
+      "id": "path:0:step:2",
+      "inputs": [
+        "relationship:grant",
+        "path:0:step:1",
+      ],
+      "rule": "entra-configured/1/CAN_CALL_AS_APP",
+    },
+    {
+      "conclusion": "supported",
+      "id": "query",
+      "inputs": [
+        "path:0:step:2",
+        "coverage:appRoleAssignments",
+        "coverage:applications",
+        "coverage:federatedIdentityCredentials",
+        "coverage:owners",
+        "coverage:servicePrincipals",
+        "object:blueprint",
+        "object:client",
+        "object:resource",
+        "object:trust",
+      ],
+      "rule": "entra-configured/1/control-path",
+    },
+  ],
+  "engineVersion": "1.0.0",
+  "evidenceClass": "inferred",
+  "facts": [
+    {
+      "collectedAt": "2026-10-08T12:00:00.000Z",
+      "completeness": "complete",
+      "id": "coverage:appRoleAssignments",
+      "kind": "coverage",
+      "sourceEndpoint": "/appRoleAssignments",
+      "sourceEndpoints": [
+        "/appRoleAssignments",
+      ],
+      "sourceObjectId": "appRoleAssignments",
+      "sourceRecordIds": [],
+      "targetObjectId": "appRoleAssignments",
+    },
+    {
+      "collectedAt": "2026-10-08T12:00:00.000Z",
+      "completeness": "complete",
+      "id": "coverage:applications",
+      "kind": "coverage",
+      "sourceEndpoint": "/applications",
+      "sourceEndpoints": [
+        "/applications",
+      ],
+      "sourceObjectId": "applications",
+      "sourceRecordIds": [],
+      "targetObjectId": "applications",
+    },
+    {
+      "collectedAt": "2026-10-08T12:00:00.000Z",
+      "completeness": "complete",
+      "id": "coverage:federatedIdentityCredentials",
+      "kind": "coverage",
+      "sourceEndpoint": "/federatedIdentityCredentials",
+      "sourceEndpoints": [
+        "/federatedIdentityCredentials",
+      ],
+      "sourceObjectId": "federatedIdentityCredentials",
+      "sourceRecordIds": [],
+      "targetObjectId": "federatedIdentityCredentials",
+    },
+    {
+      "collectedAt": "2026-10-08T12:00:00.000Z",
+      "completeness": "complete",
+      "id": "coverage:owners",
+      "kind": "coverage",
+      "sourceEndpoint": "/owners",
+      "sourceEndpoints": [
+        "/owners",
+      ],
+      "sourceObjectId": "owners",
+      "sourceRecordIds": [],
+      "targetObjectId": "owners",
+    },
+    {
+      "collectedAt": "2026-10-08T12:00:00.000Z",
+      "completeness": "complete",
+      "id": "coverage:servicePrincipals",
+      "kind": "coverage",
+      "sourceEndpoint": "/servicePrincipals",
+      "sourceEndpoints": [
+        "/servicePrincipals",
+      ],
+      "sourceObjectId": "servicePrincipals",
+      "sourceRecordIds": [],
+      "targetObjectId": "servicePrincipals",
+    },
+    {
+      "collectedAt": "2026-10-08T12:00:00.000Z",
+      "completeness": "recorded",
+      "id": "object:blueprint",
+      "kind": "object",
+      "sourceEndpoint": "/servicePrincipals",
+      "sourceObjectId": "blueprint",
+      "sourceRecordIds": [
+        "blueprint",
+      ],
+      "targetObjectId": "blueprint",
+    },
+    {
+      "collectedAt": "2026-10-08T12:00:00.000Z",
+      "completeness": "recorded",
+      "id": "object:client",
+      "kind": "object",
+      "sourceEndpoint": "/servicePrincipals",
+      "sourceObjectId": "client",
+      "sourceRecordIds": [
+        "client",
+      ],
+      "targetObjectId": "client",
+    },
+    {
+      "collectedAt": "2026-10-08T12:00:00.000Z",
+      "completeness": "recorded",
+      "id": "object:resource",
+      "kind": "object",
+      "sourceEndpoint": "/servicePrincipals",
+      "sourceObjectId": "resource",
+      "sourceRecordIds": [
+        "resource",
+      ],
+      "targetObjectId": "resource",
+    },
+    {
+      "collectedAt": "2026-10-08T12:00:00.000Z",
+      "completeness": "recorded",
+      "id": "object:trust",
+      "kind": "object",
+      "sourceEndpoint": "/servicePrincipals",
+      "sourceObjectId": "trust",
+      "sourceRecordIds": [
+        "trust",
+      ],
+      "targetObjectId": "trust",
+    },
+    {
+      "collectedAt": "2026-10-08T12:00:00.000Z",
+      "completeness": "complete",
+      "id": "relationship:grant",
+      "kind": "relationship",
+      "relationshipType": "CAN_CALL_AS_APP",
+      "sourceEndpoint": "/servicePrincipals/resource/appRoleAssignedTo",
+      "sourceObjectId": "client",
+      "sourceRecordIds": [
+        "grant",
+      ],
+      "targetObjectId": "resource",
+    },
+    {
+      "collectedAt": "2026-10-08T12:00:00.000Z",
+      "completeness": "complete",
+      "id": "relationship:instance",
+      "kind": "relationship",
+      "relationshipType": "INSTANTIATES_AS",
+      "sourceEndpoint": "/servicePrincipals/client/appRoleAssignedTo",
+      "sourceObjectId": "blueprint",
+      "sourceRecordIds": [
+        "instance",
+      ],
+      "targetObjectId": "client",
+    },
+    {
+      "collectedAt": "2026-10-08T12:00:00.000Z",
+      "completeness": "complete",
+      "id": "relationship:trust-to-app",
+      "kind": "relationship",
+      "relationshipType": "FEDERATES_AS",
+      "sourceEndpoint": "/servicePrincipals/blueprint/appRoleAssignedTo",
+      "sourceObjectId": "trust",
+      "sourceRecordIds": [
+        "trust-to-app",
+      ],
+      "targetObjectId": "blueprint",
+    },
+  ],
+  "limits": {
+    "exhausted": false,
+    "maxDepth": 12,
+    "maxPaths": 128,
+    "maxSteps": 50000,
+    "steps": 3,
+  },
+  "missing": [],
+  "paths": [
+    [
+      "trust-to-app",
+      "instance",
+      "grant",
+    ],
+  ],
+  "query": {
+    "kind": "control-path",
+    "permissionId": "read-id",
+    "principalId": "trust",
+    "resourceId": "resource",
+    "tenantId": "synthetic-tenant",
+  },
+  "ruleVersion": "entra-configured/1",
+  "snapshotIds": [
+    "synthetic-snapshot",
+  ],
+  "tenantId": "synthetic-tenant",
+  "verdict": "supported",
+}
+`;
+
+exports[`version 1 evidence format compatibility > preserves the public proof fields for missing grant inventory 1`] = `
+{
+  "assumptions": [
+    "This conclusion describes recorded configuration under the published rule subset, not effective access or observed use.",
+  ],
+  "collectedAt": [
+    "2026-10-08T12:00:00.000Z",
+  ],
+  "conflicts": [],
+  "dependencies": [
+    "collection:appRoleAssignments",
+    "collection:servicePrincipals",
+    "coverage:appRoleAssignments",
+    "coverage:servicePrincipals",
+    "object:client",
+    "object:resource",
+  ],
+  "derivation": [
+    {
+      "conclusion": "unknown",
+      "id": "query",
+      "inputs": [
+        "coverage:appRoleAssignments",
+        "coverage:servicePrincipals",
+        "object:client",
+        "object:resource",
+      ],
+      "rule": "entra-configured/1/application-permission",
+    },
+  ],
+  "engineVersion": "1.0.0",
+  "evidenceClass": "configured",
+  "facts": [
+    {
+      "collectedAt": "",
+      "completeness": "unknown",
+      "id": "coverage:appRoleAssignments",
+      "kind": "coverage",
+      "sourceEndpoint": "",
+      "sourceEndpoints": [],
+      "sourceObjectId": "appRoleAssignments",
+      "sourceRecordIds": [],
+      "targetObjectId": "appRoleAssignments",
+    },
+    {
+      "collectedAt": "",
+      "completeness": "unknown",
+      "id": "coverage:servicePrincipals",
+      "kind": "coverage",
+      "sourceEndpoint": "",
+      "sourceEndpoints": [],
+      "sourceObjectId": "servicePrincipals",
+      "sourceRecordIds": [],
+      "targetObjectId": "servicePrincipals",
+    },
+    {
+      "collectedAt": "2026-10-08T12:00:00.000Z",
+      "completeness": "recorded",
+      "id": "object:client",
+      "kind": "object",
+      "sourceEndpoint": "/servicePrincipals",
+      "sourceObjectId": "client",
+      "sourceRecordIds": [
+        "client",
+      ],
+      "targetObjectId": "client",
+    },
+    {
+      "collectedAt": "2026-10-08T12:00:00.000Z",
+      "completeness": "recorded",
+      "id": "object:resource",
+      "kind": "object",
+      "sourceEndpoint": "/servicePrincipals",
+      "sourceObjectId": "resource",
+      "sourceRecordIds": [
+        "resource",
+      ],
+      "targetObjectId": "resource",
+    },
+  ],
+  "limits": {
+    "exhausted": false,
+    "maxDepth": 12,
+    "maxPaths": 128,
+    "maxSteps": 50000,
+    "steps": 0,
+  },
+  "missing": [
+    "coverage:appRoleAssignments",
+    "coverage:servicePrincipals",
+  ],
+  "paths": [],
+  "query": {
+    "kind": "application-permission",
+    "permissionId": "read-id",
+    "principalId": "client",
+    "resourceId": "resource",
+    "tenantId": "synthetic-tenant",
+  },
+  "ruleVersion": "entra-configured/1",
+  "snapshotIds": [
+    "synthetic-snapshot",
+  ],
+  "tenantId": "synthetic-tenant",
+  "verdict": "unknown",
+}
+`;
+
+exports[`version 1 evidence format compatibility > preserves the public proof fields for ownership control 1`] = `
+{
+  "assumptions": [
+    "This conclusion describes recorded configuration under the published rule subset, not effective access or observed use.",
+    "Ownership is modeled as a potential configuration-control capability; credential creation, possession, token issuance, policy, and resource enforcement are not proven.",
+  ],
+  "collectedAt": [
+    "2026-10-08T12:00:00.000Z",
+  ],
+  "conflicts": [],
+  "dependencies": [
+    "collection:appRoleAssignments",
+    "collection:applications",
+    "collection:federatedIdentityCredentials",
+    "collection:owners",
+    "collection:servicePrincipals",
+    "coverage:appRoleAssignments",
+    "coverage:applications",
+    "coverage:federatedIdentityCredentials",
+    "coverage:owners",
+    "coverage:servicePrincipals",
+    "object:client",
+    "object:person",
+    "object:resource",
+    "relationship:grant",
+    "relationship:owner",
+  ],
+  "derivation": [
+    {
+      "conclusion": "Recorded OWNS: person → client.",
+      "id": "path:0:step:0",
+      "inputs": [
+        "relationship:owner",
+      ],
+      "rule": "entra-configured/1/OWNS",
+    },
+    {
+      "conclusion": "Recorded CAN_CALL_AS_APP: client → resource.",
+      "id": "path:0:step:1",
+      "inputs": [
+        "relationship:grant",
+        "path:0:step:0",
+      ],
+      "rule": "entra-configured/1/CAN_CALL_AS_APP",
+    },
+    {
+      "conclusion": "supported",
+      "id": "query",
+      "inputs": [
+        "path:0:step:1",
+        "coverage:appRoleAssignments",
+        "coverage:applications",
+        "coverage:federatedIdentityCredentials",
+        "coverage:owners",
+        "coverage:servicePrincipals",
+        "object:client",
+        "object:person",
+        "object:resource",
+      ],
+      "rule": "entra-configured/1/control-path",
+    },
+  ],
+  "engineVersion": "1.0.0",
+  "evidenceClass": "inferred",
+  "facts": [
+    {
+      "collectedAt": "2026-10-08T12:00:00.000Z",
+      "completeness": "complete",
+      "id": "coverage:appRoleAssignments",
+      "kind": "coverage",
+      "sourceEndpoint": "/appRoleAssignments",
+      "sourceEndpoints": [
+        "/appRoleAssignments",
+      ],
+      "sourceObjectId": "appRoleAssignments",
+      "sourceRecordIds": [],
+      "targetObjectId": "appRoleAssignments",
+    },
+    {
+      "collectedAt": "2026-10-08T12:00:00.000Z",
+      "completeness": "complete",
+      "id": "coverage:applications",
+      "kind": "coverage",
+      "sourceEndpoint": "/applications",
+      "sourceEndpoints": [
+        "/applications",
+      ],
+      "sourceObjectId": "applications",
+      "sourceRecordIds": [],
+      "targetObjectId": "applications",
+    },
+    {
+      "collectedAt": "2026-10-08T12:00:00.000Z",
+      "completeness": "complete",
+      "id": "coverage:federatedIdentityCredentials",
+      "kind": "coverage",
+      "sourceEndpoint": "/federatedIdentityCredentials",
+      "sourceEndpoints": [
+        "/federatedIdentityCredentials",
+      ],
+      "sourceObjectId": "federatedIdentityCredentials",
+      "sourceRecordIds": [],
+      "targetObjectId": "federatedIdentityCredentials",
+    },
+    {
+      "collectedAt": "2026-10-08T12:00:00.000Z",
+      "completeness": "complete",
+      "id": "coverage:owners",
+      "kind": "coverage",
+      "sourceEndpoint": "/owners",
+      "sourceEndpoints": [
+        "/owners",
+      ],
+      "sourceObjectId": "owners",
+      "sourceRecordIds": [],
+      "targetObjectId": "owners",
+    },
+    {
+      "collectedAt": "2026-10-08T12:00:00.000Z",
+      "completeness": "complete",
+      "id": "coverage:servicePrincipals",
+      "kind": "coverage",
+      "sourceEndpoint": "/servicePrincipals",
+      "sourceEndpoints": [
+        "/servicePrincipals",
+      ],
+      "sourceObjectId": "servicePrincipals",
+      "sourceRecordIds": [],
+      "targetObjectId": "servicePrincipals",
+    },
+    {
+      "collectedAt": "2026-10-08T12:00:00.000Z",
+      "completeness": "recorded",
+      "id": "object:client",
+      "kind": "object",
+      "sourceEndpoint": "/servicePrincipals",
+      "sourceObjectId": "client",
+      "sourceRecordIds": [
+        "client",
+      ],
+      "targetObjectId": "client",
+    },
+    {
+      "collectedAt": "2026-10-08T12:00:00.000Z",
+      "completeness": "recorded",
+      "id": "object:person",
+      "kind": "object",
+      "sourceEndpoint": "/servicePrincipals",
+      "sourceObjectId": "person",
+      "sourceRecordIds": [
+        "person",
+      ],
+      "targetObjectId": "person",
+    },
+    {
+      "collectedAt": "2026-10-08T12:00:00.000Z",
+      "completeness": "recorded",
+      "id": "object:resource",
+      "kind": "object",
+      "sourceEndpoint": "/servicePrincipals",
+      "sourceObjectId": "resource",
+      "sourceRecordIds": [
+        "resource",
+      ],
+      "targetObjectId": "resource",
+    },
+    {
+      "collectedAt": "2026-10-08T12:00:00.000Z",
+      "completeness": "complete",
+      "id": "relationship:grant",
+      "kind": "relationship",
+      "relationshipType": "CAN_CALL_AS_APP",
+      "sourceEndpoint": "/servicePrincipals/resource/appRoleAssignedTo",
+      "sourceObjectId": "client",
+      "sourceRecordIds": [
+        "grant",
+      ],
+      "targetObjectId": "resource",
+    },
+    {
+      "collectedAt": "2026-10-08T12:00:00.000Z",
+      "completeness": "complete",
+      "id": "relationship:owner",
+      "kind": "relationship",
+      "relationshipType": "OWNS",
+      "sourceEndpoint": "/servicePrincipals/client/appRoleAssignedTo",
+      "sourceObjectId": "person",
+      "sourceRecordIds": [
+        "owner",
+      ],
+      "targetObjectId": "client",
+    },
+  ],
+  "limits": {
+    "exhausted": false,
+    "maxDepth": 12,
+    "maxPaths": 128,
+    "maxSteps": 50000,
+    "steps": 2,
+  },
+  "missing": [],
+  "paths": [
+    [
+      "owner",
+      "grant",
+    ],
+  ],
+  "query": {
+    "kind": "control-path",
+    "permissionId": "read-id",
+    "principalId": "person",
+    "resourceId": "resource",
+    "tenantId": "synthetic-tenant",
+  },
+  "ruleVersion": "entra-configured/1",
+  "snapshotIds": [
+    "synthetic-snapshot",
+  ],
+  "tenantId": "synthetic-tenant",
+  "verdict": "supported",
+}
+`;
+
+exports[`version 1 evidence format compatibility > preserves time windows, uncertain continuity and collection context 1`] = `
+{
+  "assumptions": [
+    "A collected-snapshot witness assumes consistency of that scan; collection is not an atomic transaction.",
+    "Source-declared validity intersects as half-open intervals. Repeated observations, event ordering, and missing audit windows do not prove uninterrupted existence.",
+  ],
+  "auditContext": "not-used-to-infer-continuity",
+  "collectedAt": [
+    "2026-10-08T12:00:00.000Z",
+    "2026-10-10T12:00:00.000Z",
+  ],
+  "engineVersion": "1.0.0",
+  "limits": {
+    "exhausted": false,
+    "maxSteps": 100000,
+    "steps": 2,
+  },
+  "missing": [],
+  "paths": [
+    {
+      "collectedInstants": [
+        "2026-10-08T12:00:00.000Z",
+        "2026-10-10T12:00:00.000Z",
+      ],
+      "edges": [
+        "grant",
+      ],
+      "snapshots": [
+        "later",
+        "synthetic-snapshot",
+      ],
+      "sourceValidity": {
+        "endsAt": "2026-10-31T00:00:00.000Z",
+        "startsAt": "2026-10-01T00:00:00.000Z",
+      },
+      "uncertainIntervals": [
+        {
+          "endsAt": "2026-10-10T12:00:00.000Z",
+          "startsAt": "2026-10-08T12:00:00.000Z",
+        },
+      ],
+      "validity": "overlap",
+    },
+  ],
+  "ruleVersion": "entra-configured/1",
+  "snapshotIds": [
+    "later",
+    "synthetic-snapshot",
+  ],
+  "tenantId": "synthetic-tenant",
+  "verdict": "supported",
+}
+`;
+
+exports[`version 1 evidence format compatibility > projects allowlisted facts and leaves labels out of portable evidence 1`] = `
+{
+  "collectedAt": [
+    "2026-10-08T12:00:00.000Z",
+  ],
+  "conflicts": [],
+  "coverage": [
+    {
+      "collectedAt": "2026-10-08T12:00:00.000Z",
+      "endpoints": [
+        "/activity",
+      ],
+      "failedEndpoints": [],
+      "id": "activity",
+      "itemCount": 1,
+      "reason": "Recorded collection boundary.",
+      "scope": "AuditLog.Read.All",
+      "state": "complete",
+    },
+    {
+      "collectedAt": "2026-10-08T12:00:00.000Z",
+      "endpoints": [
+        "/administrativeUnits",
+      ],
+      "failedEndpoints": [],
+      "id": "administrativeUnits",
+      "itemCount": 1,
+      "reason": "Recorded collection boundary.",
+      "scope": "Directory.Read.All",
+      "state": "complete",
+    },
+    {
+      "collectedAt": "2026-10-08T12:00:00.000Z",
+      "endpoints": [
+        "/appRoleAssignments",
+      ],
+      "failedEndpoints": [],
+      "id": "appRoleAssignments",
+      "itemCount": 1,
+      "reason": "Recorded collection boundary.",
+      "scope": "Application.Read.All",
+      "state": "complete",
+    },
+    {
+      "collectedAt": "2026-10-08T12:00:00.000Z",
+      "endpoints": [
+        "/applications",
+      ],
+      "failedEndpoints": [],
+      "id": "applications",
+      "itemCount": 1,
+      "limits": {
+        "maxItemsPerEndpoint": 20,
+        "maxPagesPerEndpoint": 4,
+      },
+      "reason": "Recorded collection boundary.",
+      "scope": "Application.Read.All",
+      "state": "complete",
+      "window": {
+        "endsAt": "2026-10-08T12:00:00.000Z",
+        "eventClasses": [
+          "one",
+          "two",
+        ],
+        "startsAt": "2026-10-01T00:00:00.000Z",
+      },
+    },
+    {
+      "collectedAt": "2026-10-08T12:00:00.000Z",
+      "endpoints": [
+        "/authorizationPolicy",
+      ],
+      "failedEndpoints": [],
+      "id": "authorizationPolicy",
+      "itemCount": 1,
+      "reason": "Recorded collection boundary.",
+      "scope": "Policy.Read.All",
+      "state": "complete",
+    },
+    {
+      "collectedAt": "2026-10-08T12:00:00.000Z",
+      "endpoints": [
+        "/conditionalAccess",
+      ],
+      "failedEndpoints": [],
+      "id": "conditionalAccess",
+      "itemCount": 1,
+      "reason": "Recorded collection boundary.",
+      "scope": "Policy.Read.All",
+      "state": "complete",
+    },
+    {
+      "collectedAt": "2026-10-08T12:00:00.000Z",
+      "endpoints": [
+        "/crossTenantAccess",
+      ],
+      "failedEndpoints": [],
+      "id": "crossTenantAccess",
+      "itemCount": 1,
+      "reason": "Recorded collection boundary.",
+      "scope": "Policy.Read.All",
+      "state": "complete",
+    },
+    {
+      "collectedAt": "2026-10-08T12:00:00.000Z",
+      "endpoints": [
+        "/delegatedPermissionGrants",
+      ],
+      "failedEndpoints": [],
+      "id": "delegatedPermissionGrants",
+      "itemCount": 1,
+      "reason": "Recorded collection boundary.",
+      "scope": "Directory.Read.All",
+      "state": "complete",
+    },
+    {
+      "collectedAt": "2026-10-08T12:00:00.000Z",
+      "endpoints": [
+        "/devices",
+      ],
+      "failedEndpoints": [],
+      "id": "devices",
+      "itemCount": 1,
+      "reason": "Recorded collection boundary.",
+      "scope": "Directory.Read.All",
+      "state": "complete",
+    },
+    {
+      "collectedAt": "2026-10-08T12:00:00.000Z",
+      "endpoints": [
+        "/directoryAudits",
+      ],
+      "failedEndpoints": [],
+      "id": "directoryAudits",
+      "itemCount": 1,
+      "reason": "Recorded collection boundary.",
+      "scope": "Directory.Read.All",
+      "state": "complete",
+    },
+    {
+      "collectedAt": "2026-10-08T12:00:00.000Z",
+      "endpoints": [
+        "/federatedIdentityCredentials",
+      ],
+      "failedEndpoints": [],
+      "id": "federatedIdentityCredentials",
+      "itemCount": 1,
+      "reason": "Recorded collection boundary.",
+      "scope": "Application.Read.All",
+      "state": "complete",
+    },
+    {
+      "collectedAt": "2026-10-08T12:00:00.000Z",
+      "endpoints": [
+        "/groupMemberships",
+      ],
+      "failedEndpoints": [],
+      "id": "groupMemberships",
+      "itemCount": 1,
+      "reason": "Recorded collection boundary.",
+      "scope": "Directory.Read.All",
+      "state": "complete",
+    },
+    {
+      "collectedAt": "2026-10-08T12:00:00.000Z",
+      "endpoints": [
+        "/owners",
+      ],
+      "failedEndpoints": [],
+      "id": "owners",
+      "itemCount": 1,
+      "reason": "Recorded collection boundary.",
+      "scope": "Application.Read.All",
+      "state": "complete",
+    },
+    {
+      "collectedAt": "2026-10-08T12:00:00.000Z",
+      "endpoints": [
+        "/permissionGrantPolicies",
+      ],
+      "failedEndpoints": [],
+      "id": "permissionGrantPolicies",
+      "itemCount": 1,
+      "reason": "Recorded collection boundary.",
+      "scope": "Policy.Read.PermissionGrant",
+      "state": "complete",
+    },
+    {
+      "collectedAt": "2026-10-08T12:00:00.000Z",
+      "endpoints": [
+        "/roles",
+      ],
+      "failedEndpoints": [],
+      "id": "roles",
+      "itemCount": 1,
+      "reason": "Recorded collection boundary.",
+      "scope": "RoleManagement.Read.Directory",
+      "state": "complete",
+    },
+    {
+      "collectedAt": "2026-10-08T12:00:00.000Z",
+      "endpoints": [
+        "/servicePrincipals",
+      ],
+      "failedEndpoints": [],
+      "id": "servicePrincipals",
+      "itemCount": 1,
+      "reason": "Recorded collection boundary.",
+      "scope": "Application.Read.All",
+      "state": "complete",
+    },
+    {
+      "collectedAt": "2026-10-08T12:00:00.000Z",
+      "endpoints": [
+        "/usersAndGroups",
+      ],
+      "failedEndpoints": [],
+      "id": "usersAndGroups",
+      "itemCount": 1,
+      "reason": "Recorded collection boundary.",
+      "scope": "Directory.Read.All",
+      "state": "complete",
+    },
+  ],
+  "edges": [
+    {
+      "evidence": {
+        "completeness": "complete",
+        "configured": true,
+        "observed": null,
+        "scannedAt": "2026-10-08T12:00:00.000Z",
+        "sourceEndpoint": "/servicePrincipals/resource/appRoleAssignedTo",
+        "sourceObjectId": "client",
+        "sourceRecordIds": [
+          "grant",
+        ],
+        "targetObjectId": "resource",
+      },
+      "id": "grant",
+      "permissionIds": [
+        "read-id",
+      ],
+      "permissions": [
+        "Read",
+      ],
+      "plainLabel": "CAN_CALL_AS_APP",
+      "sourceId": "client",
+      "targetId": "resource",
+      "tenantId": "synthetic-tenant",
+      "type": "CAN_CALL_AS_APP",
+    },
+  ],
+  "engineVersion": "1.0.0",
+  "nodes": [
+    {
+      "description": "",
+      "id": "blueprint",
+      "kind": "application",
+      "label": "blueprint",
+      "ownerIds": [],
+      "risk": {
+        "level": "low",
+        "reason": "Engine facts carry no risk score.",
+      },
+      "sourceEndpoint": "/servicePrincipals",
+      "tenantId": "synthetic-tenant",
+    },
+    {
+      "appId": "synthetic-app-id",
+      "applicationProfile": {
+        "accountEnabled": false,
+        "assignmentRequired": true,
+        "signInAudience": "AzureADMyOrg",
+        "verifiedPublisherId": null,
+        "verifiedPublisherName": null,
+      },
+      "credentials": [
+        {
+          "expiresAt": "2027-01-01T00:00:00.000Z",
+          "id": "metadata-only",
+          "kind": "certificate",
+          "label": null,
+          "sourceEndpoint": "/applications/client",
+          "startsAt": "2026-10-08T12:00:00.000Z",
+        },
+      ],
+      "description": "",
+      "id": "client",
+      "kind": "servicePrincipal",
+      "label": "client",
+      "ownerIds": [],
+      "risk": {
+        "level": "low",
+        "reason": "Engine facts carry no risk score.",
+      },
+      "sourceEndpoint": "/servicePrincipals",
+      "tenantId": "synthetic-tenant",
+    },
+    {
+      "description": "",
+      "id": "nested",
+      "kind": "group",
+      "label": "nested",
+      "ownerIds": [],
+      "risk": {
+        "level": "low",
+        "reason": "Engine facts carry no risk score.",
+      },
+      "sourceEndpoint": "/servicePrincipals",
+      "tenantId": "synthetic-tenant",
+    },
+    {
+      "description": "",
+      "id": "other",
+      "kind": "user",
+      "label": "other",
+      "ownerIds": [],
+      "risk": {
+        "level": "low",
+        "reason": "Engine facts carry no risk score.",
+      },
+      "sourceEndpoint": "/servicePrincipals",
+      "tenantId": "synthetic-tenant",
+    },
+    {
+      "description": "",
+      "id": "person",
+      "kind": "user",
+      "label": "person",
+      "ownerIds": [],
+      "risk": {
+        "level": "low",
+        "reason": "Engine facts carry no risk score.",
+      },
+      "sourceEndpoint": "/servicePrincipals",
+      "tenantId": "synthetic-tenant",
+    },
+    {
+      "conditionalAccess": {
+        "applications": {
+          "exclude": [],
+          "include": [
+            "All",
+          ],
+        },
+        "clientAppTypes": [],
+        "grant": {
+          "controls": [
+            "mfa",
+          ],
+          "operator": "AND",
+        },
+        "locations": null,
+        "platforms": null,
+        "state": "enabled",
+        "unsupported": [],
+        "users": {
+          "exclude": [],
+          "excludeGroups": [],
+          "include": [
+            "All",
+          ],
+          "includeGroups": [],
+        },
+      },
+      "description": "",
+      "id": "policy",
+      "kind": "policy",
+      "label": "policy",
+      "ownerIds": [],
+      "risk": {
+        "level": "low",
+        "reason": "Engine facts carry no risk score.",
+      },
+      "sourceEndpoint": "/identity/conditionalAccess/policies",
+      "tenantId": "synthetic-tenant",
+    },
+    {
+      "description": "",
+      "id": "resource",
+      "kind": "servicePrincipal",
+      "label": "resource",
+      "ownerIds": [],
+      "risk": {
+        "level": "low",
+        "reason": "Engine facts carry no risk score.",
+      },
+      "sourceEndpoint": "/servicePrincipals",
+      "tenantId": "synthetic-tenant",
+    },
+    {
+      "description": "",
+      "id": "role",
+      "kind": "directoryRole",
+      "label": "role",
+      "ownerIds": [],
+      "risk": {
+        "level": "low",
+        "reason": "Engine facts carry no risk score.",
+      },
+      "sourceEndpoint": "/servicePrincipals",
+      "tenantId": "synthetic-tenant",
+    },
+    {
+      "description": "",
+      "id": "team",
+      "kind": "group",
+      "label": "team",
+      "ownerIds": [],
+      "risk": {
+        "level": "low",
+        "reason": "Engine facts carry no risk score.",
+      },
+      "sourceEndpoint": "/servicePrincipals",
+      "tenantId": "synthetic-tenant",
+    },
+    {
+      "description": "",
+      "federationTrust": {
+        "audiences": [
+          "exchange",
+        ],
+        "issuer": "https://issuer.example",
+        "subject": "repo:sample/tool:ref:main",
+        "unsupported": [],
+      },
+      "id": "trust",
+      "kind": "federatedCredential",
+      "label": "trust",
+      "ownerIds": [],
+      "risk": {
+        "level": "low",
+        "reason": "Engine facts carry no risk score.",
+      },
+      "sourceEndpoint": "/servicePrincipals",
+      "tenantId": "synthetic-tenant",
+    },
+  ],
+  "ruleVersion": "entra-configured/1",
+  "snapshotIds": [
+    "synthetic-snapshot",
+  ],
+  "tenantId": "synthetic-tenant",
+}
+`;
+
+exports[`version 1 evidence format compatibility > projects allowlisted facts and leaves labels out of portable evidence 2`] = `
+{
+  "package": {
+    "budget": {
+      "maxDepth": 12,
+      "maxPaths": 128,
+      "maxSteps": 50000,
+    },
+    "format": "entra-investigation/1",
+    "manifest": {
+      "algorithm": "SHA-256",
+      "dependencies": [
+        "collection:appRoleAssignments",
+        "collection:servicePrincipals",
+        "coverage:appRoleAssignments",
+        "coverage:servicePrincipals",
+        "object:client",
+        "object:resource",
+        "relationship:grant",
+      ],
+      "digest": "5a5538c7c233ca2f74ca62213b0b64dadb17d66939a20e2a0a925fa3445f0083",
+      "engineVersion": "1.0.0",
+      "ruleVersion": "entra-configured/1",
+    },
+    "proof": {
+      "assumptions": [
+        "This conclusion describes recorded configuration under the published rule subset, not effective access or observed use.",
+      ],
+      "collectedAt": [
+        "2026-10-08T12:00:00.000Z",
+      ],
+      "conflicts": [],
+      "dependencies": [
+        "collection:appRoleAssignments",
+        "collection:servicePrincipals",
+        "coverage:appRoleAssignments",
+        "coverage:servicePrincipals",
+        "object:client",
+        "object:resource",
+        "relationship:grant",
+      ],
+      "derivation": [
+        {
+          "conclusion": "Recorded CAN_CALL_AS_APP: client → resource.",
+          "id": "path:0:step:0",
+          "inputs": [
+            "relationship:grant",
+          ],
+          "rule": "entra-configured/1/CAN_CALL_AS_APP",
+        },
+        {
+          "conclusion": "supported",
+          "id": "query",
+          "inputs": [
+            "path:0:step:0",
+            "coverage:appRoleAssignments",
+            "coverage:servicePrincipals",
+            "object:client",
+            "object:resource",
+          ],
+          "rule": "entra-configured/1/application-permission",
+        },
+      ],
+      "engineVersion": "1.0.0",
+      "evidenceClass": "configured",
+      "facts": [
+        {
+          "collectedAt": "2026-10-08T12:00:00.000Z",
+          "completeness": "complete",
+          "id": "coverage:appRoleAssignments",
+          "kind": "coverage",
+          "sourceEndpoint": "/appRoleAssignments",
+          "sourceEndpoints": [
+            "/appRoleAssignments",
+          ],
+          "sourceObjectId": "appRoleAssignments",
+          "sourceRecordIds": [],
+          "targetObjectId": "appRoleAssignments",
+        },
+        {
+          "collectedAt": "2026-10-08T12:00:00.000Z",
+          "completeness": "complete",
+          "id": "coverage:servicePrincipals",
+          "kind": "coverage",
+          "sourceEndpoint": "/servicePrincipals",
+          "sourceEndpoints": [
+            "/servicePrincipals",
+          ],
+          "sourceObjectId": "servicePrincipals",
+          "sourceRecordIds": [],
+          "targetObjectId": "servicePrincipals",
+        },
+        {
+          "collectedAt": "2026-10-08T12:00:00.000Z",
+          "completeness": "recorded",
+          "id": "object:client",
+          "kind": "object",
+          "sourceEndpoint": "/servicePrincipals",
+          "sourceObjectId": "client",
+          "sourceRecordIds": [
+            "client",
+          ],
+          "targetObjectId": "client",
+        },
+        {
+          "collectedAt": "2026-10-08T12:00:00.000Z",
+          "completeness": "recorded",
+          "id": "object:resource",
+          "kind": "object",
+          "sourceEndpoint": "/servicePrincipals",
+          "sourceObjectId": "resource",
+          "sourceRecordIds": [
+            "resource",
+          ],
+          "targetObjectId": "resource",
+        },
+        {
+          "collectedAt": "2026-10-08T12:00:00.000Z",
+          "completeness": "complete",
+          "id": "relationship:grant",
+          "kind": "relationship",
+          "relationshipType": "CAN_CALL_AS_APP",
+          "sourceEndpoint": "/servicePrincipals/resource/appRoleAssignedTo",
+          "sourceObjectId": "client",
+          "sourceRecordIds": [
+            "grant",
+          ],
+          "targetObjectId": "resource",
+        },
+      ],
+      "limits": {
+        "exhausted": false,
+        "maxDepth": 12,
+        "maxPaths": 128,
+        "maxSteps": 50000,
+        "steps": 1,
+      },
+      "missing": [],
+      "paths": [
+        [
+          "grant",
+        ],
+      ],
+      "query": {
+        "kind": "application-permission",
+        "permissionId": "read-id",
+        "principalId": "client",
+        "resourceId": "resource",
+        "tenantId": "synthetic-tenant",
+      },
+      "ruleVersion": "entra-configured/1",
+      "snapshotIds": [
+        "synthetic-snapshot",
+      ],
+      "tenantId": "synthetic-tenant",
+      "verdict": "supported",
+    },
+    "query": {
+      "kind": "application-permission",
+      "permissionId": "read-id",
+      "principalId": "client",
+      "resourceId": "resource",
+      "tenantId": "synthetic-tenant",
+    },
+    "sharing": "identified",
+    "snapshot": {
+      "completion": {
+        "collectedEndpoints": [],
+        "collectors": [
+          {
+            "collectedAt": "2026-10-08T12:00:00.000Z",
+            "endpoints": [
+              "/appRoleAssignments",
+            ],
+            "failedEndpoints": [],
+            "id": "appRoleAssignments",
+            "itemCount": 1,
+            "reason": "Recorded collection boundary.",
+            "scope": "Application.Read.All",
+            "state": "complete",
+          },
+          {
+            "collectedAt": "2026-10-08T12:00:00.000Z",
+            "endpoints": [
+              "/servicePrincipals",
+            ],
+            "failedEndpoints": [],
+            "id": "servicePrincipals",
+            "itemCount": 1,
+            "reason": "Recorded collection boundary.",
+            "scope": "Application.Read.All",
+            "state": "complete",
+          },
+        ],
+        "errors": [],
+        "skippedEndpoints": [],
+        "status": "partial",
+      },
+      "edges": [
+        {
+          "evidence": {
+            "completeness": "complete",
+            "configured": true,
+            "observed": null,
+            "scannedAt": "2026-10-08T12:00:00.000Z",
+            "sourceEndpoint": "/servicePrincipals/resource/appRoleAssignedTo",
+            "sourceObjectId": "client",
+            "sourceRecordIds": [
+              "grant",
+            ],
+            "targetObjectId": "resource",
+          },
+          "id": "grant",
+          "permissionIds": [
+            "read-id",
+          ],
+          "permissions": [
+            "Read",
+          ],
+          "plainLabel": "CAN_CALL_AS_APP",
+          "sourceId": "client",
+          "targetId": "resource",
+          "tenantId": "synthetic-tenant",
+          "type": "CAN_CALL_AS_APP",
+        },
+      ],
+      "id": "synthetic-snapshot",
+      "mode": "tenant",
+      "nodes": [
+        {
+          "description": "",
+          "id": "client",
+          "kind": "servicePrincipal",
+          "label": "client",
+          "ownerIds": [],
+          "risk": {
+            "level": "low",
+            "reason": "No score exported.",
+          },
+          "sourceEndpoint": "/servicePrincipals",
+          "tenantId": "synthetic-tenant",
+        },
+        {
+          "description": "",
+          "id": "resource",
+          "kind": "servicePrincipal",
+          "label": "resource",
+          "ownerIds": [],
+          "risk": {
+            "level": "low",
+            "reason": "No score exported.",
+          },
+          "sourceEndpoint": "/servicePrincipals",
+          "tenantId": "synthetic-tenant",
+        },
+      ],
+      "scannedAt": "2026-10-08T12:00:00.000Z",
+      "tenant": {
+        "tenantId": "synthetic-tenant",
+        "tenantLabel": "Investigation projection",
+      },
+    },
+  },
+  "privateMapping": {},
+}
+`;
+
+exports[`version 1 evidence format compatibility > retains declared deployment intervals, fallback windows and dependencies 1`] = `
+{
+  "affectedByCredential": {
+    "client/new": [
+      "worker",
+    ],
+    "client/old": [
+      "worker",
+    ],
+  },
+  "assumptions": [
+    "Deployment stages and workload dependencies are operator-supplied assumptions, not observed use or proof of secret possession.",
+    "Validity and declared deployment intervals are half-open and conservatively shortened by the clock-skew budget. Rollback indicates overlapping declared availability only.",
+  ],
+  "collectedAt": [
+    "2026-10-08T12:00:00.000Z",
+  ],
+  "engineVersion": "1.0.0",
+  "intervals": [
+    {
+      "credentials": [
+        "client/old",
+      ],
+      "endsAt": "2026-10-09T00:00:00.000Z",
+      "rollbackAvailable": false,
+      "startsAt": "2026-10-08T12:00:00.000Z",
+      "verdict": "supported",
+      "workloadId": "worker",
+    },
+    {
+      "credentials": [
+        "client/new",
+        "client/old",
+      ],
+      "endsAt": "2026-10-10T00:00:00.000Z",
+      "rollbackAvailable": true,
+      "startsAt": "2026-10-09T00:00:00.000Z",
+      "verdict": "supported",
+      "workloadId": "worker",
+    },
+    {
+      "credentials": [
+        "client/new",
+      ],
+      "endsAt": "2026-10-11T00:00:00.000Z",
+      "rollbackAvailable": false,
+      "startsAt": "2026-10-10T00:00:00.000Z",
+      "verdict": "supported",
+      "workloadId": "worker",
+    },
+  ],
+  "limits": {
+    "exhausted": false,
+    "maxSteps": 1000000,
+    "steps": 3,
+  },
+  "missing": [],
+  "ruleVersion": "entra-configured/1",
+  "snapshotIds": [
+    "synthetic-snapshot",
+  ],
+  "tenantId": "synthetic-tenant",
+  "verdict": "supported",
+}
+`;
+
+exports[`version 1 evidence format compatibility > retains distinct overlap, mismatch and unsupported federation pairs 1`] = `
+{
+  "assumptions": [
+    "Witnesses are unsigned synthetic claims, never tokens. A match does not establish issuer control, token validity, successful exchange, or observed use.",
+    "Only exact case-sensitive v1.0 semantics and one audience are supported. Preview expressions and historical flattened audience strings remain unknown.",
+  ],
+  "collectedAt": [
+    "2026-10-08T12:00:00.000Z",
+  ],
+  "comparisons": [
+    {
+      "left": "trust",
+      "reason": "Exact trust constraints share synthetic claims.",
+      "right": "trust-2",
+      "verdict": "supported",
+      "witness": {
+        "audience": "exchange",
+        "issuer": "https://issuer.example",
+        "subject": "sample-production",
+      },
+    },
+    {
+      "left": "trust",
+      "reason": "Issuer, subject, or audience differs.",
+      "right": "trust-3",
+      "verdict": "refuted",
+      "witness": null,
+    },
+    {
+      "left": "trust",
+      "reason": "Structured v1.0 exact trust evidence is missing or unsupported.",
+      "right": "trust-4",
+      "verdict": "unknown",
+      "witness": null,
+    },
+    {
+      "left": "trust-2",
+      "reason": "Issuer, subject, or audience differs.",
+      "right": "trust-3",
+      "verdict": "refuted",
+      "witness": null,
+    },
+    {
+      "left": "trust-2",
+      "reason": "Structured v1.0 exact trust evidence is missing or unsupported.",
+      "right": "trust-4",
+      "verdict": "unknown",
+      "witness": null,
+    },
+    {
+      "left": "trust-3",
+      "reason": "Structured v1.0 exact trust evidence is missing or unsupported.",
+      "right": "trust-4",
+      "verdict": "unknown",
+      "witness": null,
+    },
+  ],
+  "engineVersion": "1.0.0",
+  "limits": {
+    "exhausted": false,
+    "maxSteps": 20000,
+    "steps": 6,
+  },
+  "missing": [
+    "object:trust-4:exact-trust",
+  ],
+  "ruleVersion": "entra-configured/1",
+  "snapshotIds": [
+    "synthetic-snapshot",
+  ],
+  "tenantId": "synthetic-tenant",
+  "unknownTrusts": [
+    "trust-4",
+  ],
+  "verdict": "unknown",
+}
+`;
+
+exports[`version 1 evidence format compatibility > retains unknown read prerequisites and minimizes shared candidate reads 1`] = `
+{
+  "assumptions": [
+    "Plans minimize declared read cost over supplied candidates. Shared prerequisites are fetched once.",
+    "This is a proposed collection plan, not consent or a guarantee that a read will resolve a question. Role, license, pagination, retention, and unsupported semantics remain separate constraints.",
+  ],
+  "collectedAt": [
+    "2026-10-08T12:00:00.000Z",
+  ],
+  "engineVersion": "1.0.0",
+  "limits": {
+    "exhausted": false,
+    "maxSteps": 100000,
+    "steps": 3,
+  },
+  "lowerBound": 2,
+  "missing": [],
+  "optimal": true,
+  "plans": [
+    {
+      "cost": 2,
+      "endpoints": [
+        "/servicePrincipals",
+        "/servicePrincipals/{resource-id}/appRoleAssignedTo",
+      ],
+      "mayResolve": [
+        "coverage:appRoleAssignments",
+        "coverage:servicePrincipals",
+      ],
+      "reads": [
+        "appRoleAssignments",
+        "servicePrincipals",
+      ],
+      "requiredScopes": [
+        "Application.Read.All",
+      ],
+      "unavailableScopes": [
+        "Application.Read.All",
+      ],
+    },
+  ],
+  "ruleVersion": "entra-configured/1",
+  "snapshotIds": [
+    "synthetic-snapshot",
+  ],
+  "tenantId": "synthetic-tenant",
+  "unresolved": [],
+  "verdict": "supported",
+}
+`;

@@ -1,0 +1,24 @@
+{
+  "name": "@entra-explorer/engine",
+  "version": "0.1.0",
+  "private": true,
+  "license": "Apache-2.0",
+  "type": "module",
+  "exports": { ".": "./src/index.ts" },
+  "scripts": {
+    "build": "tsc --noEmit",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage --coverage.reporter=text-summary --coverage.reporter=json --coverage.reporter=json-summary --coverage.include='src/**/*.ts' --coverage.exclude=src/**/*.test.ts --coverage.exclude=src/test-support.ts --coverage.exclude=src/index.ts",
+    "test:mutation": "stryker run"
+  },
+  "dependencies": { "@entra-explorer/domain": "workspace:*" },
+  "devDependencies": {
+    "@stryker-mutator/core": "^10.0.0",
+    "@stryker-mutator/vitest-runner": "^10.0.0",
+    "@types/node": "24.19.1",
+    "@vitest/coverage-v8": "5.0.3",
+    "typescript": "5.9.2",
+    "vitest": "5.0.3"
+  }
+}

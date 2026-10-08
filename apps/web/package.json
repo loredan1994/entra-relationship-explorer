@@ -24,7 +24,8 @@
     "react": "19.2.8",
     "react-dom": "19.2.8",
     "server-only": "0.0.1",
-    "tsx": "4.23.15"
+    "tsx": "4.23.15",
+    "@entra-explorer/engine": "workspace:*"
   },
   "devDependencies": {
     "@axe-core/playwright": "4.13.0",

@@ -68,3 +68,11 @@ Live review writes are bound to the displayed snapshot and an opaque revision. C
 ### Application access context
 
 Snapshots may also retain allowlisted sign-in audience, service-principal account state, assignment requirement, home-tenant ID, preferred SSO mode and verified-publisher ID/name. These are configuration evidence, not effective access or publisher safety judgments. Existing Graph read scopes cover them. Missing historical fields remain unknown. Incoming assignments/consent and observed sign-ins remain separate, including in the relationship inspector.
+
+### Custom evidence engine
+
+The engine is a pure local TypeScript module without network, token or database access. Structured policy projection retains supported selectors and unsupported field names, not arbitrary Graph bodies. Core Graph permissions are unchanged; the existing optional Policy.Read.All read also requests sessionControls so unsupported enforcement is visible.
+
+Engine contracts and packages contain data, never executable plugins. Contract imports are bounded to 100 KB. Investigation packages are bounded to 5 MB with structural-depth limits, version checks, tenant validation, dependency checking and deterministic replay. The JSON format contains no archive paths or extracted files. Export projection omits labels and unrelated metadata. Sensitive exports require acknowledgment in the UI; pseudonymization retains linkable topology and dates. Private identity mappings are offered as a separate download and never embedded in the investigation. SHA-256 checks integrity, not Microsoft origin. Imported packages remain separate from the active tenant and are never uploaded.
+
+Deployment stages, costs and protected integrations are explicitly operator-supplied assumptions. Plans never apply changes. Missing source evidence and exhausted budgets cannot establish a negative security claim.

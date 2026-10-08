@@ -1,6 +1,6 @@
 # Dependency follow-up — 8 October 2026
 
-This change consolidates the remaining reviewed dependency work on top of the merged investigation release (#42). It preserves the GET-only Microsoft Graph boundary, existing consent scopes, Node 24 runtime and dependency license gate. The separate [custom-engine roadmap](CUSTOM_ENGINE_ROADMAP.md) contains proposed features, not shipped functionality.
+This change consolidates the remaining reviewed dependency work on top of the merged investigation release (#42). It preserves the GET-only Microsoft Graph boundary, existing consent scopes, Node 24 runtime and dependency license gate. At the time of this dependency change, the [custom-engine roadmap](CUSTOM_ENGINE_ROADMAP.md) contained proposals. The subsequent [engine validation report](CUSTOM_ENGINE_VALIDATION_2026-10-09.md) records their implementation.
 
 ## PR resolutions
 

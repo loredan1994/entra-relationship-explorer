@@ -200,7 +200,7 @@ function administrativeUnitNode(record: GraphAdministrativeUnit, tenantId: strin
 }
 
 function federatedCredentialNode(record: GraphFederatedIdentityCredential, parentId: string, parentType: "application" | "managedIdentity", tenantId: string): DirectoryNode {
-  return { id: federatedCredentialNodeId(parentId, record.id), tenantId, kind: "federatedCredential", label: record.name, description: "Federated identity credential (workload trust) collected from Microsoft Graph.", ownerIds: [], metadata: { credentialId: record.id, parentId, parentType, issuer: record.issuer, subject: record.subject, audiences: record.audiences.join(", "), description: record.description ?? null }, risk: { level: "review", reason: "A matching external token can authenticate as the configured workload identity; configured trust does not prove token issuance or use." } };
+  return { id: federatedCredentialNodeId(parentId, record.id), tenantId, kind: "federatedCredential", federationTrust: { issuer: record.issuer, subject: record.subject, audiences: [...record.audiences], unsupported: [] }, label: record.name, description: "Federated identity credential (workload trust) collected from Microsoft Graph.", ownerIds: [], metadata: { credentialId: record.id, parentId, parentType, issuer: record.issuer, subject: record.subject, audiences: record.audiences.join(", "), description: record.description ?? null }, risk: { level: "review", reason: "A matching external token can authenticate as the configured workload identity; configured trust does not prove token issuance or use." } };
 }
 
 function authorizationPolicyNode(record: GraphAuthorizationPolicy, tenantId: string): DirectoryNode {
@@ -228,6 +228,8 @@ function conditionalAccessPolicyNode(record: GraphConditionalAccessPolicy, tenan
     id: record.id,
     tenantId,
     kind: "policy",
+    conditionalAccess: record.enginePolicy,
+    sourceEndpoint: "/identity/conditionalAccess/policies",
     label: record.displayName,
     description: "Conditional Access policy collected from Microsoft Graph.",
     ownerIds: [],
@@ -583,11 +585,17 @@ function assignmentEdges(raw: RawTenantScan, nodes: Map<string, DirectoryNode>):
 }
 
 function delegatedGrantEdges(raw: RawTenantScan, nodes: Map<string, DirectoryNode>): RelationshipEdge[] {
+  const services = new Map(raw.servicePrincipals.map(({ record }) => [record.id, record]));
   return raw.oauth2PermissionGrants.map(({ record, endpoint }) => {
     ensureMissingTarget(nodes, record.clientId, null, raw.tenantId);
     ensureMissingTarget(nodes, record.resourceId, null, raw.tenantId);
-    const unresolved = !raw.servicePrincipals.some(({ record: service }) => service.id === record.clientId) ||
-      !raw.servicePrincipals.some(({ record: service }) => service.id === record.resourceId);
+    const unresolved = !services.has(record.clientId) || !services.has(record.resourceId);
+    // Consent records contain scope values; IDs belong to the resource's scope
+    // catalog. A partial or ambiguous join must not become a negative ID lookup.
+    const permissions = unique(record.scope.split(/\s+/).filter(Boolean));
+    const definitions = services.get(record.resourceId)?.oauth2PermissionScopes ?? [];
+    const resolvedIds = permissions.map(value => unique(definitions.filter(scope => scope.value === value && scope.id).map(scope => scope.id)));
+    const permissionIds = resolvedIds.every(ids => ids.length === 1) ? unique(resolvedIds.flat()) : undefined;
     return {
       id: stableId("delegated", record.id),
       tenantId: raw.tenantId,
@@ -596,8 +604,8 @@ function delegatedGrantEdges(raw: RawTenantScan, nodes: Map<string, DirectoryNod
       sourceId: record.clientId,
       targetId: record.resourceId,
       plainLabel: "Can call with a signed-in person",
-      // Stryker disable next-line Regex: filter(Boolean) drops the empty entries a single-space split would leave.
-      permissions: unique(record.scope.split(/\s+/).filter(Boolean)),
+      permissions,
+      permissionIds,
       evidence: {
         configured: true,
         observed: null,

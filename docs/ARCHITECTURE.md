@@ -6,6 +6,7 @@ A TypeScript monorepo with a Next.js web application, a background scanner, and 
 
 - **Web:** Next.js, React, accessible HTML controls, and Cytoscape.js for headless relationship layout. The graph always has a table equivalent.
 - **API/scanner:** TypeScript, a narrow GET-only Microsoft Graph transport, a thin versioned API, and a separate restart-safe worker.
+- **Evidence engine:** `packages/engine` compiles immutable tenant snapshots into versioned facts. Typed worklist evaluation produces source-linked derivations and dependency fingerprints. Local algorithms handle interval intersections, weighted hitting sets, finite policy scenarios, trust intersections and declarative access contracts. The browser and offline CLI share the same bounded engine; neither has a tenant mutation transport.
 - **Storage:** PostgreSQL stores encrypted OAuth sessions and snapshot payloads plus a durable scan queue and access events. Every retrieval is tenant-keyed.
 - **Authentication:** Microsoft identity platform authorization-code flow with PKCE.
 - **Local runtime:** Docker Compose runs PostgreSQL, an idempotent migration job, the web service, and one worker. The application uses a pinned non-root distroless Node 24 Debian 13 runtime with production-only dependencies and Next.js standalone output. Only the web and database development ports bind to loopback.
@@ -112,3 +113,7 @@ Focused evidence packets are projections, not snapshot serialization. The domain
 The worker checkpoints sanitized collection state after each completed stage. A recovered job resumes at the next stage rather than re-reading completed stages. Checkpoints use tenant-bound authenticated encryption and are deleted after completion or cancellation.
 
 The Compose bridge is private. Web and PostgreSQL publish loopback ports only; worker and migration have no host port. All services use `no-new-privileges`; the application runtime is non-root. Sensitive PostgreSQL payloads use tenant-bound authenticated encryption, while scheduling/index metadata remains plaintext by design.
+
+## Portable reasoning boundary
+
+An investigation package contains the query, budgets, minimal projected facts, proof and SHA-256 integrity manifest. The verifier enforces a bounded JSON schema and independently recomputes the model result. It does not execute imported code, extract archives, fetch endpoints or authenticate Microsoft as the source. Pseudonymization keeps an identity mapping separate; topology remains sensitive. See [CUSTOM_ENGINE.md](CUSTOM_ENGINE.md) for versioning, migration and precise limits.

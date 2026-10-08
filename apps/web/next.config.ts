@@ -6,7 +6,7 @@ const nextConfig: NextConfig = {
   reactStrictMode: true,
   // Keep the unused native image processor out of the distributed runtime.
   images: { unoptimized: true },
-  transpilePackages: ["@entra-explorer/domain", "@entra-explorer/graph", "@entra-explorer/backend"],
+  transpilePackages: ["@entra-explorer/domain", "@entra-explorer/engine", "@entra-explorer/graph", "@entra-explorer/backend"],
   async headers() {
     return [{
       source: "/:path*",

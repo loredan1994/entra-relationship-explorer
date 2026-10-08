@@ -77,7 +77,7 @@ pnpm run verify
 ```
 
 That single command validates Compose isolation, lints, type-checks, runs the
-domain, scanner, storage, authentication, accessibility, and browser tests, and
+domain, custom engine, offline CLI, scanner, storage, authentication, accessibility, and browser tests, and
 builds every route. CI runs this with an isolated PostgreSQL service. A separate quality job runs
 coverage, maintainability and fresh mutation checks.
 
@@ -144,6 +144,7 @@ Do not use the public issue tracker. Follow [SECURITY.md](SECURITY.md).
 |---|---|
 | `apps/web` | Next.js application, API routes, server-side auth and config |
 | `packages/domain` | Tenant intelligence: findings, attack paths, comparisons |
+| `packages/engine` | Versioned evidence proofs, typed semantics, bounded planning and offline replay |
 | `packages/graph` | Microsoft Graph client, scanner, and normalization |
 | `packages/backend` | Storage, encryption, sessions, durable job queue |
 | `docs/` | Product specification, architecture, security model, API contract |
@@ -153,3 +154,7 @@ Do not use the public issue tracker. Follow [SECURITY.md](SECURITY.md).
 ## Adding investigation rules
 
 Use the [synthetic rule laboratory](docs/RULE_LAB.md) to scaffold and replay a declarative regression case. New compiled rules need positive, nearby negative, coverage and version-change tests. The [investigation guide](docs/INVESTIGATIONS.md) describes the database and browser checks; passing mocks alone is not evidence of PostgreSQL concurrency correctness.
+
+## Changing engine semantics
+
+Read [CUSTOM_ENGINE.md](docs/CUSTOM_ENGINE.md) for supported rules, limits and the offline format. Add independent expected outcomes for positive, nearby negative, unknown and conflicting evidence. Use exhaustive small cases for planning and sampled time intervals for continuity. Review public-format snapshots before updating them; version provenance and replay changes deliberately. `pnpm test:engine-cli` checks real process exit codes and filesystem behavior using temporary synthetic files.

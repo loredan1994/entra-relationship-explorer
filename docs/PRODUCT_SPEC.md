@@ -39,6 +39,7 @@ The workspace starts with synthetic sample data. An operator can configure one t
 - Application access context, per-collector coverage, requested-versus-granted permission reconciliation and individual credential/federation history
 - Selectable retained snapshots with field-level differences and explicitly enabled directory-audit correlation
 - Local what-if review plans and a synthetic rule laboratory
+- A custom evidence engine with ten workflows: proofs, typed access compilation, time-consistent paths, minimal-change planning, policy counterexamples, federation boundaries, credential continuity, evidence-gap planning, access contracts with semantic change review, and portable offline replay
 - Question-based overview shortcuts and an in-app Guide explaining workflows, evidence classes and data handling
 
 Optional evidence is implemented behind separately approved read-only scopes: sign-in activity, active and PIM-eligible roles, Conditional Access, and partner cross-tenant settings. Maester is not embedded: an isolated posture worker remains appropriate only after a concrete, license-verified test pack produces evidence that the native Graph collector does not already provide.
@@ -84,6 +85,9 @@ The evidence panel then shows both service-principal object IDs, the resource ap
 | `/investigations?view=credentials` | Individual credentials and federated workload trust |
 | `/investigations?view=scenarios` | Local what-if path comparison and review plans |
 | `/investigations?view=rules` | Synthetic rule replay and contributor guidance |
+| `/engine` | Ten bounded reasoning workflows with assumptions, exact sources and local exports |
 | `/guide` | Product boundary, question-based workflows, evidence interpretation and first steps |
 
 The [user guide](USER_GUIDE.md) is the operator walkthrough. [Investigation tools](INVESTIGATIONS.md) is the detailed behavior and limitations reference. [Release verification](RELEASE_VERIFICATION_2026-10-08.md) separates measured acceptance from the success measures above.
+
+The [custom engine support matrix](CUSTOM_ENGINE.md) defines the published rule subset. Supported configuration is not effective access; policy conditions outside that subset, uncollected optional data, uncertain deployment and exhausted searches remain explicit. Plans and counterexamples are local review artifacts and cannot modify Entra.

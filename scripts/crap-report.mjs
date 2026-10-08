@@ -17,6 +17,7 @@ import path from "node:path";
 
 const ROOT = path.resolve(import.meta.dirname, "..");
 const PACKAGES = [
+  { name: "@entra-explorer/engine", dir: "packages/engine" },
   { name: "@entra-explorer/domain", dir: "packages/domain" },
   { name: "@entra-explorer/graph", dir: "packages/graph" },
   { name: "@entra-explorer/backend", dir: "packages/backend" },

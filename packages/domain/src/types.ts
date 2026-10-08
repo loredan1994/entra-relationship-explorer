@@ -43,6 +43,10 @@ export interface DirectoryNode {
   sourceEndpoint?: string;
   /** Missing historical fields remain unknown, never false or disabled. */
   applicationProfile?: ApplicationProfile;
+  /** Structured trust semantics. Absent in older snapshots means unknown. */
+  federationTrust?: FederationTrust;
+  /** Allowlisted policy inputs and names of unsupported conditions; never raw Graph JSON. */
+  conditionalAccess?: ConditionalAccessDefinition;
   credential?: {
     status: "healthy" | "expiring" | "expired" | "none";
     expiresAt: string | null;
@@ -61,6 +65,24 @@ export interface ApplicationProfile {
   assignmentRequired?: boolean | null;
   homeTenantId?: string | null;
   preferredSsoMode?: string | null;
+}
+
+export interface FederationTrust {
+  issuer: string;
+  subject: string;
+  audiences: string[];
+  unsupported: string[];
+}
+
+export interface ConditionalAccessDefinition {
+  state: string;
+  users: { include: string[]; exclude: string[]; includeGroups: string[]; excludeGroups: string[] };
+  applications: { include: string[]; exclude: string[] };
+  platforms: { include: string[]; exclude: string[] } | null;
+  locations: { include: string[]; exclude: string[] } | null;
+  clientAppTypes: string[];
+  grant: { operator: string; controls: string[] } | null;
+  unsupported: string[];
 }
 
 export interface RelationshipEvidence {
@@ -91,6 +113,8 @@ export interface RelationshipEdge {
     directoryScopeId: string;
     objectId: string | null;
   };
+  /** Source-declared validity, not inferred from repeated observations. End is exclusive. */
+  validity?: { startsAt: string | null; endsAt: string | null };
   evidence: RelationshipEvidence;
 }
 
