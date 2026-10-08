@@ -16,7 +16,7 @@
   },
   "dependencies": {
     "@entra-explorer/domain": "workspace:*",
-    "pg": "8.23.0"
+    "pg": "8.23.1"
   },
   "devDependencies": {
     "@stryker-mutator/core": "^10.0.0",
