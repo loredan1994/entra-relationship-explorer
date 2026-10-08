@@ -25,14 +25,16 @@ The UI exposes all ten workflows on desktop and mobile. The CLI implements proof
 
 The complete `pnpm verify` command covers Compose invariants, lint, types, unit/contract/database tests, the CLI, production build and browser flows. An isolated loopback PostgreSQL database contains only synthetic test fixtures.
 
-- **2,004 unit/contract/database tests:** 552 domain, 566 engine, 445 Graph, 208 backend and 233 web-server tests.
+- **2,017 unit/contract/database tests:** 552 domain, 579 engine, 445 Graph, 208 backend and 233 web-server tests.
 - **64 browser checks:** 62 desktop/mobile checks and two separate PostgreSQL persistence flows. Intentional optional-live and desktop-only skips remain explicit; persistence flows were actually run.
 - **18 CLI subprocess checks**, including local export and replay.
-- **Coverage and maintainability:** 1,054 measured functions; zero above CRAP 30. Engine coverage is 99.89% statements, 99.56% branches and 100% functions.
-- **Fresh engine mutation score: 95.69%.** Of 3,064 mutations, 2,910 were killed, 22 timed out, 128 survived and four had no coverage. This passes the existing 95% package gate; it is not a claim that every mutation was detected. Remaining survivors include redundant checks and unasserted formatting/guard variants. No threshold was reduced or production semantic module excluded.
+- **Coverage and maintainability:** 1,055 measured functions; zero above CRAP 30. Engine coverage is 99.90% statements, 99.57% branches and 100% functions.
+- **Engine mutation score: 95.67%.** Of 3,097 mutations, 2,942 were killed, 21 timed out, 130 survived and 4 had no coverage. After a full fresh run, the final token-scanner change reran all affected mutations locally; hosted CI reruns the entire production scope from scratch. This passes the existing 95% package gate; it is not a claim that every mutation was detected. Remaining survivors include redundant checks and unasserted formatting/guard variants. No threshold was reduced or production semantic module excluded.
 - **Fresh Graph mutation score: 99.48%.** 2,300 killed, four timed out, 12 survived and none without coverage. Other production packages retain their existing mutation gate and are rerun by hosted CI.
 - **Dependency audit:** zero known advisories at validation time.
 - **Container:** the production image built with the reviewed Node 24 Alpine digest from PR #46 and restarted the existing local web/worker stack while preserving encrypted snapshots and sessions. Unrelated Docker services were left intact.
+
+One local coverage attempt stopped because Docker’s internal filesystem filled with accumulated build cache. Removing 17.78 GB of identified stale Entra build cache restored the disposable database; database-dependent checks were rerun. Tenant storage and unrelated services were preserved.
 
 Coverage metrics apply to configured production modules, not every UI line. Public-format snapshots supplement behavioral assertions; they do not replace the independent planning, interval and policy expectations. Hosted Product verification also reruns coverage and all mutation packages from a fresh checkout, including the actual Stryker/Vitest nested-test-selection canary.
 
@@ -56,6 +58,7 @@ The saved application's optional role, policy and activity collectors remained d
 
 - Hosted CodeQL identified a file-size check/read race and a potentially quadratic scope expression. The CLI now reads at most the permitted bytes plus one through a single open handle; scope parsing uses bounded, separately validated segments. Exact file-size boundaries, a growing input stream and crafted scope inputs have regression checks. The growing-stream test was also run against the original reader and failed as expected; the corrected reader passed.
 
+- Adversarial token-shaped text exposed another slow scan in portable replay. Token detection now processes bounded segments in linear passes, rejects oversized scalars before scanning, and preserves the original detection boundary across 960 independently compared synthetic cases.
 - Missing single-user consent context and unresolved delegated scope IDs could otherwise turn missing evidence into a false negative. Both now remain unknown.
 - Proof-cache dependencies now include source endpoint and collection metadata; canonical path ordering agrees with derivation references.
 - Ownership and role facts enforce their supported principal/resource types. Conflicting grant, federation and credential variants cannot silently establish assurance.

@@ -101,9 +101,25 @@ export async function exportInvestigation(model: EvidenceModel, query: Authoriza
   return { package: packet, privateMapping: result.privateMapping };
 }
 
+function secretLike(value: string): boolean {
+  if (/-----BEGIN [A-Z ]*PRIVATE KEY-----/.test(value)) return true;
+  // Tokenize once. Repeated header-like prefixes without a following dot must
+  // not restart a greedy JWT match over the rest of an untrusted scalar.
+  for (const run of value.split(/[^A-Za-z0-9_.-]+/)) {
+    const segments = run.split(".");
+    for (let index = 0; index + 2 < segments.length; index++) {
+      if (!segments[index + 1] || !segments[index + 2]) continue;
+      const header = segments[index]!;
+      const start = header.search(/(?:^|-)eyJ/);
+      if (start >= 0 && header.length - start - (header[start] === "-" ? 1 : 0) >= 13) return true;
+    }
+  }
+  return false;
+}
+
 function inspectJson(value: unknown, depth = 0, count = { value: 0 }): void {
   if (depth > 24 || ++count.value > 150_000) throw new Error("Investigation exceeds structural limits.");
-  if (typeof value === "string" && (/-----BEGIN [A-Z ]*PRIVATE KEY-----|\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/.test(value) || value.length > 50_000)) throw new Error("Secret-like or oversized content rejected.");
+  if (typeof value === "string" && (value.length > 50_000 || secretLike(value))) throw new Error("Secret-like or oversized content rejected.");
   if (Array.isArray(value)) { for (const item of value) inspectJson(item, depth + 1, count); return; }
   if (value && typeof value === "object") for (const [key, item] of Object.entries(value)) {
     if (["__proto__", "constructor", "prototype", "accessToken", "refreshToken", "clientSecret", "secretText", "privateKey", "files", "path", "filename"].includes(key)) throw new Error("Forbidden investigation field.");

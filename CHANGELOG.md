@@ -55,7 +55,7 @@ Breaking changes are always called out under **Changed** with a migration note.
 
 ### Fixed
 
-- Bound offline CLI reads through a single open file handle and validate evidence-gap scopes without a backtracking expression; cover size boundaries and crafted scope inputs.
+- Bound offline CLI reads through a single open file handle and validate evidence-gap scopes and token-like export content without repeated backtracking; cover growing inputs, size boundaries and crafted scope/token inputs.
 
 - Backport Stryker's Vitest 5 nested-test selection fix through a pinned pnpm patch. An end-to-end runner check rejects missing tests and incorrect prefix matches before the production mutation suite runs.
 - Browser verification always starts the current build on a dedicated port instead of silently reusing an older local preview server.

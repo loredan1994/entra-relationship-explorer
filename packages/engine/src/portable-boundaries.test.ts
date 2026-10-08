@@ -3,6 +3,26 @@ import { expect, it } from "vitest";
 import { canonical } from "./canonical";
 import { compileSnapshot, exportInvestigation, verifyInvestigation, type InvestigationPackage } from "./index";
 import { edge, node, query, snapshot } from "./test-support";
+it.each([
+  ["prefix-eyJabcdefghij.a.b", true],
+  ["prefix-eyJabcdefghi.a.b", false],
+  ["prefixeyJabcdefghij.a.b", false],
+  ["prefix_eyJabcdefghij.a.b", false],
+  ["!eyJabcdefghij.a.b?", true],
+  ["before.a.b eyJabcdefghij.a.b", true],
+  ["one.eyJabcdefghij.a.b", true],
+  ["eyJabcdefghij..b", false],
+  ["eyJabcdefghij.a.", false],
+  ["eyJabcdefghij.a!b", false],
+  ["eyJabcdefghij!.a.b", false],
+  ["prefix-eyJabcdefghij-_._-._-", true],
+])("keeps token detection boundaries for %s", async (value, secret) => {
+  await expect(verifyInvestigation(JSON.stringify(value))).rejects.toThrow(secret ? "Secret-like or oversized" : "Invalid investigation document");
+});
+it("rejects oversized repeated token prefixes before scanning them", async () => {
+  await expect(verifyInvestigation(JSON.stringify("eyJabcdefghijk-".repeat(30_000)))).rejects.toThrow("Secret-like or oversized");
+  await expect(verifyInvestigation(JSON.stringify("eyJabcdefghijk-".repeat(3000)))).rejects.toThrow("Invalid investigation document");
+});
 function rehash(p: InvestigationPackage) { const { manifest, ...body } = p; manifest.digest = createHash("sha256").update(canonical(body)).digest("hex"); return canonical(p); }
 it("replays typed object and coverage conflicts and omits unrelated conflict families", async () => {
   const s = snapshot(); s.nodes.push({ ...s.nodes[0]!, kind: "application" }, { ...node("unrelated"), kind: "group" }, node("unrelated"));
