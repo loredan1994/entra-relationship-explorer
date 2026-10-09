@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { spawnSync } from "node:child_process";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 
@@ -32,6 +33,34 @@ if (rendered.status !== 0) {
 
 const config = JSON.parse(rendered.stdout);
 const errors = [];
+
+// New workspace packages must join the manifest-only install layer. Otherwise a
+// cached image can silently retain an incomplete dependency tree after COPY . .
+const dockerInstructions = readFileSync(path.join(root, "Dockerfile"), "utf8")
+  .replace(/\\\r?\n/g, " ")
+  .split(/\r?\n/)
+  .map((line) => line.trim())
+  .filter((line) => line && !line.startsWith("#"));
+const dependencyInstall = dockerInstructions.findIndex((line) => /^RUN\s+pnpm install --frozen-lockfile$/.test(line));
+const sourceCopy = dockerInstructions.findIndex((line) => /^COPY\s+\.\s+\.$/.test(line));
+if (dependencyInstall < 0 || sourceCopy <= dependencyInstall) {
+  errors.push("Docker must install frozen dependencies before copying product source");
+}
+const dependencyInputs = new Set(dockerInstructions.slice(0, Math.max(0, dependencyInstall))
+  .filter((line) => line.startsWith("COPY "))
+  .flatMap((line) => line.split(/\s+/).slice(1, -1)));
+const workspaceManifests = ["apps", "packages"].flatMap((directory) =>
+  readdirSync(path.join(root, directory), { withFileTypes: true })
+    .filter((entry) => entry.isDirectory() && existsSync(path.join(root, directory, entry.name, "package.json")))
+    .map((entry) => `${directory}/${entry.name}/package.json`));
+for (const input of ["package.json", "pnpm-lock.yaml", "pnpm-workspace.yaml", "patches", ...workspaceManifests]) {
+  if (!dependencyInputs.has(input)) errors.push(`Docker dependency layer is missing ${input}`);
+}
+const ignoredBuildInputs = new Set(readFileSync(path.join(root, ".dockerignore"), "utf8")
+  .split(/\r?\n/).map((line) => line.trim()));
+for (const input of [".pnpm-store", "**/.pnpm-store", "**/.env", "**/.env.*"]) {
+  if (!ignoredBuildInputs.has(input)) errors.push(`Docker build context must exclude ${input}`);
+}
 const requiredServices = ["postgres", "migrate", "web", "worker"];
 
 for (const serviceName of requiredServices) {
@@ -84,4 +113,4 @@ if (errors.length > 0) {
   process.exit(1);
 }
 
-process.stdout.write("Compose security invariants valid: loopback exposure only, no privileged/host namespaces, worker and migration unpublished.\n");
+process.stdout.write("Compose security invariants valid: loopback exposure only, no privileged/host namespaces, worker and migration unpublished; Docker dependency inputs are cached before source.\n");

@@ -114,6 +114,27 @@ describe("Backend contract", () => {
     expect(await backend.priorThreatReviews(randomUUID(), "snap-current", ["finding-1"])).toEqual([]);
   });
 
+  it("rejects a review when a newer scan was published after its evidence was loaded", async () => {
+    const backend = new MemoryBackend();
+    const valid = session();
+    await backend.createSession(valid);
+    const save = async (id: string, scannedAt: string) => {
+      const queued = await backend.enqueueScan(tenantId, valid.id);
+      await backend.claimNextJob("review-race", tenantId);
+      await backend.completeJob(queued.id, "review-race", { ...cleanProjectFixture, id, scannedAt, tenant: { tenantId, tenantLabel: "Synthetic" } }, new Date(0));
+    };
+    await save("older-evidence", new Date(Date.now() - 1000).toISOString());
+    const review = { tenantId, snapshotId: "older-evidence", findingId: "finding", disposition: "open" as const, owner: "Original", assumption: "Original evidence", expiresAt: null, updatedAt: "" };
+    const saved = await backend.upsertThreatReview(review, valid.id, null);
+    await save("new-evidence", new Date().toISOString());
+
+    await expect(backend.upsertThreatReview({ ...review, owner: "Stale update" }, valid.id, saved.revision)).rejects.toThrow("Review conflict:");
+    await expect(backend.upsertThreatReview({ ...review, findingId: "new-stale-decision" }, valid.id, null)).rejects.toThrow("Review conflict:");
+    expect(await backend.getThreatReview(tenantId, review.snapshotId, review.findingId)).toMatchObject({ owner: "Original", revision: saved.revision });
+    expect(await backend.getThreatReview(tenantId, review.snapshotId, "new-stale-decision")).toBeNull();
+    expect(await backend.upsertThreatReview({ ...review, snapshotId: "new-evidence" }, valid.id, null)).toMatchObject({ snapshotId: "new-evidence" });
+  });
+
   it("removes reviews when their snapshots age out of retention", async () => {
     const backend = new MemoryBackend(); const valid = session(); await backend.createSession(valid);
     const queued = await backend.enqueueScan(tenantId, valid.id); await backend.claimNextJob("old-worker", tenantId);

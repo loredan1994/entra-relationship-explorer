@@ -353,10 +353,20 @@ function consentPolicyId(assignment: string): string {
 }
 
 function activityEdges(raw: RawTenantScan, nodes: Map<string, DirectoryNode>): RelationshipEdge[] {
-  return (raw.signIns ?? []).flatMap(({ record, endpoint }) => {
+  if (!raw.signIns?.length) return [];
+  const sourceIndex = new Map<string | null | undefined, string>();
+  const targetIndex = new Map<string | null | undefined, string>();
+  for (const { record } of raw.servicePrincipals) {
+    if (!sourceIndex.has(record.appId)) sourceIndex.set(record.appId, record.id);
+    // Resource IDs can identify an application or its tenant identity. Keep the
+    // first record matching either form, including collisions between the forms.
+    if (!targetIndex.has(record.appId)) targetIndex.set(record.appId, record.id);
+    if (!targetIndex.has(record.id)) targetIndex.set(record.id, record.id);
+  }
+  return raw.signIns.flatMap(({ record, endpoint }) => {
     if (record.status?.errorCode !== 0) return [];
-    const sourceId = record.servicePrincipalId ?? raw.servicePrincipals.find(item => item.record.appId === record.appId)?.record.id;
-    const targetId = record.resourceServicePrincipalId ?? raw.servicePrincipals.find(item => item.record.appId === record.resourceId || item.record.id === record.resourceId)?.record.id;
+    const sourceId = record.servicePrincipalId ?? sourceIndex.get(record.appId);
+    const targetId = record.resourceServicePrincipalId ?? targetIndex.get(record.resourceId);
     if (!sourceId || !targetId) return [];
     ensureMissingTarget(nodes, sourceId, record.appDisplayName, raw.tenantId);
     ensureMissingTarget(nodes, targetId, record.resourceDisplayName, raw.tenantId);

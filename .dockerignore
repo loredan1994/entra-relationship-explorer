@@ -3,12 +3,17 @@
 **/.next
 node_modules
 **/node_modules
+.pnpm-store
+**/.pnpm-store
 test-results
 playwright-report
 coverage
 .env
 .env.*
+**/.env
+**/.env.*
 !.env.example
+!**/.env.example
 **/.data
 exports
 snapshots
@@ -25,3 +30,6 @@ tenant-data
 **/*.tsbuildinfo
 quality-reports
 .gstack
+.claude
+.DS_Store
+**/.DS_Store

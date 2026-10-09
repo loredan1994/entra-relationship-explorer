@@ -37,6 +37,9 @@ Breaking changes are always called out under **Changed** with a migration note.
 
 ### Changed
 
+- Version the corrected interpretation as engine `1.0.1` / authorization rules `entra-configured/2`. Re-export older portable investigations from their source snapshots; incompatible replay versions are explicitly rejected. Stored snapshots remain readable.
+- Cache container dependency installation separately from product sources; exclude package stores and nested environment files from the build context.
+- Load engine history only for workflows that use it, and skip graph layout in table view.
 - Refresh the pinned Node 24 Alpine build image to the reviewed digest from dependency PR #46.
 - Resolve delegated consent scopes to exact resource-specific permission IDs; missing and ambiguous mappings remain unknown.
 - Preserve structured federation audiences and supported Conditional Access inputs. Read session-control metadata through the existing optional policy permission; unsupported conditions remain unknown. Historical snapshots remain compatible and require a fresh read-only scan for missing structured fields.
@@ -55,6 +58,12 @@ Breaking changes are always called out under **Changed** with a migration note.
 
 ### Fixed
 
+- Serialize concurrent startup migrations to prevent PostgreSQL DDL deadlocks. Index identity lookups while normalizing observed sign-ins, preserving first-match behavior.
+- Preserve uncertainty for missing or conflicting intermediate identities, conflicting policy variants, and partially known validity windows. Apply explicit work limits to change planning.
+- Build large relationship indexes without repeatedly copying adjacency arrays; aggregate large Graph collections without exceeding JavaScript's argument limit.
+- Bind engine state to the displayed snapshot, distinguish observed evidence in the map and table, and recover cleanly from scan-control network failures.
+- Serialize snapshot publication with local review saves, so a completed newer scan cannot race a decision into older evidence. Reject review bodies over 128 KiB before parsing or storage.
+- Pseudonymize exact identifiers inside quoted and encoded source endpoint filters as well as URL path segments.
 - Bound offline CLI reads through a single open file handle and validate evidence-gap scopes and token-like export content without repeated backtracking; cover growing inputs, size boundaries and crafted scope/token inputs.
 
 - Backport Stryker's Vitest 5 nested-test selection fix through a pinned pnpm patch. An end-to-end runner check rejects missing tests and incorrect prefix matches before the production mutation suite runs.

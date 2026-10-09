@@ -17,10 +17,15 @@ Startup reads three values from outside the repository: the app-registration cre
 
 `GET /api/v1/health` reports the web/database state and the `read-only` Graph boundary.
 
+Container builds cache the frozen dependency install independently of source edits. Changes to a workspace manifest, lockfile, workspace configuration or pnpm patch invalidate that layer. Local package stores and nested environment files are excluded from the build context.
+
+Review decisions use a revision check and are serialized with snapshot publication within the tenant. If a newer scan completes before a decision is saved, the API returns 409 and the reviewer must reload the evidence. Review JSON is limited to 128 KiB of actual streamed bytes; oversized requests return 413. These writes affect the local database only.
+
 ## Stop and recover
 
 - `docker compose down` stops services while preserving the named PostgreSQL volume.
 - Starting again applies migrations before web and worker become available.
+- Concurrent startup migrations acquire a database-wide transaction lock before schema changes and expired-auth cleanup. Other instances wait for the migration to commit; failures roll back and release the lock.
 - A stopped web service does not lose sessions or jobs.
 - A worker interrupted during a scan leaves its job durable. On startup, jobs whose worker lease has been stale for ten minutes return to the queue.
 

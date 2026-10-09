@@ -62,17 +62,29 @@ function controls(policy: ConditionalAccessDefinition, scenario: SignInScenario)
   return policy.grant.operator === "AND" ? and(values) : policy.grant.operator === "OR" ? or(values) : null;
 }
 
+function scenarioEvaluator(model: EvidenceModel): (scenario: SignInScenario) => ScenarioEvaluation {
+  const conflicts = new Set(model.conflicts.map(c => c.factId));
+  const nodes = model.nodes.filter(n => n.conditionalAccess || (n.kind === "policy" && (n.sourceEndpoint?.startsWith("/identity/conditionalAccess") || !["authorization", "permissionGrant", "crossTenantAccess"].includes(String(n.metadata?.policyType)))));
+  const incomplete = !complete(model, "conditionalAccess") || model.conflicts.length > 0;
+  return scenario => {
+    const policies = nodes.map((node): PolicyDecision => {
+      // Compilation retains one canonical variant for stable output. It is not
+      // authoritative when the same policy ID has contradictory source records.
+      if (conflicts.has(`object:${node.id}`)) return { id: node.id, mode: "unknown", applies: null, satisfied: null, unsupported: ["conflicting-policy-evidence"] };
+      const p = node.conditionalAccess;
+      if (!p) return { id: node.id, mode: "unknown", applies: null, satisfied: null, unsupported: ["structured-policy-not-collected"] };
+      const mode = p.state === "enabled" ? "enforced" : p.state === "enabledForReportingButNotEnforced" ? "report-only" : p.state === "disabled" ? "disabled" : "unknown";
+      return { id: node.id, mode, applies: mode === "disabled" ? false : applicability(p, scenario), satisfied: controls(p, scenario), unsupported: p.unsupported };
+    });
+    const enforced = policies.filter(p => p.mode === "enforced" || p.mode === "unknown");
+    const denied = enforced.some(p => p.mode === "enforced" && p.applies === true && p.satisfied === false);
+    const unknown = incomplete || enforced.some(p => p.mode === "unknown" || p.applies === null || (p.applies === true && p.satisfied === null));
+    return { decision: denied ? "requirements-unmet" : unknown ? "unknown" : "permits-under-model", policies };
+  };
+}
+
 export function evaluatePolicyScenario(model: EvidenceModel, scenario: SignInScenario): ScenarioEvaluation {
-  const policies = model.nodes.filter(n => n.conditionalAccess || (n.kind === "policy" && (n.sourceEndpoint?.startsWith("/identity/conditionalAccess") || !["authorization", "permissionGrant", "crossTenantAccess"].includes(String(n.metadata?.policyType))))).map((node): PolicyDecision => {
-    const p = node.conditionalAccess;
-    if (!p) return { id: node.id, mode: "unknown", applies: null, satisfied: null, unsupported: ["structured-policy-not-collected"] };
-    const mode = p.state === "enabled" ? "enforced" : p.state === "enabledForReportingButNotEnforced" ? "report-only" : p.state === "disabled" ? "disabled" : "unknown";
-    return { id: node.id, mode, applies: mode === "disabled" ? false : applicability(p, scenario), satisfied: controls(p, scenario), unsupported: p.unsupported };
-  });
-  const enforced = policies.filter(p => p.mode === "enforced" || p.mode === "unknown");
-  const denied = enforced.some(p => p.mode === "enforced" && p.applies === true && p.satisfied === false);
-  const unknown = !complete(model, "conditionalAccess") || model.conflicts.length > 0 || enforced.some(p => p.mode === "unknown" || p.applies === null || (p.applies === true && p.satisfied === null));
-  return { decision: denied ? "requirements-unmet" : unknown ? "unknown" : "permits-under-model", policies };
+  return scenarioEvaluator(model)(scenario);
 }
 
 function violates(intent: PolicyIntent, scenario: SignInScenario): boolean {
@@ -81,23 +93,30 @@ function violates(intent: PolicyIntent, scenario: SignInScenario): boolean {
   return intent.require === "block" || scenario[intent.require] === false;
 }
 
-function minimized(model: EvidenceModel, intent: PolicyIntent, original: SignInScenario): SignInScenario {
+function minimized(evaluate: (scenario: SignInScenario) => ScenarioEvaluation, intent: PolicyIntent, original: SignInScenario): SignInScenario {
   const scenario = { ...original };
   for (const field of ["groups", "platform", "location", "trustedLocation", "clientAppType", "mfa", "compliantDevice", "hybridJoinedDevice"] as const) {
     const proposed = { ...scenario, [field]: null };
-    if (violates(intent, proposed) && evaluatePolicyScenario(model, proposed).decision === "permits-under-model") Object.assign(scenario, proposed);
+    if (violates(intent, proposed) && evaluate(proposed).decision === "permits-under-model") Object.assign(scenario, proposed);
   }
   return scenario;
 }
 
 function groupResolver(model: EvidenceModel) {
   const cache = new Map<string, string[] | null>();
+  // A canonical conflicting relationship cannot prove either membership or its
+  // absence. Keep generated group assumptions unknown until sources agree.
+  const completeGroups = complete(model, "groupMemberships") && model.conflicts.length === 0;
   const groups = new Set(model.nodes.filter(n => n.kind === "group").map(n => n.id));
   const outgoing = new Map<string, typeof model.edges>();
-  for (const edge of model.edges) if (edge.type === "MEMBER_OF" && edge.evidence.configured) outgoing.set(edge.sourceId, [...(outgoing.get(edge.sourceId) ?? []), edge]);
+  for (const edge of model.edges) if (edge.type === "MEMBER_OF" && edge.evidence.configured) {
+    const edges = outgoing.get(edge.sourceId);
+    if (edges) edges.push(edge);
+    else outgoing.set(edge.sourceId, [edge]);
+  }
   let remaining = 100_000;
   return (userId: string): string[] | null => {
-    if (!complete(model, "groupMemberships")) return null;
+    if (!completeGroups) return null;
     if (cache.has(userId)) return cache.get(userId)!;
     const visited = new Set([userId]), queue = [userId];
     let known = true;
@@ -131,16 +150,17 @@ export function findPolicyCounterexamples(model: EvidenceModel, intent: PolicyIn
   // Resolve only users actually visited by the bounded scenario search. Group
   // closure is a separate bounded worklist; an incomplete closure remains unknown.
   const resolveGroups = groupResolver(model);
+  const evaluate = scenarioEvaluator(model);
   outer: for (const userId of users) for (const applicationId of apps) for (const platform of platforms) for (const location of locations) for (const clientAppType of clients) for (let bits = 0; bits < 16; bits++) {
     if (checked === maxSteps) { exhausted = true; break outer; }
     checked++;
     const scenario: SignInScenario = { userId, applicationId, platform, location, clientAppType, groups: resolveGroups(userId),
       mfa: Boolean(bits & 1), compliantDevice: Boolean(bits & 2), hybridJoinedDevice: Boolean(bits & 4), trustedLocation: Boolean(bits & 8) };
-    const evaluation = evaluatePolicyScenario(model, scenario);
+    const evaluation = evaluate(scenario);
     if (evaluation.decision === "unknown") unknown++;
     if (evaluation.decision === "permits-under-model" && violates(intent, scenario)) {
-      const witness = minimized(model, intent, scenario), key = canonical(witness);
-      if (!seen.has(key)) { seen.add(key); if (witnesses.length < 100) witnesses.push({ scenario: witness, evaluation: evaluatePolicyScenario(model, witness) }); }
+      const witness = minimized(evaluate, intent, scenario), key = canonical(witness);
+      if (!seen.has(key)) { seen.add(key); if (witnesses.length < 100) witnesses.push({ scenario: witness, evaluation: evaluate(witness) }); }
     }
   }
   witnesses.sort((a, b) => compare(canonical(a.scenario), canonical(b.scenario)));

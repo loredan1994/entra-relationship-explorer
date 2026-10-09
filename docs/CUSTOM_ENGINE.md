@@ -2,7 +2,7 @@
 
 The **Evidence engine** screen contains ten local investigation workflows backed by `@entra-explorer/engine`. The engine has no Graph client, token access, database connection, or write transport. It consumes a projection of one tenant’s recorded snapshots and operator-supplied intent. Its public entry point is `packages/engine/src/index.ts`.
 
-Engine version: `1.0.0`. Authorization rule version: `entra-configured/1`. These version the interpretation and replay format, independently of the application release.
+Engine version: `1.0.1`. Authorization rule version: `entra-configured/2`. These version the interpretation and replay format, independently of the application release. This revision preserves uncertainty for missing or conflicting intermediate objects and corrects policy and temporal interpretation. Portable packages from older engine/rule versions must be re-exported from their source snapshots; the verifier rejects incompatible versions instead of silently applying new semantics.
 
 ## Read the result correctly
 
@@ -91,7 +91,7 @@ Other kinds are `require-grant` (`principalId`, `resourceId`, `permissionId`) an
 | Compile a snapshot | 100,000 nodes / 500,000 relationships |
 | Default authorization query | 50,000 steps / 128 paths / depth 12 |
 | Maximum explicit query budget | 1,000,000 steps / 10,000 paths / depth 32 |
-| Planning | 1,000 candidates / 10,000 paths / 1,000 protected integrations; 25,000 search steps in UI |
+| Planning | 1,000 candidates / 10,000 paths / 1,000 protected integrations; 25,000 search steps and 6.4 million work units in UI |
 | Policy search | 10,000 scenarios by default, maximum 100,000; group closure stops after 100,000 relationship visits and unresolved groups remain unknown |
 | Federation comparison | 20,000 pairs by default |
 | Rotation | 1,000 deployment stages / 200 workloads / 1,000,000 evaluation steps |
@@ -99,6 +99,8 @@ Other kinds are `require-grant` (`principalId`, `resourceId`, `permissionId`) an
 | Portable package | 5 MB / depth 24 / 150,000 structural values |
 
 Budgets are visible in results. Reaching a limit does not certify absence or global optimality. Bound completion and source completeness are separate facts.
+
+Planning reports both search states (`limits.steps`) and total indexed work (`limits.work`). The work budget is `max(10,000, min(10,000,000, maxSteps × 256))` and covers input entries, dependency incidences, candidate inspections, copied entries and ordering comparisons. Preprocessing and greedy planning can exhaust it before a feasible plan is found; that result is bounded/unknown, not infeasible. Previously found complete plans remain available as upper bounds.
 
 Tests use exhaustive subset enumeration as an independent planning oracle, hand-authored policy decision tables, independent sampled-time interval checks, cross-tenant and malformed inputs, input permutation invariance, cache-versus-full replay, negative dependency invalidation and tamper checks. Browser checks cover all ten screens, meaningful interactions, accessibility, mobile overflow and absence of write requests.
 

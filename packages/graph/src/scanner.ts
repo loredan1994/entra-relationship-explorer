@@ -185,6 +185,11 @@ function report(run: ScanRun, stage: ScanStage, collected: number, detail: strin
   run.options.onProgress?.({ stage, collected, detail });
 }
 
+/** Append without turning every collected record into a function argument. */
+function append<T>(target: T[], records: readonly T[]): void {
+  for (const record of records) target.push(record);
+}
+
 function read<TInput, TOutput>(
   run: ScanRun,
   endpoint: string,
@@ -206,13 +211,13 @@ async function readOne<TInput, TOutput>(run: ScanRun, endpoint: string, sanitize
 }
 
 async function collectApplications(run: ScanRun): Promise<void> {
-  run.scan.applications.push(...await read(run, APPLICATIONS_ENDPOINT, sanitizeApplication, (count) =>
+  append(run.scan.applications, await read(run, APPLICATIONS_ENDPOINT, sanitizeApplication, (count) =>
     report(run, "applications", count, "Application blueprints collected"),
   ));
 }
 
 async function collectServicePrincipals(run: ScanRun): Promise<void> {
-  run.scan.servicePrincipals.push(...await read(run, SERVICE_PRINCIPALS_ENDPOINT, sanitizeServicePrincipal, (count) =>
+  append(run.scan.servicePrincipals, await read(run, SERVICE_PRINCIPALS_ENDPOINT, sanitizeServicePrincipal, (count) =>
     report(run, "servicePrincipals", count, "Tenant identities collected"),
   ));
 }
@@ -223,13 +228,13 @@ async function collectFederatedIdentityCredentials(run: ScanRun): Promise<void> 
     await ensureActive(run);
     const endpoint = `/applications/${encodeURIComponent(record.id)}/federatedIdentityCredentials?$select=id,name,issuer,subject,audiences,description`;
     const credentials = await read(run, endpoint, sanitizeFederatedIdentityCredential);
-    scan.federatedIdentityCredentials!.push(...credentials.map((credential) => ({ ...credential, parentId: record.id, parentType: "application" as const })));
+    append(scan.federatedIdentityCredentials!, credentials.map((credential) => ({ ...credential, parentId: record.id, parentType: "application" as const })));
     report(run, "federatedIdentityCredentials", scan.federatedIdentityCredentials!.length, "Federated workload trust credentials collected");
   });
   const managedIdentityContainers = await read(run, SERVICE_PRINCIPAL_FEDERATION_ENDPOINT, sanitizeServicePrincipalFederation);
   for (const container of managedIdentityContainers) {
     if (container.record.servicePrincipalType?.toLocaleLowerCase() !== "managedidentity") continue;
-    scan.federatedIdentityCredentials!.push(...container.record.federatedIdentityCredentials!.map((record) => ({ endpoint: container.endpoint, record, parentId: container.record.id, parentType: "managedIdentity" as const })));
+    append(scan.federatedIdentityCredentials!, container.record.federatedIdentityCredentials!.map((record) => ({ endpoint: container.endpoint, record, parentId: container.record.id, parentType: "managedIdentity" as const })));
   }
   report(run, "federatedIdentityCredentials", scan.federatedIdentityCredentials!.length, "Federated workload trust credentials collected");
 }
@@ -237,9 +242,9 @@ async function collectFederatedIdentityCredentials(run: ScanRun): Promise<void> 
 async function collectUsersAndGroups(run: ScanRun): Promise<void> {
   const { scan } = run;
   const users = await read(run, USERS_ENDPOINT, sanitizeUser);
-  scan.users!.push(...users);
+  append(scan.users!, users);
   const groups = await read(run, GROUPS_ENDPOINT, sanitizeGroup);
-  scan.groups!.push(...groups);
+  append(scan.groups!, groups);
   report(run, "usersAndGroups", users.length + groups.length, "People and groups collected");
 }
 
@@ -249,13 +254,13 @@ async function collectGroupMemberships(run: ScanRun): Promise<void> {
     await ensureActive(run);
     const endpoint = `/groups/${encodeURIComponent(record.id)}/members?$select=id,displayName,userType`;
     const members = await read(run, endpoint, sanitizeDirectoryObject);
-    scan.groupMemberships!.push(...members.map((member) => ({ ...member, groupId: record.id })));
+    append(scan.groupMemberships!, members.map((member) => ({ ...member, groupId: record.id })));
     report(run, "groupMemberships", scan.groupMemberships!.length, "Direct group memberships collected");
   });
 }
 
 async function collectDevices(run: ScanRun): Promise<void> {
-  run.scan.devices!.push(...await read(run, DEVICES_ENDPOINT, sanitizeDevice, (count) =>
+  append(run.scan.devices!, await read(run, DEVICES_ENDPOINT, sanitizeDevice, (count) =>
     report(run, "devices", count, "Directory devices collected"),
   ));
 }
@@ -263,19 +268,19 @@ async function collectDevices(run: ScanRun): Promise<void> {
 async function collectAdministrativeUnits(run: ScanRun): Promise<void> {
   const { scan } = run;
   const units = await read(run, ADMINISTRATIVE_UNITS_ENDPOINT, sanitizeAdministrativeUnit);
-  scan.administrativeUnits!.push(...units);
+  append(scan.administrativeUnits!, units);
   await mapLimit(units, run.concurrency, async ({ record }) => {
     await ensureActive(run);
     const endpoint = `/directory/administrativeUnits/${encodeURIComponent(record.id)}/members?$select=id,displayName,userType,deviceId`;
     const members = await read(run, endpoint, sanitizeDirectoryObject);
-    scan.administrativeUnitMemberships!.push(...members.map((member) => ({ ...member, administrativeUnitId: record.id })));
+    append(scan.administrativeUnitMemberships!, members.map((member) => ({ ...member, administrativeUnitId: record.id })));
     report(run, "administrativeUnits", scan.administrativeUnitMemberships!.length, "Administrative unit membership collected");
   });
   report(run, "administrativeUnits", units.length, "Administrative units collected");
 }
 
 async function collectDelegatedGrants(run: ScanRun): Promise<void> {
-  run.scan.oauth2PermissionGrants.push(...await read(run, GRANTS_ENDPOINT, sanitizeGrant, (count) =>
+  append(run.scan.oauth2PermissionGrants, await read(run, GRANTS_ENDPOINT, sanitizeGrant, (count) =>
     report(run, "delegatedPermissionGrants", count, "Delegated permission grants collected"),
   ));
 }
@@ -286,7 +291,7 @@ async function collectAppRoleAssignments(run: ScanRun): Promise<void> {
     await ensureActive(run);
     const endpoint = `/servicePrincipals/${encodeURIComponent(record.id)}/appRoleAssignedTo?$select=id,appRoleId,principalDisplayName,principalId,principalType,resourceDisplayName,resourceId`;
     const assignments = await read(run, endpoint, sanitizeAssignment);
-    scan.appRoleAssignments.push(...assignments);
+    append(scan.appRoleAssignments, assignments);
     report(run, "appRoleAssignments", scan.appRoleAssignments.length, "Application and user assignments collected");
   });
 }
@@ -305,13 +310,13 @@ async function collectOwners(run: ScanRun): Promise<void> {
       await ensureActive(run);
       const endpoint = `/applications/${encodeURIComponent(record.id)}/owners?$select=id,displayName`;
       const owners = await read(run, endpoint, sanitizeDirectoryObject);
-      scan.applicationOwners.push(...owners.map((owner) => ({ ...owner, targetId: record.id })));
+      append(scan.applicationOwners, owners.map((owner) => ({ ...owner, targetId: record.id })));
     });
     await mapLimit(scan.servicePrincipals, run.concurrency, async ({ record }) => {
       await ensureActive(run);
       const endpoint = `/servicePrincipals/${encodeURIComponent(record.id)}/owners?$select=id,displayName`;
       const owners = await read(run, endpoint, sanitizeDirectoryObject);
-      scan.servicePrincipalOwners.push(...owners.map((owner) => ({ ...owner, targetId: record.id })));
+      append(scan.servicePrincipalOwners, owners.map((owner) => ({ ...owner, targetId: record.id })));
     });
   }
   report(run, "owners", scan.applicationOwners.length + scan.servicePrincipalOwners.length, "Ownership relationships collected");
@@ -322,9 +327,9 @@ async function collectDirectoryRoles(run: ScanRun): Promise<void> {
   if (!hasScope(run.options.enabledScopes, "RoleManagement.Read.Directory")) return;
   await ensureActive(run);
   const { scan } = run;
-  scan.roleDefinitions!.push(...await read(run, ROLE_DEFINITIONS_ENDPOINT, sanitizeRoleDefinition));
-  scan.roleAssignments!.push(...await read(run, ROLE_ASSIGNMENTS_ENDPOINT, sanitizeRoleSchedule));
-  scan.roleEligibilities!.push(...await read(run, ROLE_ELIGIBILITIES_ENDPOINT, sanitizeRoleSchedule));
+  append(scan.roleDefinitions!, await read(run, ROLE_DEFINITIONS_ENDPOINT, sanitizeRoleDefinition));
+  append(scan.roleAssignments!, await read(run, ROLE_ASSIGNMENTS_ENDPOINT, sanitizeRoleSchedule));
+  append(scan.roleEligibilities!, await read(run, ROLE_ELIGIBILITIES_ENDPOINT, sanitizeRoleSchedule));
   report(run, "roles", scan.roleAssignments!.length + scan.roleEligibilities!.length, "Active and eligible administrative roles collected");
 }
 
@@ -332,7 +337,7 @@ async function collectConditionalAccess(run: ScanRun): Promise<void> {
   if (!hasScope(run.options.enabledScopes, "Policy.Read.All")) return;
   await ensureActive(run);
   const { scan } = run;
-  scan.conditionalAccessPolicies!.push(...await read(run, CONDITIONAL_ACCESS_ENDPOINT, sanitizeConditionalAccessPolicy));
+  append(scan.conditionalAccessPolicies!, await read(run, CONDITIONAL_ACCESS_ENDPOINT, sanitizeConditionalAccessPolicy));
   report(run, "conditionalAccess", scan.conditionalAccessPolicies!.length, "Conditional Access policies collected");
 }
 
@@ -347,15 +352,15 @@ async function collectPermissionGrantPolicies(run: ScanRun): Promise<void> {
   if (!hasScope(run.options.enabledScopes, "Policy.Read.PermissionGrant")) return;
   const { scan } = run;
   const policies = await read(run, PERMISSION_GRANT_POLICIES_ENDPOINT, sanitizePermissionGrantPolicy);
-  scan.permissionGrantPolicies!.push(...policies);
+  append(scan.permissionGrantPolicies!, policies);
   await mapLimit(policies, run.concurrency, async ({ record }) => {
     await ensureActive(run);
     const includesEndpoint = `/policies/permissionGrantPolicies/${encodeURIComponent(record.id)}/includes`;
     const excludesEndpoint = `/policies/permissionGrantPolicies/${encodeURIComponent(record.id)}/excludes`;
     const includes = await read(run, includesEndpoint, sanitizePermissionGrantConditionSet);
     const excludes = await read(run, excludesEndpoint, sanitizePermissionGrantConditionSet);
-    scan.permissionGrantPolicyIncludes!.push(...includes.map((condition) => ({ ...condition, policyId: record.id })));
-    scan.permissionGrantPolicyExcludes!.push(...excludes.map((condition) => ({ ...condition, policyId: record.id })));
+    append(scan.permissionGrantPolicyIncludes!, includes.map((condition) => ({ ...condition, policyId: record.id })));
+    append(scan.permissionGrantPolicyExcludes!, excludes.map((condition) => ({ ...condition, policyId: record.id })));
     report(run, "permissionGrantPolicies", scan.permissionGrantPolicyIncludes!.length + scan.permissionGrantPolicyExcludes!.length, "Consent policy conditions collected");
   });
   report(run, "permissionGrantPolicies", policies.length, "Consent policies collected");
@@ -365,7 +370,7 @@ async function collectCrossTenantAccess(run: ScanRun): Promise<void> {
   if (!hasScope(run.options.enabledScopes, "Policy.Read.All")) return;
   await ensureActive(run);
   const { scan } = run;
-  scan.crossTenantPartners!.push(...await read(run, CROSS_TENANT_ENDPOINT, sanitizeCrossTenantPartner));
+  append(scan.crossTenantPartners!, await read(run, CROSS_TENANT_ENDPOINT, sanitizeCrossTenantPartner));
   report(run, "crossTenantAccess", scan.crossTenantPartners!.length, "Partner-specific cross-tenant trust collected");
 }
 
@@ -375,7 +380,7 @@ async function collectActivity(run: ScanRun): Promise<void> {
   const { scan } = run;
   const since = new Date(Date.parse(scan.scannedAt) - ACTIVITY_WINDOW_MS).toISOString();
   const endpoint = `/auditLogs/signIns?$top=250&$filter=${encodeURIComponent(`createdDateTime ge ${since} and createdDateTime le ${scan.scannedAt}`)}&$select=id,createdDateTime,appId,resourceId,appDisplayName,resourceDisplayName,status`;
-  scan.signIns!.push(...await read(run, endpoint, sanitizeSignIn));
+  append(scan.signIns!, await read(run, endpoint, sanitizeSignIn));
   report(run, "activity", scan.signIns!.length, "Time-bounded sign-in activity collected");
 }
 

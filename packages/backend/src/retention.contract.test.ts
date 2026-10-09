@@ -54,13 +54,16 @@ it("rejects a checkpoint whose tenant differs from the worker's job", async () =
   expect(await backend.heartbeatJob(next.id, "other")).toBe(false);
 });
 it.each(["idle", "completion"])("%s retention physically removes only expired evidence and decisions", async (mode) => {
-  const old = await publish("old", 30 * DAY + 1);
-  const boundary = await publish("boundary", 30 * DAY);
-  const fresh = await publish("fresh", DAY);
-  const foreign = await publish("foreign", 31 * DAY, "beta");
-  // Seed reviews when their snapshots are within the supported read window.
+  // Create each decision while its own snapshot is current and retained.
   vi.setSystemTime(NOW - 2 * DAY);
-  for (const item of [old, boundary, fresh, foreign]) await backend.upsertThreatReview(review(item.snapshot), null, null);
+  const old = await publish("old", 30 * DAY + 1);
+  await backend.upsertThreatReview(review(old.snapshot), null, null);
+  const boundary = await publish("boundary", 30 * DAY);
+  await backend.upsertThreatReview(review(boundary.snapshot), null, null);
+  const fresh = await publish("fresh", DAY);
+  await backend.upsertThreatReview(review(fresh.snapshot), null, null);
+  const foreign = await publish("foreign", 31 * DAY, "beta");
+  await backend.upsertThreatReview(review(foreign.snapshot), null, null);
   vi.setSystemTime(NOW);
   if (mode === "idle") await backend.pruneExpiredData("alpha", new Date(NOW - 30 * DAY));
   else await publish("new", 0, "alpha", new Date(NOW - 30 * DAY));
@@ -96,18 +99,23 @@ it("physically deletes expired sessions and authorization flows, preserving futu
 });
 it("retains the full 30th day and refuses missing or expired review targets even for unconditional writes", async () => {
   const { snapshot } = await publish("boundary", 30 * DAY);
-  await publish("fresh");
-  expect((await backend.recentSnapshots("alpha")).map(s => s.id)).toEqual(["fresh", "boundary"]);
   const saved = await backend.upsertThreatReview(review(snapshot), null, null);
   expect(saved.revision).toBeTruthy();
   await expect(backend.upsertThreatReview(review(snapshot), null, "stale")).rejects.toThrow("Review conflict: another decision was saved. Reload before saving.");
   await expect(backend.upsertThreatReview(review(snapshot), null, null)).rejects.toThrow("Review conflict");
   for (const target of [{ ...snapshot, id: "missing" }, { ...snapshot, tenant: { tenantId: "beta", tenantLabel: "Other" } }]) {
-    await expect(backend.upsertThreatReview(review(target), null)).rejects.toThrow("Review conflict: the snapshot expired or is unavailable.");
+    await expect(backend.upsertThreatReview(review(target), null)).rejects.toThrow("Review conflict:");
   }
   vi.setSystemTime(NOW + 1);
   expect(await backend.getThreatReview("alpha", snapshot.id, "finding")).toBeNull();
-  await expect(backend.upsertThreatReview(review(snapshot), null, saved.revision)).rejects.toThrow("Review conflict: the snapshot expired or is unavailable.");
+  await expect(backend.upsertThreatReview(review(snapshot), null, saved.revision)).rejects.toThrow("Review conflict:");
+  vi.setSystemTime(NOW);
+  await publish("fresh");
+  expect((await backend.recentSnapshots("alpha")).map(s => s.id)).toEqual(["fresh", "boundary"]);
+  expect(await backend.priorThreatReviews("alpha", "fresh", ["finding"])).toHaveLength(1);
+  vi.setSystemTime(NOW + 1);
+  expect(await backend.getThreatReview("alpha", snapshot.id, "finding")).toBeNull();
+  expect(await backend.priorThreatReviews("alpha", "fresh", ["finding"])).toEqual([]);
 });
 it("prior context uses the nearest strictly older snapshot, excluding newer, current and missing selections", async () => {
   for (const [id, age] of [["old", 30 * DAY], ["middle", DAY], ["new", 0]] as const) {

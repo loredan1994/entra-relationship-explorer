@@ -83,3 +83,10 @@ it.each(["2026-02-30", "2026-13-01", "2026-00-10"])("rejects impossible acceptan
   expect(response!.status).toBe(400);
   expect(upsertThreatReview).not.toHaveBeenCalled();
 });
+
+it.each(["PUT", "POST"] as const)("rejects an oversized %s before storing a review", async method => {
+  const response = await route[method](request({ disposition: "open", sourceSnapshotId: prior.snapshotId, assumption: "x".repeat(131_072) }), { params: Promise.resolve({ id: findingId }) });
+  expect(response!.status).toBe(413);
+  expect(upsertThreatReview).not.toHaveBeenCalled();
+  expect(recordAccess).not.toHaveBeenCalled();
+});
