@@ -38,6 +38,8 @@ New browser suites are `scenario-import-lifecycle`, `application-selection-recov
 
 Hosted mutation checks run independently for domain, backend, engine, Graph and web, each with isolated PostgreSQL. The final quality gate requires coverage and every package to succeed. The fresh-run requirement, 95% thresholds and tested scopes are unchanged; local commands remain sequential to avoid shared-resource contention.
 
+The repository now also requires `quality` in GitHub's `main` branch protection, alongside the existing `verify`, `Analyze TypeScript` and `review` checks. Previously, a failed quality run did not itself prevent a normal protected merge. Existing strictness and other protection settings are preserved; fork maintainers must configure required checks separately from the workflow file.
+
 ## Compatibility and limits
 
 - Interpretation is engine `1.0.4` / authorization rules `entra-configured/4`. Older portable packages require re-export; stored snapshots remain readable.
@@ -48,11 +50,11 @@ Hosted mutation checks run independently for domain, backend, engine, Graph and 
 
 ## Final verification
 
-- **2,670 unit/integration tests passed:** domain 552, engine 857, Graph 486, backend 288 and web 487. The opt-in Graph live test remains separate from the synthetic suite. The final web run includes eight additional worker lifecycle tests prompted by mutation-survivor review.
+- **2,699 unit/integration tests passed:** domain 552, engine 886, Graph 486, backend 288 and web 487. The opt-in Graph live test remains separate from the synthetic suite. Mutation-survivor review added eight worker lifecycle cases and 29 engine cases covering contract evidence, bounded reads and independent continuity timelines.
 - **195 browser checks passed:** 165 desktop/mobile behaviors and 30 isolated PostgreSQL scenarios. The full browser run plus a focused rerun verify the final selectors; three project-specific duplicate cases are intentionally skipped. The entire PostgreSQL browser suite passed again after the migration coordination fix.
 - Production build, lint, TypeScript, 18 offline CLI checks and Compose security validation passed. Coverage/maintainability assessed 1,134 functions with none above CRAP 30. Measured line coverage is 99.88% for the engine and 100% for domain, Graph, backend and web-server code; other coverage dimensions and browser assertions are reported separately rather than inferred from those numbers.
-- A fresh local web mutation run passed at **95.13%** before the additional worker lifecycle tests. Hosted CI repeats fresh mutation runs for all five packages at the unchanged 95% minimum before merge; its check results are the final mutation evidence.
-- The current dependency audit reported no known vulnerabilities. The pre-publication scan found no known deployment credentials or private tenant identifiers in 401 candidate files.
+- The first fresh hosted engine mutation run correctly stopped the release at **94.38%**, below the unchanged 95% minimum. The 29 added engine regressions target observable missed behavior; independent review found no weakened expectations or tests encoding a known product defect. Hosted CI repeats all five packages from scratch before merge. [PR #52](https://github.com/loredan1994/entra-relationship-explorer/pull/52) records the final fresh scores and check results.
+- The current dependency audit reported no known vulnerabilities. The pre-publication scan found no known deployment credentials or private tenant identifiers in 404 candidate files.
 - Read-only Azure CLI validation made **19 Microsoft Graph GET requests** and matched **5,136 comparisons**, with zero mismatches. Optional policy/activity collectors were not enabled, directory-audit reads were denied and group-membership evidence remained partial; those gaps are not claims of absence.
 - The deployed image passed **40 live UI interaction checks and all ten engine workflows**, including 49 displayed-source comparisons. There were zero browser errors, attempted writes, authentication/export requests or downloads. Accessibility checks found no violations across the ten engine workflows. Five live actions were deliberately skipped because they require writes/downloads or evidence absent from this snapshot; synthetic suites cover those behaviors.
 - In-memory engine checks matched 20 relationship-provenance fields across five supported application queries, verified pseudonymized replay and correctly failed a forbidden-grant contract. Unavailable policy evidence remained unknown.

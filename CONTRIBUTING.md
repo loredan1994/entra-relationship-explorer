@@ -32,8 +32,9 @@ rather than a pull request that quietly crosses it.
 
 ## Getting set up
 
-Requirements: Node.js 22 or later, pnpm 11.23.0, and Docker Desktop only if you
-want to run the live stack.
+Requirements: Node.js 24 (recommended), pnpm 11.23.0, and Docker Desktop for the
+live stack or database integration tests. Development also supports Node.js
+22.12+ on the 22.x line or 26+; CI and the container runtime use Node.js 24.
 
 ```bash
 pnpm install --frozen-lockfile
@@ -78,8 +79,12 @@ pnpm run verify
 
 That single command validates Compose isolation, lints, type-checks, runs the
 domain, custom engine, offline CLI, scanner, storage, authentication, accessibility, and browser tests, and
-builds every route. CI runs this with an isolated PostgreSQL service. A separate quality job runs
-coverage, maintainability and fresh mutation checks.
+builds every route. CI runs this with an isolated PostgreSQL service. Separate
+jobs run coverage/maintainability and fresh mutation checks for each package;
+the final `quality` check requires all of them to succeed. The repository's
+`main` branch requires `verify`, `Analyze TypeScript`, `review` and `quality`.
+Fork maintainers should configure those same required checks in their branch
+protection settings; committing a workflow alone does not configure protection.
 
 Run the same quality checks when changing logic:
 

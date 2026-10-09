@@ -38,6 +38,7 @@ Breaking changes are always called out under **Changed** with a migration note.
 ### Changed
 
 - Run fresh mutation checks in separate hosted package jobs, each with its own database, while requiring every package and coverage check to pass the final quality gate. The 95% thresholds and tested scopes are unchanged.
+- Require the aggregate quality check in `main` branch protection and document the equivalent setting for forks.
 - Review input limits are enforced explicitly: invalid or oversized fields return HTTP 400 without saving, instead of silently truncating a successful write. Existing documented limits and stored reviews remain compatible.
 - CSV export is available for the synthetic demo. Live exports still require an authenticated tenant and retained snapshot; unavailable exports offer connection/scan guidance.
 - Version the corrected interpretation as engine `1.0.4` / authorization rules `entra-configured/4`. Re-export older portable investigations from their source snapshots; incompatible replay versions are explicitly rejected. Stored snapshots remain readable.
