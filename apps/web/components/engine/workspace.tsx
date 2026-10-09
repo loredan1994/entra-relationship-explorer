@@ -55,14 +55,14 @@ export function EngineWorkspace({ snapshot, history, view }: { snapshot: TenantS
         <button className="button button-primary" type="submit">Evaluate recorded evidence</button>
       </form> : null}
       {usesQuery && proof ? <p>Results describe the last evaluated query: <strong>{names.get(query.principalId) ?? query.principalId}</strong> → <strong>{names.get(query.resourceId) ?? query.resourceId}</strong> · {query.kind}. After editing controls, select Evaluate recorded evidence.</p> : null}
-      {error ? <p role="alert">{error}</p> : null}
-      {usesQuery && !proof ? <p>Select a principal, resource, and required permission ID to begin.</p> : null}
+      {usesQuery && error ? <p role="alert">{error}</p> : null}
+      {usesQuery && !proof ? <p>Select a principal, resource, and required permission ID to evaluate or export a query. {tab.id === "contracts" ? "You can still edit and evaluate a contract below." : tab.id === "verify" ? "You can still verify an offline package below." : ""}</p> : null}
       {proof && (tab.id === "proof" || tab.id === "authorization") ? <ProofView proof={proof} names={names} /> : null}
       {proof && tab.id === "time" ? <TemporalView models={models} query={query} /> : null}
       {proof && tab.id === "plans" ? <ChangePlanner key={JSON.stringify(query)} model={model} proof={proof} names={names} /> : null}
       {proof && tab.id === "gaps" ? <GapView proof={proof} /> : null}
-      {proof && tab.id === "contracts" ? <ContractWorkbench key={JSON.stringify(query)} model={model} previous={models[1]} query={query} /> : null}
-      {proof && tab.id === "verify" ? <PortableWorkbench model={model} query={query} /> : null}
+      {tab.id === "contracts" ? <ContractWorkbench key={JSON.stringify(query)} model={model} previous={models[1]} query={query} /> : null}
+      {tab.id === "verify" ? <PortableWorkbench model={model} query={proof ? query : null} /> : null}
       {tab.id === "federation" ? <FederationWorkbench model={model} names={names} /> : null}
       {tab.id === "policy" ? <PolicyWorkbench model={model} /> : null}
       {tab.id === "rotation" ? <RotationWorkbench model={model} names={names} /> : null}

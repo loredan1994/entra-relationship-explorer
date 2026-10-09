@@ -62,7 +62,7 @@ paths:
         "404": { description: Finding absent from the latest tenant snapshot }
     put:
       summary: Save a decision and optional analyst-edited attack-flow copy
-      description: expectedRevision is null when GET returned no review; otherwise send the opaque review.revision from GET. A successful write returns a new revision. Conflicts require reloading and reviewing the latest decision.
+      description: expectedRevision is null when GET returned no review; otherwise send the opaque review.revision from GET. A successful write returns a new revision. Conflicts require reloading and reviewing the latest decision. Invalid or oversized fields return 400 without saving; fields are never silently truncated.
       requestBody:
         required: true
         content:
@@ -83,15 +83,15 @@ paths:
                     type: object
                     required: [title]
                     properties:
-                      id: { type: string, maxLength: 100 }
-                      title: { type: string, maxLength: 500 }
-                      evidenceEdgeId: { type: [string, "null"], maxLength: 160 }
+                      id: { type: string, minLength: 1, maxLength: 100 }
+                      title: { type: string, minLength: 1, maxLength: 500 }
+                      evidenceEdgeId: { type: [string, "null"], minLength: 1, maxLength: 160 }
       responses:
         "200": { description: Encrypted review saved with a new opaque revision }
         "404": { description: Finding absent from the latest retained tenant snapshot }
         "409": { description: Snapshot expired or changed, or another analyst saved a decision }
         "413": { description: JSON request body exceeds 128 KiB }
-        "400": { description: Invalid decision or accepted-risk fields }
+        "400": { description: Invalid decision, accepted-risk fields, or review field/step limits; no write occurs }
         "401": { description: Authentication required }
         "403": { description: Same-origin check failed }
     post:
@@ -116,7 +116,8 @@ paths:
         "413": { description: JSON request body exceeds 128 KiB }
   /export/relationships.csv:
     get:
-      summary: Export the latest tenant snapshot as CSV
+      summary: Export the current snapshot as CSV
+      description: Demo mode exports synthetic sample data. Live mode requires an authenticated tenant session and a retained snapshot; it never falls back to demo data for an unavailable tenant export.
       responses:
         "200": { description: CSV export }
         "401": { description: Authentication required }

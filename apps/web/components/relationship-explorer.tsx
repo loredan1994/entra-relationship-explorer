@@ -12,7 +12,7 @@ import {
 } from "@entra-explorer/domain";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type Ref } from "react";
 import { layoutGraph, NODE_HEIGHT, NODE_WIDTH } from "./graph-layout";
 import { PermissionPills } from "./permission-pills";
 import { permissionPhrase } from "./permission-utils";
@@ -92,11 +92,14 @@ function evidenceLabel(edge: RelationshipEdge) {
 
 export function RelationshipExplorer({ snapshot }: { snapshot: TenantSnapshot }) {
   const searchParams = useSearchParams();
-  const initialEdgeId = searchParams.get("edge");
-  const [query, setQuery] = useState(searchParams.get("q") ?? "");
-  const [selectedKinds, setSelectedKinds] = useState<NodeKind[]>(() =>
-    searchParams.getAll("kind").filter((kind): kind is NodeKind => Object.hasOwn(kindLabels, kind)),
-  );
+  // Next preserves client state on query-only navigation. A new URL or snapshot
+  // starts a new investigation; local filter edits remain local until then.
+  return <RelationshipWorkspace key={JSON.stringify([snapshot.tenant.tenantId, snapshot.id, searchParams.toString()])} snapshot={snapshot} initialQuery={searchParams.get("q") ?? ""} initialKinds={searchParams.getAll("kind").filter((kind): kind is NodeKind => Object.hasOwn(kindLabels, kind))} initialEdgeId={searchParams.get("edge")} />;
+}
+
+function RelationshipWorkspace({ snapshot, initialQuery, initialKinds, initialEdgeId }: { snapshot: TenantSnapshot; initialQuery: string; initialKinds: NodeKind[]; initialEdgeId: string | null }) {
+  const [query, setQuery] = useState(initialQuery);
+  const [selectedKinds, setSelectedKinds] = useState<NodeKind[]>(initialKinds);
   const [viewMode, setViewMode] = useState<"map" | "table">(snapshot.mode === "tenant" || snapshot.nodes.length > MAP_NODE_LIMIT ? "table" : "map");
   const allViews = useMemo(() => filterRelationships(snapshot, {}), [snapshot]);
   const initialEdge = allViews.find(({ edge }) => edge.id === initialEdgeId) ??
@@ -105,7 +108,12 @@ export function RelationshipExplorer({ snapshot }: { snapshot: TenantSnapshot })
   const [selectedEdgeId, setSelectedEdgeId] = useState(initialEdge?.edge.id ?? "");
   const [focusNodeId, setFocusNodeId] = useState<string | null>(null);
   const [savedFilters, setSavedFilters] = useState<SavedFilter[]>([]);
+  const [filterStorageStatus, setFilterStorageStatus] = useState("");
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
+  const [filtersReady, setFiltersReady] = useState(false);
+  const inspectorRef = useRef<HTMLElement>(null);
+  const resultsRef = useRef<HTMLElement>(null);
+  const inspectionTrigger = useRef<{ element: HTMLElement; edgeId: string } | null>(null);
   const storageKey = `entra-explorer-filters:${snapshot.tenant.tenantId}`;
   const neighborhood = useMemo(
     () => focusNodeId ? boundedNeighborhood(snapshot, focusNodeId, MAP_NODE_LIMIT) : null,
@@ -120,7 +128,11 @@ export function RelationshipExplorer({ snapshot }: { snapshot: TenantSnapshot })
     () => filterRelationships(scopedSnapshot, { query, nodeKinds: selectedKinds }),
     [query, selectedKinds, scopedSnapshot],
   );
+  // An incoming Inspect link is also an explicit inspection request. Do not
+  // focus a fallback relationship when its ID is absent, stale or filtered out.
+  const [inspectionRequest, setInspectionRequest] = useState(() => filteredViews.some(({ edge }) => edge.id === initialEdgeId) ? 1 : 0);
   const visibleNodes = useMemo(() => connectedNodes(filteredViews), [filteredViews]);
+  const hasRelationships = filteredViews.length > 0;
   const canvasRef = useRef<HTMLDivElement>(null);
   const [viewport, setViewport] = useState({ width: 0, height: 0 });
   const [zoom, setZoom] = useState(1);
@@ -150,6 +162,10 @@ export function RelationshipExplorer({ snapshot }: { snapshot: TenantSnapshot })
   const panBoundsRef = useRef(panBounds);
   panBoundsRef.current = panBounds;
 
+  // Streamed HTML can arrive before this component's event handlers. Exposing
+  // an enabled toggle then would silently discard a visitor's first click.
+  useEffect(() => { setFiltersReady(true); }, []);
+
   useEffect(() => {
     const element = canvasRef.current;
     if (!element) return;
@@ -168,7 +184,7 @@ export function RelationshipExplorer({ snapshot }: { snapshot: TenantSnapshot })
       observer.disconnect();
       document.removeEventListener("visibilitychange", measure);
     };
-  }, [viewMode]);
+  }, [viewMode, hasRelationships]);
 
   const fitZoom = useMemo(() => {
     if (!viewport.width || !viewport.height || !layout.width || !layout.height) return 1;
@@ -185,6 +201,36 @@ export function RelationshipExplorer({ snapshot }: { snapshot: TenantSnapshot })
   );
   const selectedView = filteredViews.find(({ edge }) => edge.id === selectedEdgeId) ?? filteredViews[0];
   const unresolvedCount = filteredViews.filter(({ edge }) => edge.evidence.completeness === "unresolved").length;
+
+  useEffect(() => {
+    if (!inspectionRequest) return;
+    const inspector = inspectorRef.current;
+    if (!inspector) return;
+    inspector.scrollTop = 0;
+    inspector.focus({ preventScroll: true });
+    inspector.scrollIntoView({ block: "start", inline: "nearest" });
+  }, [inspectionRequest]);
+
+  function inspectRelationship(edgeId: string, trigger: HTMLElement) {
+    inspectionTrigger.current = { element: trigger, edgeId };
+    setSelectedEdgeId(edgeId);
+    // Also reveal an already-selected relationship when Inspect is clicked again.
+    setInspectionRequest((request) => request + 1);
+  }
+
+  function returnToRelationship() {
+    const trigger = inspectionTrigger.current;
+    const currentControl = [...(resultsRef.current?.querySelectorAll<HTMLElement>('[aria-controls="relationship-evidence"][aria-pressed="true"]') ?? [])].find(element => element.getClientRects().length > 0);
+    const target = trigger?.edgeId === selectedView?.edge.id && trigger?.element.isConnected && trigger.element.getClientRects().length > 0 ? trigger.element : currentControl ?? resultsRef.current;
+    target?.focus({ preventScroll: true });
+    target?.scrollIntoView({ block: "nearest", inline: "nearest" });
+  }
+
+  function fitMap() {
+    setZoomTouched(true);
+    setZoom(fitZoom);
+    setPan({ x: 0, y: 0 });
+  }
 
   // Every new layout starts fitted to the viewport (never enlarged past 100%) so
   // the whole graph is visible at once. Connection labels render at constant
@@ -221,9 +267,10 @@ export function RelationshipExplorer({ snapshot }: { snapshot: TenantSnapshot })
     };
     element.addEventListener("wheel", onWheel, { passive: false });
     return () => element.removeEventListener("wheel", onWheel);
-  }, [changeZoom, viewMode]);
+  }, [changeZoom, viewMode, hasRelationships]);
 
   function beginPan(event: ReactPointerEvent<HTMLDivElement>) {
+    if (event.button !== 0) return;
     if ((event.target as HTMLElement).closest("button")) return;
     const element = canvasRef.current;
     if (!element) return;
@@ -259,6 +306,7 @@ export function RelationshipExplorer({ snapshot }: { snapshot: TenantSnapshot })
       }));
     } catch {
       setSavedFilters([]);
+      setFilterStorageStatus("Saved filters could not be read. Browser storage may be blocked.");
     }
   }, [storageKey]);
 
@@ -268,9 +316,14 @@ export function RelationshipExplorer({ snapshot }: { snapshot: TenantSnapshot })
     );
   }
 
-  function selectNode(nodeId: string) {
+  function selectNode(nodeId: string, trigger: HTMLElement) {
     const connection = filteredViews.find(({ source, target }) => source.id === nodeId || target.id === nodeId);
-    if (connection) setSelectedEdgeId(connection.edge.id);
+    if (connection) {
+      setSelectedEdgeId(connection.edge.id);
+      inspectionTrigger.current = { element: trigger, edgeId: connection.edge.id };
+    } else {
+      inspectionTrigger.current = null;
+    }
     setFocusNodeId(nodeId);
   }
 
@@ -279,9 +332,26 @@ export function RelationshipExplorer({ snapshot }: { snapshot: TenantSnapshot })
     setViewMode("map");
   }
 
+  function showTable() {
+    setFocusNodeId(null);
+    setViewMode("table");
+  }
+
+  function clearFilters() {
+    setQuery("");
+    setSelectedKinds([]);
+    setFocusNodeId(null);
+    if (snapshot.nodes.length > MAP_NODE_LIMIT) setViewMode("table");
+  }
+
   function persistFilters(next: SavedFilter[]) {
-    setSavedFilters(next);
-    window.localStorage.setItem(storageKey, JSON.stringify(next));
+    try {
+      window.localStorage.setItem(storageKey, JSON.stringify(next));
+      setSavedFilters(next);
+      setFilterStorageStatus("Saved filters updated in this browser.");
+    } catch {
+      setFilterStorageStatus("Could not save this change. Browser storage may be full or blocked; saved filters were not changed.");
+    }
   }
 
   function saveFilter() {
@@ -303,6 +373,7 @@ export function RelationshipExplorer({ snapshot }: { snapshot: TenantSnapshot })
             <button
               className="button button-secondary mobile-filter-toggle"
               type="button"
+              disabled={!filtersReady}
               aria-expanded={mobileFiltersOpen}
               aria-controls="relationship-filter-controls"
               onClick={() => setMobileFiltersOpen((open) => !open)}
@@ -338,7 +409,8 @@ export function RelationshipExplorer({ snapshot }: { snapshot: TenantSnapshot })
           <section className="saved-filters" aria-label="Saved filters">
             <div><h2>Saved filters</h2><button className="text-button" type="button" onClick={saveFilter}>Save current</button></div>
             <p>Stored only in this browser.</p>
-            {savedFilters.length === 0 ? <small>No saved filters yet.</small> : savedFilters.map((filter) => <div className="saved-filter" key={filter.id}><button type="button" onClick={() => { setQuery(filter.query); setSelectedKinds(filter.nodeKinds); }}>{filter.label}</button><button type="button" aria-label={`Remove saved filter ${filter.label}`} onClick={() => persistFilters(savedFilters.filter((item) => item.id !== filter.id))}>×</button></div>)}
+            {savedFilters.length === 0 ? <small>No saved filters yet.</small> : savedFilters.map((filter) => <div className="saved-filter" key={filter.id}><button type="button" onClick={() => { setQuery(filter.query); setSelectedKinds(filter.nodeKinds); setFocusNodeId(null); if (snapshot.nodes.length > MAP_NODE_LIMIT) setViewMode("table"); }}>{filter.label}</button><button type="button" aria-label={`Remove saved filter ${filter.label}`} onClick={() => persistFilters(savedFilters.filter((item) => item.id !== filter.id))}>×</button></div>)}
+            {filterStorageStatus ? <p role="status">{filterStorageStatus}</p> : null}
           </section>
 
           <div className="filter-group filter-summary">
@@ -361,32 +433,32 @@ export function RelationshipExplorer({ snapshot }: { snapshot: TenantSnapshot })
           </div>
 
           {(query || selectedKinds.length > 0) && (
-            <button className="button button-secondary button-full" onClick={() => { setQuery(""); setSelectedKinds([]); }}>
+            <button className="button button-secondary button-full" onClick={clearFilters}>
               Clear filters
             </button>
           )}
         </div>
       </aside>
 
-      <section className="map-workspace" aria-label="Relationship results">
+      <section className="map-workspace" aria-label="Relationship results" ref={resultsRef} tabIndex={-1}>
         <div className="map-toolbar">
           <div className="segmented-control" aria-label="Result presentation">
             <button className={viewMode === "map" ? "active" : ""} aria-pressed={viewMode === "map"} onClick={showMap}>Map</button>
-            <button className={viewMode === "table" ? "active" : ""} aria-pressed={viewMode === "table"} onClick={() => setViewMode("table")}>Table</button>
+            <button className={viewMode === "table" ? "active" : ""} aria-pressed={viewMode === "table"} onClick={showTable}>Table</button>
           </div>
           {viewMode === "map" ? (
             <div className="zoom-control" role="group" aria-label="Map zoom">
               <button type="button" onClick={() => changeZoom(-0.15)} disabled={zoom <= MIN_ZOOM} aria-label="Zoom out">−</button>
               <span aria-live="polite">{Math.round(zoom * 100)}%</span>
               <button type="button" onClick={() => changeZoom(0.15)} disabled={zoom >= MAX_ZOOM} aria-label="Zoom in">+</button>
-              <button type="button" className="zoom-fit" onClick={() => { setZoomTouched(true); setZoom(fitZoom); }}>Fit</button>
+              <button type="button" className="zoom-fit" onClick={fitMap}>Fit</button>
             </div>
           ) : null}
           <div className="configured-key">
             <span aria-hidden="true" />
             {observedCount ? "Recorded facts and observed sign-ins · inspect evidence" : "Recorded directory facts · no observed activity recorded"}
           </div>
-          {viewMode === "map" ? <span className="map-hint">Drag or scroll to pan · ⌘/Ctrl + scroll to zoom</span> : null}
+          {viewMode === "map" ? <span className="map-hint" id="map-controls-help">Drag or scroll to pan · Arrow keys pan · Home fits · ⌘/Ctrl + scroll to zoom</span> : null}
         </div>
 
         {focusNodeId ? <div className="scope-banner"><strong>One-hop view.</strong> Select an object to expand its direct relationships.{neighborhood?.truncated ? ` Limited to ${MAP_NODE_LIMIT} objects; use the table for the complete result.` : ""}</div> : null}
@@ -397,18 +469,31 @@ export function RelationshipExplorer({ snapshot }: { snapshot: TenantSnapshot })
             <span aria-hidden="true">⌕</span>
             <h2>No relationships match</h2>
             <p>The current snapshot contains data, but the search or object filter hides it.</p>
-            <button className="button button-secondary" onClick={() => { setQuery(""); setSelectedKinds([]); }}>Clear filters</button>
+            <button className="button button-secondary" onClick={clearFilters}>Clear filters</button>
           </div>
         ) : viewMode === "map" ? (
           <div
             className={`relationship-canvas ${panning ? "panning" : ""}`}
             ref={canvasRef}
             role="group"
+            tabIndex={0}
+            aria-describedby="map-controls-help"
             aria-label={`${visibleNodes.length} objects and ${configuredCount} configured connections${observedCount ? `, ${observedCount} observed sign-in connections` : ""}${incompleteCount ? `, ${incompleteCount} connections with incomplete evidence` : ""}`}
             onPointerDown={beginPan}
             onPointerMove={movePan}
             onPointerUp={endPan}
             onPointerCancel={endPan}
+            onLostPointerCapture={() => setPanning(false)}
+            onKeyDown={(event) => {
+              if (event.target !== event.currentTarget) return;
+              if (event.key === "Home") { event.preventDefault(); fitMap(); return; }
+              const movement: Record<string, [number, number]> = { ArrowLeft: [50, 0], ArrowRight: [-50, 0], ArrowUp: [0, 50], ArrowDown: [0, -50] };
+              const delta = movement[event.key];
+              if (!delta) return;
+              event.preventDefault();
+              const bounds = panBoundsRef.current;
+              setPan(current => ({ x: Math.min(bounds.maxX, Math.max(bounds.minX, current.x + delta[0])), y: Math.min(bounds.maxY, Math.max(bounds.minY, current.y + delta[1])) }));
+            }}
           >
             <div className="canvas-scaler" style={{ width: scaledWidth, height: scaledHeight, transform: `translate(${Math.round(baseX + pan.x)}px, ${Math.round(baseY + pan.y)}px)` }}>
             <div className="canvas-inner" style={{ width: layout.width, height: layout.height, transform: `scale(${zoom})`, "--zoom": zoom } as CSSProperties}>
@@ -452,7 +537,9 @@ export function RelationshipExplorer({ snapshot }: { snapshot: TenantSnapshot })
                   key={view.edge.id}
                   className={`connection-label ${selectedView?.edge.id === view.edge.id ? "selected" : ""}`}
                   style={{ left: label.x, top: label.y, width: label.width, transform: `translate(-50%, -50%) scale(${(1 / zoom).toFixed(3)})` }}
-                  onClick={() => setSelectedEdgeId(view.edge.id)}
+                  onClick={(event) => inspectRelationship(view.edge.id, event.currentTarget)}
+                  aria-controls="relationship-evidence"
+                  aria-pressed={selectedView?.edge.id === view.edge.id}
                   title={`${view.source.label} ${view.edge.plainLabel} ${view.target.label}: ${label.full}`}
                   aria-label={`${view.source.label} ${view.edge.plainLabel} ${view.target.label}: ${label.full}. ${evidenceLabel(view.edge)} relationship.`}
                 >
@@ -465,7 +552,7 @@ export function RelationshipExplorer({ snapshot }: { snapshot: TenantSnapshot })
                   key={node.id}
                   className={`entity-node node-${node.kind} ${selectedView && (selectedView.source.id === node.id || selectedView.target.id === node.id) ? "connected" : ""}`}
                   style={{ left: x, top: y, width: NODE_WIDTH, height: NODE_HEIGHT }}
-                  onClick={() => selectNode(node.id)}
+                  onClick={(event) => selectNode(node.id, event.currentTarget)}
                   title={node.label}
                   aria-label={`${node.label}, ${kindLabels[node.kind].plain}, risk ${node.risk.level}`}
                 >
@@ -478,11 +565,11 @@ export function RelationshipExplorer({ snapshot }: { snapshot: TenantSnapshot })
             </div>
           </div>
         ) : (
-          <RelationshipTable key={JSON.stringify([snapshot.id, query, selectedKinds, focusNodeId])} views={filteredViews} selectedEdgeId={selectedView?.edge.id} onSelect={setSelectedEdgeId} />
+          <RelationshipTable key={JSON.stringify([snapshot.id, query, selectedKinds, focusNodeId])} views={filteredViews} selectedEdgeId={selectedView?.edge.id} onSelect={inspectRelationship} />
         )}
       </section>
 
-      <EvidenceInspector view={selectedView} snapshot={snapshot} />
+      <EvidenceInspector view={selectedView} snapshot={snapshot} ref={inspectorRef} onReturn={inspectionRequest ? returnToRelationship : undefined} />
     </div>
   );
 }
@@ -494,7 +581,7 @@ function RelationshipTable({
 }: {
   views: RelationshipView[];
   selectedEdgeId?: string;
-  onSelect: (edgeId: string) => void;
+  onSelect: (edgeId: string, trigger: HTMLElement) => void;
 }) {
   const [page, setPage] = useState(() => Math.floor(Math.max(0, views.findIndex(({ edge }) => edge.id === selectedEdgeId)) / TABLE_PAGE_SIZE));
   const start = page * TABLE_PAGE_SIZE;
@@ -520,7 +607,7 @@ function RelationshipTable({
               <td>{relationshipLabels[edge.type]}<small>{evidenceLabel(edge)}</small></td>
               <td><strong>{target.label}</strong><small>{kindLabels[target.kind].plain}</small></td>
               <td className="mono">{edge.permissions.length > 4 ? `${edge.permissions.slice(0, 4).join(", ")} +${edge.permissions.length - 4} more` : edge.permissions.join(", ") || "—"}</td>
-              <td className="table-action-cell"><button className="text-button" onClick={() => onSelect(edge.id)}>Inspect</button></td>
+              <td className="table-action-cell"><button className="text-button" type="button" aria-controls="relationship-evidence" aria-pressed={selectedEdgeId === edge.id} onClick={(event) => onSelect(edge.id, event.currentTarget)}>Inspect</button></td>
             </tr>
           ))}
         </tbody>
@@ -534,10 +621,10 @@ function RelationshipTable({
   );
 }
 
-export function EvidenceInspector({ view, snapshot }: { view?: RelationshipView; snapshot: TenantSnapshot }) {
+export function EvidenceInspector({ view, snapshot, ref, onReturn }: { view?: RelationshipView; snapshot: TenantSnapshot; ref?: Ref<HTMLElement>; onReturn?: () => void }) {
   if (!view) {
     return (
-      <aside className="evidence-inspector">
+      <aside className="evidence-inspector" id="relationship-evidence" ref={ref} tabIndex={-1}>
         <div className="map-empty compact"><h2>No evidence selected</h2></div>
       </aside>
     );
@@ -545,8 +632,9 @@ export function EvidenceInspector({ view, snapshot }: { view?: RelationshipView;
 
   const { edge, source, target } = view;
   return (
-    <aside className="evidence-inspector" aria-label="Selected relationship evidence" aria-live="polite">
+    <aside className="evidence-inspector" id="relationship-evidence" ref={ref} tabIndex={-1} aria-label="Selected relationship evidence" aria-live="polite">
       <div className="inspector-header">
+        {onReturn ? <button className="text-button inspector-back" type="button" onClick={onReturn}>Back to selected relationship</button> : null}
         <p className="eyebrow">Why this line exists</p>
         <h2>{edge.plainLabel}</h2>
         <span className="evidence-status"><i aria-hidden="true" /> {edge.evidence.configured ? "Configured relationship" : edge.evidence.observed ? "Observed sign-in" : "Evidence incomplete"}</span>

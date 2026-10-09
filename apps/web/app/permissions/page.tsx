@@ -1,13 +1,13 @@
 import { AppShell } from "@/components/app-shell";
 import { PageHeading } from "@/components/page-heading";
 import { PermissionsTable } from "@/components/permissions-table";
-import { loadCurrentSnapshot } from "@/server/current-snapshot";
+import { loadSnapshotContext } from "@/server/current-snapshot";
 import { analyzeTenantSecurity } from "@/server/tenant-security";
 
 export const dynamic = "force-dynamic";
 
 export default async function PermissionsPage() {
-  const snapshot = await loadCurrentSnapshot();
+  const { snapshot, state } = await loadSnapshotContext(1);
   const security = analyzeTenantSecurity(snapshot);
   const { summary } = security;
 
@@ -18,7 +18,7 @@ export default async function PermissionsPage() {
           eyebrow="Configured access inventory"
           title="Permissions"
           description={`Every configured grant in the ${snapshot.mode === "fixture" ? "sample" : "latest tenant"} snapshot: who can call which resource, with the exact permission values, an exposure assessment, and a link to the source evidence.`}
-          actions={<a className="button button-secondary" href="/api/export/relationships.csv">Export CSV</a>}
+          actions={state === "demo" || state === "connected" ? <a className="button button-secondary" href="/api/export/relationships.csv">Export CSV</a> : <a className="button button-secondary" href="/settings">{state === "signed-out" ? "Sign in to export tenant data" : "Scan tenant to enable exports"}</a>}
         />
 
         <section className="summary-strip" aria-label="Permission grant summary">

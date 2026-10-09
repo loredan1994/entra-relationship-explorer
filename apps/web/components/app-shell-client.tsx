@@ -105,6 +105,7 @@ export function AppShellClient({
           <label className="sr-only" htmlFor="global-search">Search relationships</label>
           <span aria-hidden="true">⌕</span>
           <input id="global-search" name="q" placeholder="Search names or permissions" />
+          <button type="submit" className="global-search-submit">Search</button>
         </form>
         <span className={`read-only-badge ${live ? "" : "badge-sample"}`}>{live ? "Read-only · Live tenant" : "Read-only · Sample data"}</span>
       </header>

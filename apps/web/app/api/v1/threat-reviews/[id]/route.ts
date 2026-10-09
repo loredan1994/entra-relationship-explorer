@@ -1,5 +1,7 @@
+import type { ThreatReview } from "@entra-explorer/backend";
 import { analyzeTenantIntelligenceHistory } from "@entra-explorer/domain";
 import { NextRequest } from "next/server";
+import { THREAT_REVIEW_LIMITS } from "@/lib/threat-review-limits";
 import { getServerSession, SESSION_COOKIE } from "@/server/auth/session-store";
 import { getBackend } from "@/server/backend";
 import { getEntraConfig } from "@/server/config";
@@ -8,6 +10,30 @@ import { revalidateThreatReview } from "@/server/review-revalidation";
 
 export const dynamic = "force-dynamic";
 const DISPOSITIONS = new Set(["open", "mitigating", "accepted", "resolved"]);
+
+function reviewFields(body: Record<string, unknown>) {
+  for (const field of ["owner", "assumption"] as const) {
+    if (body[field] !== undefined && typeof body[field] !== "string") return { error: `${field === "owner" ? "Owner" : "Rationale"} must be text.` };
+    if (typeof body[field] === "string" && body[field].length > THREAT_REVIEW_LIMITS[field]) return { error: `${field === "owner" ? "Owner" : "Rationale"} must be at most ${THREAT_REVIEW_LIMITS[field]} characters.` };
+  }
+  const owner = typeof body.owner === "string" ? body.owner.trim() : "";
+  const assumption = typeof body.assumption === "string" ? body.assumption.trim() : "";
+  const expiresAt = body.expiresAt === undefined || body.expiresAt === null || body.expiresAt === "" ? null : body.expiresAt;
+  if (expiresAt !== null && (typeof expiresAt !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(expiresAt) || !Number.isFinite(Date.parse(expiresAt)) || new Date(expiresAt).toISOString().slice(0, 10) !== expiresAt)) return { error: "Expiry must be a valid calendar date (YYYY-MM-DD)." };
+  if (body.flowDraft !== undefined && !Array.isArray(body.flowDraft)) return { error: "Review flow must be a list of steps." };
+  const candidates = body.flowDraft ?? [];
+  if (candidates.length > THREAT_REVIEW_LIMITS.flowDraft) return { error: `Review flow must contain at most ${THREAT_REVIEW_LIMITS.flowDraft} steps.` };
+  const flowDraft: NonNullable<ThreatReview["flowDraft"]> = [];
+  for (const [index, candidate] of candidates.entries()) {
+    if (!candidate || typeof candidate !== "object" || Array.isArray(candidate)) return { error: `Review step ${index + 1} must be an object.` };
+    const item = candidate as Record<string, unknown>;
+    if (typeof item.title !== "string" || !item.title.trim() || item.title.length > THREAT_REVIEW_LIMITS.title) return { error: `Review step ${index + 1} needs a title of 1–${THREAT_REVIEW_LIMITS.title} characters.` };
+    if (item.id !== undefined && (typeof item.id !== "string" || !item.id.trim() || item.id.length > THREAT_REVIEW_LIMITS.id)) return { error: `Review step ${index + 1} needs an ID of 1–${THREAT_REVIEW_LIMITS.id} characters.` };
+    if (item.evidenceEdgeId !== undefined && item.evidenceEdgeId !== null && (typeof item.evidenceEdgeId !== "string" || !item.evidenceEdgeId.trim() || item.evidenceEdgeId.length > THREAT_REVIEW_LIMITS.evidenceEdgeId)) return { error: `Review step ${index + 1} evidence ID must be 1–${THREAT_REVIEW_LIMITS.evidenceEdgeId} characters when supplied.` };
+    flowDraft.push({ id: typeof item.id === "string" ? item.id : `step-${index + 1}`, title: item.title.trim(), evidenceEdgeId: typeof item.evidenceEdgeId === "string" ? item.evidenceEdgeId : null });
+  }
+  return { value: { owner, assumption, expiresAt, flowDraft } };
+}
 
 async function contextFor(request: NextRequest, id: string) {
   const config = getEntraConfig();
@@ -45,17 +71,9 @@ export async function PUT(request: NextRequest, route: { params: Promise<{ id: s
   if (body instanceof Response) return body;
   if (typeof body.disposition !== "string" || !DISPOSITIONS.has(body.disposition)) return noStoreJson({ error: "A valid disposition is required." }, { status: 400 });
   if (!(body.expectedRevision === null || typeof body.expectedRevision === "string")) return noStoreJson({ error: "The current review revision is required." }, { status: 400 });
-  const owner = typeof body.owner === "string" ? body.owner.trim().slice(0, 160) : "";
-  const assumption = typeof body.assumption === "string" ? body.assumption.trim().slice(0, 4_000) : "";
-  const expiresAt = typeof body.expiresAt === "string" && /^\d{4}-\d{2}-\d{2}$/.test(body.expiresAt) ? body.expiresAt : null;
-  if (expiresAt && (!Number.isFinite(Date.parse(expiresAt)) || new Date(expiresAt).toISOString().slice(0, 10) !== expiresAt)) return noStoreJson({ error: "Expiry must be a valid calendar date." }, { status: 400 });
-  const flowDraft = Array.isArray(body.flowDraft) ? body.flowDraft.slice(0, 20).flatMap((candidate, index) => {
-    if (!candidate || typeof candidate !== "object") return [];
-    const item = candidate as Record<string, unknown>;
-    const title = typeof item.title === "string" ? item.title.trim().slice(0, 500) : "";
-    if (!title) return [];
-    return [{ id: typeof item.id === "string" ? item.id.slice(0, 100) : `step-${index + 1}`, title, evidenceEdgeId: typeof item.evidenceEdgeId === "string" ? item.evidenceEdgeId.slice(0, 160) : null }];
-  }) : [];
+  const fields = reviewFields(body);
+  if ("error" in fields) return noStoreJson({ error: fields.error }, { status: 400 });
+  const { owner, assumption, expiresAt, flowDraft } = fields.value;
   if (body.disposition === "accepted" && (!owner || !expiresAt || !assumption)) return noStoreJson({ error: "Accepted risk requires an owner, expiry date, and rationale." }, { status: 400 });
   try {
     const review = await context.backend.upsertThreatReview({ findingId: id, snapshotId: context.snapshot.id, tenantId: context.session.tenantId, disposition: body.disposition as "open" | "mitigating" | "accepted" | "resolved", owner, expiresAt, assumption, flowDraft, updatedAt: new Date().toISOString() }, context.session.id, body.expectedRevision);

@@ -52,6 +52,9 @@ export function PermissionsTable({ grants }: { grants: PermissionGrant[] }) {
   }, [ascending, sortKey, filtered]);
 
   const visible = sorted.slice(0, visibleCount);
+  const sortDescription = sortKey === "exposure"
+    ? ascending ? "most exposed first" : "least exposed first"
+    : `${sortKey === "type" ? "access type" : sortKey}, ${ascending ? "A to Z" : "Z to A"}`;
 
   function chooseSort(next: SortKey) {
     if (sortKey === next) setAscending((current) => !current);
@@ -105,7 +108,7 @@ export function PermissionsTable({ grants }: { grants: PermissionGrant[] }) {
       </div>
 
       <p className="table-result-count" role="status">
-        Showing {visible.length} of {filtered.length} grants{filtered.length !== grants.length ? ` (filtered from ${grants.length})` : ""}, most exposed first.
+        Showing {visible.length} of {filtered.length} grants{filtered.length !== grants.length ? ` (filtered from ${grants.length})` : ""}, sorted by {sortDescription}.
       </p>
 
       <div className="data-table-wrap">
