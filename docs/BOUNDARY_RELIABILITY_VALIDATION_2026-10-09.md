@@ -37,7 +37,7 @@ pnpm test:mutation --force --concurrency 2
 
 New browser suites are `scenario-import-lifecycle`, `application-selection-recovery` and PostgreSQL-backed `auth-boundaries`. Server render tests cover all ten pages and historical comparisons. Worker tests exercise the real scanner and backend with a synthetic GET-only transport. PostgreSQL race tests use explicit locks and transaction coordination rather than probabilistic sleeps.
 
-Hosted mutation checks run independently for domain, backend, engine, Graph and web, each with isolated PostgreSQL. The final quality gate requires coverage and every package to succeed. The fresh-run requirement, 95% thresholds and tested scopes are unchanged; local commands remain sequential to avoid shared-resource contention.
+Hosted mutation checks run independently for domain, backend, engine, Graph and web, each with isolated PostgreSQL. The final quality gate requires coverage and every package to succeed. The fresh-run requirement, 95% thresholds and tested scopes are unchanged; local commands remain sequential to avoid shared-resource contention. After two hosted jobs hit Docker Hub anonymous pull limits before tests started, CI switched to Docker Official Images on ECR Public; the PostgreSQL image digest is unchanged and was verified as available on ECR Public.
 
 The repository now also requires `quality` in GitHub's `main` branch protection, alongside the existing `verify`, `Analyze TypeScript` and `review` checks. Previously, a failed quality run did not itself prevent a normal protected merge. Existing strictness and other protection settings are preserved; fork maintainers must configure required checks separately from the workflow file.
 

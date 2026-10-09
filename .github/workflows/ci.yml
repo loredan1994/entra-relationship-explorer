@@ -1,5 +1,7 @@
 name: Product verification
 
+# PostgreSQL uses Docker Official Images on ECR Public to avoid Docker Hub
+# anonymous pull quotas on shared runners. Keep the verified upstream digest.
 # Actions are pinned to commit SHAs rather than tags. A tag can be moved to
 # point at different code; a SHA cannot. The trailing comment records the
 # human-readable version so updates stay reviewable.
@@ -22,7 +24,7 @@ jobs:
     timeout-minutes: 15
     services:
       postgres:
-        image: postgres:17-alpine@sha256:18cfe3ef5e6815560c98237d6216d1e5119702fb0f3894c8785dd58b8bbe5d73
+        image: public.ecr.aws/docker/library/postgres:17-alpine@sha256:18cfe3ef5e6815560c98237d6216d1e5119702fb0f3894c8785dd58b8bbe5d73
         env:
           POSTGRES_USER: entra_test
           POSTGRES_PASSWORD: synthetic-test-only
@@ -64,7 +66,7 @@ jobs:
     timeout-minutes: 15
     services:
       postgres:
-        image: postgres:17-alpine@sha256:18cfe3ef5e6815560c98237d6216d1e5119702fb0f3894c8785dd58b8bbe5d73
+        image: public.ecr.aws/docker/library/postgres:17-alpine@sha256:18cfe3ef5e6815560c98237d6216d1e5119702fb0f3894c8785dd58b8bbe5d73
         env:
           POSTGRES_USER: entra_test
           POSTGRES_PASSWORD: synthetic-test-only
@@ -105,7 +107,7 @@ jobs:
     timeout-minutes: 45
     services:
       postgres:
-        image: postgres:17-alpine@sha256:18cfe3ef5e6815560c98237d6216d1e5119702fb0f3894c8785dd58b8bbe5d73
+        image: public.ecr.aws/docker/library/postgres:17-alpine@sha256:18cfe3ef5e6815560c98237d6216d1e5119702fb0f3894c8785dd58b8bbe5d73
         env:
           POSTGRES_USER: entra_test
           POSTGRES_PASSWORD: synthetic-test-only

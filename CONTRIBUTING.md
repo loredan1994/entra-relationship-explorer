@@ -106,6 +106,11 @@ cleanup. Keep concurrent operations within the same owned schema and retain
 exact rollback/state assertions. The fixture rejects unsafe database targets
 before opening a pool and removes only the schema it created.
 
+CI pulls the same digest-pinned PostgreSQL image from
+[Docker Official Images on ECR Public](https://www.docker.com/blog/news-from-aws-reinvent-docker-official-images-on-amazon-ecr-public/)
+to avoid Docker Hub anonymous pull quotas on shared GitHub runners. No registry
+credentials are required; local database commands can keep using Docker Hub.
+
 Mutation survivors must be reviewed for an observable behavioral difference. Add a
 regression that fails for the mutation, or simplify redundant logic. Narrow Stryker
 exclusions are reserved for proven equivalent mutations with an explanation beside
