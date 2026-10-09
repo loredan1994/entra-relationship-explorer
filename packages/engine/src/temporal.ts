@@ -24,10 +24,20 @@ export function intersectWindows(windows: TimeWindow[]): TimeWindow | null {
 }
 
 function validity(edges: RelationshipEdge[]): { sourceValidity: TimeWindow | null; validity: TemporalPath["validity"] } {
-  const windows = edges.flatMap(e => e.validity?.startsAt && e.validity.endsAt ? [{ startsAt: e.validity.startsAt, endsAt: e.validity.endsAt }] : []);
-  if (!windows.length) return { sourceValidity: null, validity: "unknown" };
-  const intersection = intersectWindows(windows);
-  return { sourceValidity: intersection, validity: intersection === null ? "disjoint" : windows.length === edges.length ? "overlap" : "unknown" };
+  let start = -Infinity, end = Infinity, complete = true;
+  for (const edge of edges) {
+    const lower = edge.validity?.startsAt == null ? -Infinity : timestamp(edge.validity.startsAt);
+    const upper = edge.validity?.endsAt == null ? Infinity : timestamp(edge.validity.endsAt);
+    if (lower >= upper) throw new Error("Intervals must have a start before their exclusive end.");
+    start = Math.max(start, lower); end = Math.min(end, upper);
+    complete &&= Number.isFinite(lower) && Number.isFinite(upper);
+  }
+  // A known start after another edge's exclusive end disproves coexistence,
+  // even when the remaining bounds were not collected.
+  if (start >= end) return { sourceValidity: null, validity: "disjoint" };
+  const sourceValidity = Number.isFinite(start) && Number.isFinite(end)
+    ? { startsAt: new Date(start).toISOString(), endsAt: new Date(end).toISOString() } : null;
+  return { sourceValidity, validity: complete ? "overlap" : "unknown" };
 }
 
 /** Never union different snapshots to manufacture a path. No continuity is inferred between scans. */
@@ -42,8 +52,9 @@ export function reconstructPaths(history: EvidenceModel[], query: AuthorizationQ
     const proof = evaluateAuthorization(model, query);
     steps += proof.limits.steps; exhausted ||= proof.limits.exhausted;
     if (proof.verdict === "unknown" || proof.verdict === "conflicting") missing.push(...proof.missing, ...proof.conflicts.map(c => c.factId));
+    const edgesById = new Map(model.edges.map(edge => [edge.id, edge]));
     for (const path of proof.paths) {
-      const edges = path.map(id => model.edges.find(e => e.id === id)!);
+      const edges = path.map(id => edgesById.get(id)!);
       // Same IDs with changed semantics are distinct temporal paths.
       const key = canonical(edges.map(e => ({ id: e.id, type: e.type, source: e.sourceId, target: e.targetId, permissionIds: e.permissionIds, consent: e.consent, scope: e.scope, validity: e.validity })));
       const temporal = groups.get(key) ?? { edges: path, snapshots: [], collectedInstants: [], ...validity(edges), uncertainIntervals: [] };
@@ -53,7 +64,7 @@ export function reconstructPaths(history: EvidenceModel[], query: AuthorizationQ
     }
   }
   const paths = [...groups.values()].map(p => {
-    const instants = unique(p.collectedInstants);
+    const instants = unique(p.collectedInstants.map(instant => new Date(timestamp(instant)).toISOString()));
     return { ...p, snapshots: unique(p.snapshots), collectedInstants: instants,
       uncertainIntervals: instants.slice(1).map((end, i) => ({ startsAt: instants[i]!, endsAt: end })) };
   }).sort((a, b) => compare(canonical(a.edges), canonical(b.edges)));

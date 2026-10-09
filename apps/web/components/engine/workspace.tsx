@@ -2,7 +2,7 @@
 import { useMemo, useState, type FormEvent } from "react";
 import Link from "next/link";
 import type { TenantSnapshot } from "@entra-explorer/domain";
-import { compileSnapshot, evaluateAuthorization, reconstructPaths, planEvidenceGaps, type AuthorizationQuery, type QueryKind } from "@entra-explorer/engine";
+import { compileSnapshot, evaluateAuthorization, reconstructPaths, planEvidenceGaps, ENGINE_VERSION, type AuthorizationQuery, type QueryKind } from "@entra-explorer/engine";
 import { ProofView, ResultSummary, JsonDetails } from "./common";
 import { ChangePlanner, ContractWorkbench } from "./planning";
 import { FederationWorkbench, PolicyWorkbench, RotationWorkbench } from "./semantics";
@@ -25,7 +25,8 @@ const kinds: Array<[QueryKind, string]> = [["application-permission", "Applicati
 export function EngineWorkspace({ snapshot, history, view }: { snapshot: TenantSnapshot; history: TenantSnapshot[]; view?: string }) {
   const tab = engineTools.find(t => t.id === view) ?? engineTools[0];
   const model = useMemo(() => compileSnapshot(snapshot), [snapshot]);
-  const models = useMemo(() => history.map(compileSnapshot), [history]);
+  const needsHistory = tab.id === "time" || tab.id === "contracts";
+  const models = useMemo(() => needsHistory ? history.map(item => item.id === snapshot.id ? model : compileSnapshot(item)) : [], [history, model, needsHistory, snapshot.id]);
   const initialGrant = snapshot.edges.find(e => e.type === "CAN_CALL_AS_APP" && e.permissionIds?.length);
   const initial: AuthorizationQuery = { tenantId: model.tenantId, kind: "application-permission", principalId: initialGrant?.sourceId ?? snapshot.nodes[0]?.id ?? "", resourceId: initialGrant?.targetId ?? snapshot.nodes[1]?.id ?? "", permissionId: initialGrant?.permissionIds?.[0] ?? "" };
   const [draft, setDraft] = useState(initial), [query, setQuery] = useState(initial), [error, setError] = useState("");
@@ -67,7 +68,7 @@ export function EngineWorkspace({ snapshot, history, view }: { snapshot: TenantS
       {tab.id === "rotation" ? <RotationWorkbench model={model} names={names} /> : null}
     </section>
     <details className="panel investigation-card"><summary>Supported semantics and limits</summary>
-      <p>Engine 1.0.0 evaluates recorded configuration. Query states are supported, refuted, unknown, or conflicting. They are separate from configured, observed, and inferred evidence.</p>
+      <p>Engine {ENGINE_VERSION} evaluates recorded configuration. Query states are supported, refuted, unknown, or conflicting. They are separate from configured, observed, and inferred evidence.</p>
       <div className="table-scroll"><table><thead><tr><th>Workflow</th><th>Supported</th><th>Stays unknown or outside the model</th></tr></thead><tbody>
         <tr><td>Access compiler</td><td>Exact permission IDs, consent audiences, direct application/group assignments, nested membership, explicit role scopes and typed ownership/federation paths</td><td>Successful authentication, resource enforcement, nested application assignment, eligible-role activation</td></tr>
         <tr><td>Time and credentials</td><td>Collected-snapshot witnesses, source validity intersections, declared deployment/retirement and workload dependencies</td><td>Continuity between scans, secret possession, observed deployment</td></tr>

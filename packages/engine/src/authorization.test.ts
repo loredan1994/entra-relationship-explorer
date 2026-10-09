@@ -3,6 +3,7 @@ import { canonical } from "./canonical";
 import { compileSnapshot } from "./model";
 import { createEvaluator, evaluateAuthorization } from "./authorization";
 import { edge, node, query, snapshot } from "./test-support";
+import { RULE_VERSION } from "./types";
 
 describe("typed authorization and reproducible proofs", () => {
   it("records a grant with exact resource-specific IDs and source provenance, never observed use", () => {
@@ -101,8 +102,8 @@ describe("incremental query dependency index", () => {
     s.nodes.push(node("unrelated")); expect(engine.replace(compileSnapshot(s))).toEqual({ invalidated: 0, retained: 1 });
     s.edges.push(edge("alternative", "client", "resource")); expect(engine.replace(compileSnapshot(s)).invalidated).toBe(1);
     expect(engine.evaluate(query).proof).toEqual(evaluateAuthorization(compileSnapshot(s), query));
-    const version = { ...compileSnapshot(s), ruleVersion: "entra-configured/2" }; expect(engine.replace(version).invalidated).toBe(1);
-    expect(engine.evaluate(query).proof.ruleVersion).toBe("entra-configured/2");
+    const version = { ...compileSnapshot(s), ruleVersion: `${RULE_VERSION}/next` }; expect(engine.replace(version).invalidated).toBe(1);
+    expect(engine.evaluate(query).proof.ruleVersion).toBe(`${RULE_VERSION}/next`);
     expect(() => engine.replace({ ...version, tenantId: "other" })).toThrow("Cross-tenant");
   });
   it("a newly added grant invalidates a cached absence", () => {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { noStoreJson, requireSameOrigin } from "./http";
+import { noStoreJson, readJsonObject, requireSameOrigin } from "./http";
 
 const TRUSTED = "https://explorer.contoso.test/api/auth/callback";
 
@@ -41,6 +41,59 @@ describe("same-origin enforcement", () => {
   it("accepts a loopback development origin when that is what is configured", () => {
     expect(() => requireSameOrigin(requestFrom("http://127.0.0.1:3000"), "http://127.0.0.1:3000/api/auth/callback")).not.toThrow();
     expect(() => requireSameOrigin(requestFrom("http://localhost:3000"), "http://127.0.0.1:3000/api/auth/callback")).toThrow();
+  });
+});
+
+describe("bounded route JSON", () => {
+  function post(body: BodyInit | null, headers?: HeadersInit): Request {
+    return new Request("https://explorer.contoso.test/api/reviews", { method: "PUT", body, headers, duplex: "half" } as RequestInit);
+  }
+
+  it("accepts the exact byte boundary and preserves Unicode across chunk boundaries", async () => {
+    const json = JSON.stringify({ rationale: "é".repeat(65_528) });
+    expect(Buffer.byteLength(json)).toBe(131_072);
+    const bytes = new TextEncoder().encode(json);
+    const body = new ReadableStream({ start(controller) {
+      controller.enqueue(bytes.slice(0, 15));
+      controller.enqueue(bytes.slice(15));
+      controller.close();
+    } });
+    expect(await readJsonObject(post(body))).toEqual(JSON.parse(json));
+  });
+
+  it("rejects actual oversized bytes regardless of missing or misleading length", async () => {
+    for (const headers of [undefined, { "content-length": "1" }]) {
+      const result = await readJsonObject(post(JSON.stringify({ value: "x".repeat(131_061) }), headers));
+      expect(result).toBeInstanceOf(Response);
+      expect((result as Response).status).toBe(413);
+      expect((result as Response).headers.get("cache-control")).toBe("no-store, private");
+      expect(await (result as Response).json()).toEqual({ error: "Request body exceeds 128 KiB." });
+    }
+  });
+
+  it("cancels an overflowing stream without consuming the rest", async () => {
+    let reads = 0;
+    let cancelled = false;
+    const body = new ReadableStream({ pull(controller) {
+      reads++;
+      controller.enqueue(new Uint8Array(65_537));
+    }, cancel() { cancelled = true; } }, { highWaterMark: 0 });
+    expect((await readJsonObject(post(body)) as Response).status).toBe(413);
+    expect(reads).toBe(2);
+    expect(cancelled).toBe(true);
+    expect(body.locked).toBe(false);
+  });
+
+  it.each([null, "", "{", "null", "[]", "true", "1", '"text"'])("rejects malformed or non-object input %s", async body => {
+    const result = await readJsonObject(post(body));
+    expect((result as Response).status).toBe(400);
+    expect(await (result as Response).json()).toEqual({ error: "A JSON object is required." });
+  });
+
+  it("turns stream failure into a client error and releases the lock", async () => {
+    const body = new ReadableStream({ pull(controller) { controller.error(new Error("connection lost")); } });
+    expect((await readJsonObject(post(body)) as Response).status).toBe(400);
+    expect(body.locked).toBe(false);
   });
 });
 

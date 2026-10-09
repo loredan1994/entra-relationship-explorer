@@ -6,6 +6,7 @@ if (!["127.0.0.1", "localhost"].includes(database.hostname) || database.pathname
 
 export default defineConfig({
   testDir: "./persistence-tests", workers: 1, retries: 0,
+  outputDir: "./test-results/persistence",
   use: { baseURL: "http://127.0.0.1:3101", ...devices["Desktop Chrome"] },
   webServer: {
     command: "pnpm start --hostname 127.0.0.1 --port 3101",

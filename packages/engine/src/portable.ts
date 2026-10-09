@@ -32,7 +32,11 @@ function projectionEdges(model: EvidenceModel, query: AuthorizationQuery): Relat
   if (query.kind !== "control-path" && query.kind !== "membership") return candidates;
   const outgoing = new Map<string, RelationshipEdge[]>();
   const variants = model.conflicts.filter(c => c.factId.startsWith("relationship:") && candidates.some(e => c.factId === `relationship:${e.id}`)).flatMap(c => c.variants.map(v => JSON.parse(v) as RelationshipEdge));
-  for (const edge of [...candidates, ...variants]) outgoing.set(edge.sourceId, [...(outgoing.get(edge.sourceId) ?? []), edge]);
+  for (const edge of [...candidates, ...variants]) {
+    const edges = outgoing.get(edge.sourceId);
+    if (edges) edges.push(edge);
+    else outgoing.set(edge.sourceId, [edge]);
+  }
   const queue = [query.principalId], reached = new Set(queue), included = new Set<string>();
   for (let index = 0; index < queue.length; index++) for (const edge of outgoing.get(queue[index]!) ?? []) {
     // Application grants are terminal; another resource cannot be a control hop.
@@ -66,13 +70,30 @@ function project(model: EvidenceModel, query: AuthorizationQuery): TenantSnapsho
     completion: { status: "partial", collectedEndpoints: [], skippedEndpoints: [], errors: [], collectors }, nodes, edges };
 }
 
+function decodedEndpoint(value: string): string {
+  try { return decodeURIComponent(value); } catch {
+    // Invalid escapes must not hide otherwise valid ASCII identifiers in the
+    // same expression. Preserve undecodable bytes and literal percent signs.
+    return value.replace(/%([0-7][0-9a-f])/gi, (_, hex: string) => String.fromCharCode(Number.parseInt(hex, 16)));
+  }
+}
+
 function pseudonymize(snapshot: TenantSnapshot, query: AuthorizationQuery): { snapshot: TenantSnapshot; query: AuthorizationQuery; privateMapping: Record<string, string> } {
+  const endpoints = [query.directoryScopeId ?? "", ...snapshot.nodes.flatMap(n => n.sourceEndpoint ? [n.sourceEndpoint] : []),
+    ...snapshot.edges.flatMap(e => [e.evidence.sourceEndpoint, ...(e.scope ? [e.scope.directoryScopeId] : [])]),
+    ...(snapshot.completion.collectors ?? []).flatMap(c => [...c.endpoints, ...c.failedEndpoints])];
   const identifiers = unique([snapshot.id, snapshot.tenant.tenantId, query.principalId, query.resourceId, ...(query.userId ? [query.userId] : []), ...(query.permissionId ? [query.permissionId] : []),
-    ...snapshot.nodes.map(n => n.id), ...snapshot.edges.flatMap(e => [e.id, e.sourceId, e.targetId, ...e.evidence.sourceRecordIds, ...(e.permissionIds ?? []), ...(e.consent?.principalId ? [e.consent.principalId] : []), ...(e.scope?.objectId ? [e.scope.objectId] : [])]),
-    ...(canonical(snapshot).match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi) ?? [])]);
+    ...snapshot.nodes.map(n => n.id), ...snapshot.edges.flatMap(e => [e.id, e.sourceId, e.targetId, e.evidence.sourceObjectId, e.evidence.targetObjectId, ...e.evidence.sourceRecordIds, ...(e.permissionIds ?? []), ...(e.consent?.principalId ? [e.consent.principalId] : []), ...(e.scope?.objectId ? [e.scope.objectId] : [])]),
+    ...endpoints.flatMap(value => decodedEndpoint(value).match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi) ?? [])]);
   const mapping = Object.fromEntries(identifiers.map((id, i) => [id, `p${String(i + 1).padStart(6, "0")}`]));
-  const id = (v: string) => mapping[v] ?? v;
-  const endpoint = (v: string) => v.split(/([/?&=;,])/).map(part => id(part)).join("");
+  const id = (v: string) => Object.hasOwn(mapping, v) ? mapping[v]! : v;
+  const endpoint = (v: string) => v.split(/([/?&=;,])/).map(part => {
+    const decoded = decodedEndpoint(part);
+    // Match complete identifiers inside OData expressions, including escaped
+    // values. Do not replace a GUID embedded in an unrelated larger token.
+    const translated = id(decoded) !== decoded ? id(decoded) : decoded.split(/([^\p{L}\p{N}_-]+)/u).map(id).join("");
+    return decoded === part ? translated : translated === decoded ? part : encodeURIComponent(translated);
+  }).join("");
   const copy = structuredClone(snapshot);
   copy.id = id(copy.id); copy.tenant.tenantId = id(copy.tenant.tenantId);
   copy.nodes = copy.nodes.map(n => ({ ...n, id: id(n.id), label: id(n.id), tenantId: id(n.tenantId), ...(n.sourceEndpoint ? { sourceEndpoint: endpoint(n.sourceEndpoint) } : {}) }));

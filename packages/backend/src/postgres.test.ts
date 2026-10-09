@@ -58,9 +58,31 @@ describe("connection setup", () => {
   it("applies the schema and clears expired auth state on migrate", async () => {
     const { backend, pool } = backendUnderTest();
     await backend.migrate();
-    expect(pool.sql[0]).toBe(DATABASE_SCHEMA);
+    expect(pool.sql).toEqual([
+      "BEGIN",
+      "SELECT pg_advisory_xact_lock(hashtextextended('entra-explorer:migrations', 0))",
+      DATABASE_SCHEMA,
+      "DELETE FROM auth_flows WHERE expires_at <= now()",
+      "DELETE FROM sessions WHERE expires_at <= now()",
+      "COMMIT",
+    ]);
+    expect(pool.connects).toBe(1);
+    expect(pool.released).toBe(1);
     expect(pool.matching("DELETE FROM auth_flows WHERE expires_at <= now()")).toHaveLength(1);
     expect(pool.matching("DELETE FROM sessions WHERE expires_at <= now()")).toHaveLength(1);
+  });
+
+  it("rolls back a failed migration and releases its connection for another attempt", async () => {
+    const { backend, pool } = backendUnderTest();
+    pool.responder = sql => {
+      if (sql === DATABASE_SCHEMA) throw new Error("Synthetic schema failure");
+      return { rows: [], rowCount: 0 };
+    };
+    await expect(backend.migrate()).rejects.toThrow("Synthetic schema failure");
+    expect(pool.sql.at(-1)).toBe("ROLLBACK");
+    expect(pool.sql).not.toContain("COMMIT");
+    expect(pool.matching("DELETE FROM sessions WHERE expires_at <= now()")).toEqual([]);
+    expect(pool.released).toBe(1);
   });
 
   it("reports health from a live round trip and closes the pool", async () => {
@@ -196,6 +218,35 @@ describe("encrypted round trips", () => {
     expect(pool.matching("INSERT INTO threat_reviews")).toHaveLength(1);
     // Upserting also writes the audit trail.
     expect(pool.only("INSERT INTO access_events").params).toEqual([TENANT, "session-1", "update", "threat_review", "finding-1"]);
+    expect(pool.sql[0]).toBe("BEGIN");
+    expect(pool.sql.at(-1)).toBe("COMMIT");
+    const lock = pool.only("pg_advisory_xact_lock");
+    expect(lock.params).toEqual([TENANT]);
+    expect(pool.sql.indexOf(lock.sql)).toBeLessThan(pool.sql.indexOf(pool.only("INSERT INTO threat_reviews").sql));
+    expect(pool.only("INSERT INTO threat_reviews").sql).toContain("id=(SELECT id FROM snapshots WHERE tenant_id=$1 ORDER BY scanned_at DESC LIMIT 1)");
+  });
+
+  it("rolls back a review conflict without adding a successful-update access event", async () => {
+    const { backend, pool } = backendUnderTest();
+    const review: ThreatReview = { findingId: "finding", snapshotId: "older", tenantId: TENANT, disposition: "open", owner: "Reviewer", expiresAt: null, assumption: "", updatedAt: "" };
+    await expect(backend.upsertThreatReview(review, "session-1", null)).rejects.toThrow("Review conflict:");
+    expect(pool.sql).toContain("ROLLBACK");
+    expect(pool.sql).not.toContain("COMMIT");
+    expect(pool.matching("INSERT INTO access_events")).toEqual([]);
+    expect(pool.released).toBe(1);
+  });
+
+  it("rolls back a review if its access event cannot be recorded", async () => {
+    const { backend, pool } = backendUnderTest();
+    pool.responder = sql => {
+      if (sql.includes("INSERT INTO access_events")) throw new Error("Synthetic database failure");
+      return { rows: [], rowCount: 1 };
+    };
+    const review: ThreatReview = { findingId: "finding", snapshotId: "current", tenantId: TENANT, disposition: "open", owner: "Reviewer", expiresAt: null, assumption: "", updatedAt: "" };
+    await expect(backend.upsertThreatReview(review, "session-1", null)).rejects.toThrow("Synthetic database failure");
+    expect(pool.sql).toContain("ROLLBACK");
+    expect(pool.sql).not.toContain("COMMIT");
+    expect(pool.released).toBe(1);
   });
 
   it("decrypts a stored review with the tenant, snapshot, and finding it was sealed under", async () => {
@@ -635,6 +686,9 @@ describe("statement parameters", () => {
     const retainAfter = new Date("2026-01-01T00:00:00.000Z");
     await backend.completeJob("job-1", "worker-1", snapshot, retainAfter);
     expect(pool.only("SELECT * FROM scan_jobs WHERE id=$1 AND worker_id=$2 AND status='running' FOR UPDATE").params).toEqual(["job-1", "worker-1"]);
+    const lock = pool.only("pg_advisory_xact_lock");
+    expect(lock.params).toEqual([TENANT]);
+    expect(pool.sql.indexOf(lock.sql)).toBeLessThan(pool.sql.indexOf(pool.only("INSERT INTO snapshots").sql));
     expect(pool.only("INSERT INTO snapshots").params).toEqual([SNAPSHOT_ID, TENANT, snapshot.scannedAt, snapshot.completion.status, ...ANY_PAYLOAD]);
     expect(pool.only("UPDATE scan_jobs SET status='complete'").params).toEqual([
       "job-1", "worker-1",

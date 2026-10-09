@@ -217,7 +217,8 @@ export class MemoryBackend implements Backend {
   async upsertThreatReview(review: ThreatReview, sessionId: string | null, expectedRevision?: string | null): Promise<ThreatReview> {
     const key = `${review.tenantId}:${review.snapshotId}:${review.findingId}`;
   // Stryker disable next-line ArrayDeclaration: a seeded string has no matching ID or finite scannedAt and is discarded by the retention predicate.
-    if (!(this.snapshots.get(review.tenantId) ?? []).some(s => s.id === review.snapshotId && Date.parse(s.scannedAt) >= Date.now() - 30 * 86400000)) throw new Error("Review conflict: the snapshot expired or is unavailable.");
+    const current = (this.snapshots.get(review.tenantId) ?? []).find(s => Date.parse(s.scannedAt) >= Date.now() - 30 * 86400000);
+    if (current?.id !== review.snapshotId) throw new Error("Review conflict: a newer scan is available or the snapshot expired. Reload before saving.");
     const existing = this.threatReviews.get(key);
     if (expectedRevision !== undefined && (existing ? existing.revision : null) !== expectedRevision) throw new Error("Review conflict: another decision was saved. Reload before saving.");
     const value = { ...copy(review), revision: randomUUID(), updatedAt: new Date().toISOString() };

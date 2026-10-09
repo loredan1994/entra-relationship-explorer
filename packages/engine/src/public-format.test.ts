@@ -40,16 +40,20 @@ describe("version 1 evidence format compatibility", () => {
   cases.push(["complete absence", query, snapshot([])]);
   const conflict = snapshot(); conflict.edges.push({ ...conflict.edges[0]!, permissions: ["Disagrees"], permissionIds: ["different"] }); cases.push(["conflicting source", query, conflict]);
   it.each(cases)("preserves the public proof fields for %s", (_name, q, s) => {
-    const proof = evaluateAuthorization(compileSnapshot(s), q); expect(proof.query).toEqual(q); expect(proof.engineVersion).toBe("1.0.0"); expect(proof.ruleVersion).toBe("entra-configured/1"); expect(proof).toMatchSnapshot();
+    const proof = evaluateAuthorization(compileSnapshot(s), q); expect(proof.query).toEqual(q); expect(proof.engineVersion).toBe("1.0.1"); expect(proof.ruleVersion).toBe("entra-configured/2"); expect(proof).toMatchSnapshot();
   });
   it("preserves planning alternatives, bounds, protected paths and costs", () => {
     const model = compileSnapshot(snapshot()); const candidate = (id: string, cost: number) => ({ id, cost, removes: [id], description: `Exclude ${id}` });
     const result = solveChanges({ context: model, paths: [{ id: "one", dependencies: ["a", "shared"] }, { id: "two", dependencies: ["b", "shared"] }], candidates: [candidate("shared", 3), candidate("b", 2), candidate("a", 2)], protectedIntegrations: [{ id: "protected", alternatives: [{ id: "keep", dependencies: ["other"] }] }], evidenceComplete: true });
-    expect(result.plans.map(p => p.cost)).toEqual([3, 4]); expect(result).toMatchSnapshot();
+    expect(result.plans.map(p => p.cost)).toEqual([3, 4]);
+    expect(result.limits.work).toBeGreaterThan(0); expect(result.limits.work).toBeLessThanOrEqual(result.limits.maxWork);
+    // Native sort comparison counts vary across supported Node/V8 versions.
+    expect(result).toMatchSnapshot({ limits: { work: expect.any(Number) } });
   });
   it("retains unknown read prerequisites and minimizes shared candidate reads", () => {
     const s = snapshot([]); s.completion.collectors = [];
-    const result = planEvidenceGaps(evaluateAuthorization(compileSnapshot(s), query)); expect(result.plans[0]!.mayResolve).toHaveLength(2); expect(result).toMatchSnapshot();
+    const result = planEvidenceGaps(evaluateAuthorization(compileSnapshot(s), query)); expect(result.plans[0]!.mayResolve).toHaveLength(2);
+    expect(result).toMatchSnapshot({ limits: { work: expect.any(Number) } });
   });
   it("retains distinct overlap, mismatch and unsupported federation pairs", () => {
     const s = snapshot(), base = { issuer: "https://issuer.example", subject: "sample-production", audiences: ["exchange"], unsupported: [] };

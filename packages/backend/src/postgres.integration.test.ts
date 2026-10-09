@@ -1,6 +1,6 @@
 import { randomBytes, randomUUID } from "node:crypto";
 import { Pool } from "pg";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { cleanProjectFixture } from "@entra-explorer/domain";
 import { PostgresBackend } from "./postgres";
 import type { ThreatReview } from "./types";
@@ -16,7 +16,9 @@ describe.skipIf(!connectionString)("real PostgreSQL boundaries", () => {
   let backend: PostgresBackend;
   let sql: Pool;
   const sessionId = randomUUID();
-  async function saveSnapshot(scannedAt = new Date().toISOString()) {
+  let lastScannedAt = 0;
+  async function saveSnapshot(scannedAt = new Date(Math.max(Date.now(), lastScannedAt + 1)).toISOString()) {
+    lastScannedAt = Math.max(lastScannedAt, Date.parse(scannedAt));
     const job = await backend.enqueueScan(tenantId, sessionId);
     await backend.claimNextJob("integration", tenantId);
     const snapshot = { ...cleanProjectFixture, id: randomUUID(), tenant: { tenantId, tenantLabel: "Synthetic integration tenant" }, scannedAt };
@@ -57,8 +59,53 @@ describe.skipIf(!connectionString)("real PostgreSQL boundaries", () => {
     await backend.pruneExpiredData(tenantId, new Date(Date.now() - 30 * 86400000));
     expect((await sql.query("SELECT id FROM snapshots WHERE tenant_id=$1 AND id=$2", [tenantId, expired.id])).rowCount).toBe(0);
   });
+  it.each(["publication-first", "review-first"])("serializes overlapping snapshot publication and review writes (%s)", async order => {
+    const old = await saveSnapshot();
+    const job = await backend.enqueueScan(tenantId, sessionId);
+    await backend.claimNextJob("integration", tenantId);
+    const current = { ...old, id: randomUUID(), scannedAt: new Date(lastScannedAt + 1).toISOString() };
+    lastScannedAt += 1;
+    const review: ThreatReview = { tenantId, snapshotId: old.id, findingId: `racing-${order}`, disposition: "open", owner: "Reviewer", assumption: "Loaded before publication", expiresAt: null, updatedAt: "" };
+    const blocker = await sql.connect();
+    let publication: Promise<void> | undefined;
+    let decision: Promise<PromiseSettledResult<ThreatReview>> | undefined;
+    try {
+      await blocker.query("BEGIN");
+      await blocker.query("SELECT pg_advisory_xact_lock(hashtextextended('snapshot-review:' || $1, 0))", [tenantId]);
+      const pid = (await blocker.query("SELECT pg_backend_pid() AS pid")).rows[0].pid;
+      const waitForBlocked = (count: number) => vi.waitFor(async () => {
+        const result = await sql.query("SELECT count(*)::int AS count FROM pg_locks held JOIN pg_locks waiting ON held.locktype=waiting.locktype AND held.database IS NOT DISTINCT FROM waiting.database AND held.classid=waiting.classid AND held.objid=waiting.objid AND held.objsubid=waiting.objsubid WHERE held.pid=$1 AND held.locktype='advisory' AND held.granted AND NOT waiting.granted", [pid]);
+        expect(result.rows[0].count).toBe(count);
+      }, { timeout: 2000, interval: 10 });
+      const publish = () => { publication = backend.completeJob(job.id, "integration", current, new Date(0)); };
+      const decide = () => {
+        decision = backend.upsertThreatReview(review, sessionId, null).then(value => ({ status: "fulfilled" as const, value }), reason => ({ status: "rejected" as const, reason }));
+      };
+      (order === "publication-first" ? publish : decide)();
+      await waitForBlocked(1);
+      (order === "publication-first" ? decide : publish)();
+      await waitForBlocked(2);
+      await blocker.query("COMMIT");
+      await publication;
+      const result = await decision;
+      if (order === "publication-first") {
+        expect(result).toMatchObject({ status: "rejected", reason: expect.objectContaining({ message: expect.stringContaining("Review conflict:") }) });
+        expect(await backend.getThreatReview(tenantId, old.id, review.findingId)).toBeNull();
+        expect((await sql.query("SELECT id FROM access_events WHERE tenant_id=$1 AND resource_type='threat_review' AND resource_id=$2", [tenantId, review.findingId])).rowCount).toBe(0);
+      } else {
+        expect(result).toMatchObject({ status: "fulfilled", value: { snapshotId: old.id } });
+        expect(await backend.getThreatReview(tenantId, old.id, review.findingId)).toMatchObject({ owner: "Reviewer" });
+      }
+      expect((await backend.recentSnapshots(tenantId))[0]!.id).toBe(current.id);
+      await expect(backend.upsertThreatReview({ ...review, findingId: `late-${order}` }, sessionId, null)).rejects.toThrow("Review conflict:");
+    } finally {
+      await blocker.query("ROLLBACK");
+      blocker.release();
+      await Promise.allSettled([publication, decision]);
+    }
+  });
   it("does not expose expired decisions before cleanup, including as prior context", async () => {
-    const old = await saveSnapshot(new Date(Date.now() - 1000).toISOString());
+    const old = await saveSnapshot();
     await backend.upsertThreatReview({ tenantId, snapshotId: old.id, findingId: "expired-review", disposition: "open", owner: "Expired owner", assumption: "Expired rationale", expiresAt: null, updatedAt: old.scannedAt }, null, null);
     const current = await saveSnapshot();
     expect(await backend.priorThreatReviews(tenantId, current.id, ["expired-review"])).toHaveLength(1);

@@ -90,7 +90,7 @@ pnpm quality:crap           # coverage and maintainability gate
 pnpm test:mutation --force --concurrency 2
 ```
 
-Run coverage and mutation checks sequentially. Mutation testing enforces a 95% floor per package; maintainability fails above CRAP 30. The [custom engine validation report](docs/CUSTOM_ENGINE_VALIDATION_2026-10-09.md) records the current tests, mutation scores, read-only Azure CLI comparisons and their limits. The [earlier release report](docs/RELEASE_VERIFICATION_2026-10-08.md) covers the investigation workspace.
+Run coverage and mutation checks sequentially. Mutation testing enforces a 95% floor per package; maintainability fails above CRAP 30. The [reliability review](docs/RELIABILITY_VALIDATION_2026-10-09.md) records concurrency, large-tenant, performance and UI regressions. The [custom engine validation report](docs/CUSTOM_ENGINE_VALIDATION_2026-10-09.md) records the original engine tests, mutation scores, read-only Azure CLI comparisons and their limits. The [earlier release report](docs/RELEASE_VERIFICATION_2026-10-08.md) covers the investigation workspace.
 
 For database and browser persistence tests, set `TEST_DATABASE_URL` to an isolated loopback PostgreSQL database named `entra_review_test`. Without it, those tests explicitly skip. CI provisions this service and runs the full suite; [reproduction instructions](docs/INVESTIGATIONS.md#verification). No real tenant is needed for deterministic tests.
 

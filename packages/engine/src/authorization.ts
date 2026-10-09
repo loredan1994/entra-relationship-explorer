@@ -86,22 +86,30 @@ function canContinue(query: AuthorizationQuery, edge: RelationshipEdge): boolean
   return query.kind === "control-path" && edge.type !== "CAN_CALL_AS_APP";
 }
 
-function pathsFor(model: EvidenceModel, query: AuthorizationQuery, edges: RelationshipEdge[], limits: Limits): RelationshipEdge[][] {
-  const nodes = new Map(model.nodes.map(n => [n.id, n]));
+function pathsFor(nodes: Map<string, EvidenceModel["nodes"][number]>, query: AuthorizationQuery, edges: RelationshipEdge[], limits: Limits) {
   const outgoing = new Map<string, RelationshipEdge[]>();
-  for (const edge of edges) outgoing.set(edge.sourceId, [...(outgoing.get(edge.sourceId) ?? []), edge]);
+  for (const edge of edges) {
+    const bucket = outgoing.get(edge.sourceId);
+    if (bucket) bucket.push(edge);
+    else outgoing.set(edge.sourceId, [edge]);
+  }
   const queue: Array<{ node: string; path: RelationshipEdge[]; visited: Set<string> }> = [{ node: query.principalId, path: [], visited: new Set([query.principalId]) }];
   const paths: RelationshipEdge[][] = [];
+  // Failed type checks depend on the objects too: missing or conflicting
+  // intermediate records cannot establish that a configured path is absent.
+  const objectIds = new Set([query.principalId, query.resourceId, ...(query.userId ? [query.userId] : [])]);
+  const result = { paths, objectIds };
   // Monotone worklist: extend only typed, simple derivations; no arbitrary reachability rule.
   for (let index = 0; index < queue.length; index++) {
     const state = queue[index]!;
     for (const edge of outgoing.get(state.node) ?? []) {
-      if (limits.steps === limits.maxSteps) { limits.exhausted = true; return paths; }
+      if (limits.steps === limits.maxSteps) { limits.exhausted = true; return result; }
       limits.steps++;
+      objectIds.add(edge.targetId);
       if (state.visited.has(edge.targetId) || !validStep(nodes, query, state.path, edge)) continue;
       const path = [...state.path, edge];
       if (isTerminal(query, edge)) {
-        if (paths.length === limits.maxPaths) { limits.exhausted = true; return paths; }
+        if (paths.length === limits.maxPaths) { limits.exhausted = true; return result; }
         paths.push(path);
       }
       if (canContinue(query, edge)) {
@@ -111,7 +119,7 @@ function pathsFor(model: EvidenceModel, query: AuthorizationQuery, edges: Relati
       }
     }
   }
-  return paths;
+  return result;
 }
 
 function pathMissing(query: AuthorizationQuery, path: RelationshipEdge[]): string[] {
@@ -129,12 +137,12 @@ function pathMissing(query: AuthorizationQuery, path: RelationshipEdge[]): strin
   return missing;
 }
 
-function proofFacts(model: EvidenceModel, paths: RelationshipEdge[][], collectors: string[], objectIds: string[]): ProofFact[] {
+function proofFacts(model: EvidenceModel, nodes: Map<string, EvidenceModel["nodes"][number]>, paths: RelationshipEdge[][], collectors: string[], objectIds: string[]): ProofFact[] {
   const edges = new Map(paths.flat().map(e => [e.id, e]));
   const facts: ProofFact[] = [...edges.values()].map(e => ({ id: `relationship:${e.id}`, kind: "relationship", sourceEndpoint: e.evidence.sourceEndpoint,
     sourceRecordIds: [...e.evidence.sourceRecordIds], sourceObjectId: e.sourceId, targetObjectId: e.targetId, collectedAt: e.evidence.scannedAt, completeness: e.evidence.completeness, relationshipType: e.type }));
   for (const id of objectIds) {
-    const node = model.nodes.find(n => n.id === id);
+    const node = nodes.get(id);
     if (node) facts.push({ id: `object:${id}`, kind: "object", sourceEndpoint: node.sourceEndpoint ?? "", sourceRecordIds: [id], sourceObjectId: id, targetObjectId: id, collectedAt: model.collectedAt[0]!, completeness: "recorded" });
   }
   for (const id of collectors) {
@@ -149,16 +157,19 @@ export function evaluateAuthorization(model: EvidenceModel, query: Authorization
   validateQuery(query);
   const limits: Limits = { maxSteps: bound(budget.maxSteps, 1_000_000, "steps"), maxPaths: bound(budget.maxPaths, 10_000, "paths"), maxDepth: bound(budget.maxDepth, 32, "depth"), steps: 0, exhausted: false };
   const edges = relevantEdges(model, query);
-  const paths = pathsFor(model, query, edges, limits).sort((a, b) => compare(canonical(a.map(e => e.id)), canonical(b.map(e => e.id))));
+  const nodes = new Map(model.nodes.map(n => [n.id, n]));
+  const search = pathsFor(nodes, query, edges, limits);
+  const paths = search.paths.sort((a, b) => compare(canonical(a.map(e => e.id)), canonical(b.map(e => e.id))));
   const collectors = QUERY_COLLECTORS[query.kind];
-  const objectIds = unique([query.principalId, query.resourceId, ...(query.userId ? [query.userId] : []), ...paths.flatMap(p => p.flatMap(e => [e.sourceId, e.targetId]))]);
-  const missingObjects = objectIds.filter(id => !model.nodes.some(n => n.id === id)).map(id => `object:${id}`);
+  const objectIds = unique([...search.objectIds]);
+  const missingObjects = objectIds.filter(id => !nodes.has(id)).map(id => `object:${id}`);
   const missingCoverage = collectors.filter(c => !complete(model, c)).map(c => `coverage:${c}`);
   const missingPaths = paths.flatMap(p => pathMissing(query, p));
   const missing = unique([...missingObjects, ...missingCoverage, ...missingPaths, ...(limits.exhausted ? ["budget:search"] : [])]);
-  const facts = proofFacts(model, paths, collectors, objectIds);
+  const facts = proofFacts(model, nodes, paths, collectors, objectIds);
   const dependencies = unique([...facts.map(f => f.id), ...edges.map(e => `relationship:${e.id}`), ...collectors.map(c => `collection:${c}`)]);
-  const conflicts = model.conflicts.filter(c => dependencies.includes(c.factId));
+  const dependencyIds = new Set(dependencies);
+  const conflicts = model.conflicts.filter(c => dependencyIds.has(c.factId));
   const hasWitness = paths.some(p => pathMissing(query, p).length === 0);
   const verdict = conflicts.length ? "conflicting" : missingObjects.length || limits.exhausted ? "unknown" : hasWitness ? "supported" : paths.length || missingCoverage.length ? "unknown" : "refuted";
   const assumptions = ["This conclusion describes recorded configuration under the published rule subset, not effective access or observed use."];

@@ -6,6 +6,7 @@ import {
   filterRelationships,
   type NodeKind,
   type RelationshipType,
+  type RelationshipEdge,
   type RelationshipView,
   type TenantSnapshot,
 } from "@entra-explorer/domain";
@@ -52,6 +53,7 @@ const relationshipLabels: Record<RelationshipType, string> = {
 };
 
 const MAP_NODE_LIMIT = 15;
+const TABLE_PAGE_SIZE = 50;
 const MIN_ZOOM = 0.2;
 const MAX_ZOOM = 1.6;
 
@@ -82,6 +84,12 @@ function explanation(view: RelationshipView) {
   return `${source.label} ${edge.plainLabel.toLocaleLowerCase()} ${target.label}.`;
 }
 
+function evidenceLabel(edge: RelationshipEdge) {
+  if (edge.evidence.configured && edge.evidence.observed) return "Configured and observed";
+  if (edge.evidence.configured) return "Configured";
+  return edge.evidence.observed ? "Observed sign-in" : "Evidence incomplete";
+}
+
 export function RelationshipExplorer({ snapshot }: { snapshot: TenantSnapshot }) {
   const searchParams = useSearchParams();
   const initialEdgeId = searchParams.get("edge");
@@ -89,7 +97,7 @@ export function RelationshipExplorer({ snapshot }: { snapshot: TenantSnapshot })
   const [selectedKinds, setSelectedKinds] = useState<NodeKind[]>(() =>
     searchParams.getAll("kind").filter((kind): kind is NodeKind => Object.hasOwn(kindLabels, kind)),
   );
-  const [viewMode, setViewMode] = useState<"map" | "table">(snapshot.mode === "tenant" ? "table" : "map");
+  const [viewMode, setViewMode] = useState<"map" | "table">(snapshot.mode === "tenant" || snapshot.nodes.length > MAP_NODE_LIMIT ? "table" : "map");
   const allViews = useMemo(() => filterRelationships(snapshot, {}), [snapshot]);
   const initialEdge = allViews.find(({ edge }) => edge.id === initialEdgeId) ??
     allViews.find(({ edge }) => edge.type === "CAN_CALL_AS_APP") ??
@@ -120,7 +128,10 @@ export function RelationshipExplorer({ snapshot }: { snapshot: TenantSnapshot })
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [panning, setPanning] = useState(false);
   const panState = useRef({ pointerId: -1, startX: 0, startY: 0, panX: 0, panY: 0 });
-  const layout = useMemo(() => layoutGraph(visibleNodes, filteredViews, zoom), [visibleNodes, filteredViews, zoom]);
+  const layout = useMemo(() => viewMode === "map" ? layoutGraph(visibleNodes, filteredViews, zoom) : { width: 0, height: 0, nodes: [], edges: [] }, [viewMode, visibleNodes, filteredViews, zoom]);
+  const configuredCount = filteredViews.filter(({ edge }) => edge.evidence.configured).length;
+  const observedCount = filteredViews.filter(({ edge }) => edge.evidence.observed).length;
+  const incompleteCount = filteredViews.filter(({ edge }) => !edge.evidence.configured && !edge.evidence.observed).length;
 
   // The graph moves by translating the scaled canvas, not by scrolling overflow,
   // so panning works even when the fitted graph is smaller than the viewport.
@@ -346,7 +357,7 @@ export function RelationshipExplorer({ snapshot }: { snapshot: TenantSnapshot })
             <p><i className="line-solid" /> Configured access</p>
             <p><i className="line-dashed" /> Assignment or ownership</p>
             <p><i className="line-dotted" /> Blueprint match</p>
-            <p className="legend-note">Activity is not collected in this read-only phase.</p>
+            <p className="legend-note">{snapshot.edges.some(edge => edge.evidence.observed) ? "Observed sign-ins are separate evidence; they do not establish permission use." : "No observed activity is recorded in this snapshot. Missing activity does not establish inactivity."}</p>
           </div>
 
           {(query || selectedKinds.length > 0) && (
@@ -373,7 +384,7 @@ export function RelationshipExplorer({ snapshot }: { snapshot: TenantSnapshot })
           ) : null}
           <div className="configured-key">
             <span aria-hidden="true" />
-            {filteredViews.some(({ edge }) => edge.evidence.observed) ? "Configured facts and observed sign-ins · inspect evidence" : "Configured directory facts · no observed activity recorded"}
+            {observedCount ? "Recorded facts and observed sign-ins · inspect evidence" : "Recorded directory facts · no observed activity recorded"}
           </div>
           {viewMode === "map" ? <span className="map-hint">Drag or scroll to pan · ⌘/Ctrl + scroll to zoom</span> : null}
         </div>
@@ -393,7 +404,7 @@ export function RelationshipExplorer({ snapshot }: { snapshot: TenantSnapshot })
             className={`relationship-canvas ${panning ? "panning" : ""}`}
             ref={canvasRef}
             role="group"
-            aria-label={`${visibleNodes.length} objects and ${filteredViews.length} configured connections`}
+            aria-label={`${visibleNodes.length} objects and ${configuredCount} configured connections${observedCount ? `, ${observedCount} observed sign-in connections` : ""}${incompleteCount ? `, ${incompleteCount} connections with incomplete evidence` : ""}`}
             onPointerDown={beginPan}
             onPointerMove={movePan}
             onPointerUp={endPan}
@@ -443,7 +454,7 @@ export function RelationshipExplorer({ snapshot }: { snapshot: TenantSnapshot })
                   style={{ left: label.x, top: label.y, width: label.width, transform: `translate(-50%, -50%) scale(${(1 / zoom).toFixed(3)})` }}
                   onClick={() => setSelectedEdgeId(view.edge.id)}
                   title={`${view.source.label} ${view.edge.plainLabel} ${view.target.label}: ${label.full}`}
-                  aria-label={`${view.source.label} ${view.edge.plainLabel} ${view.target.label}: ${label.full}. Configured relationship.`}
+                  aria-label={`${view.source.label} ${view.edge.plainLabel} ${view.target.label}: ${label.full}. ${evidenceLabel(view.edge)} relationship.`}
                 >
                   {label.text}
                 </button>
@@ -467,7 +478,7 @@ export function RelationshipExplorer({ snapshot }: { snapshot: TenantSnapshot })
             </div>
           </div>
         ) : (
-          <RelationshipTable views={filteredViews} selectedEdgeId={selectedView?.edge.id} onSelect={setSelectedEdgeId} />
+          <RelationshipTable key={JSON.stringify([snapshot.id, query, selectedKinds, focusNodeId])} views={filteredViews} selectedEdgeId={selectedView?.edge.id} onSelect={setSelectedEdgeId} />
         )}
       </section>
 
@@ -485,10 +496,14 @@ function RelationshipTable({
   selectedEdgeId?: string;
   onSelect: (edgeId: string) => void;
 }) {
+  const [page, setPage] = useState(() => Math.floor(Math.max(0, views.findIndex(({ edge }) => edge.id === selectedEdgeId)) / TABLE_PAGE_SIZE));
+  const start = page * TABLE_PAGE_SIZE;
+  const visible = views.slice(start, start + TABLE_PAGE_SIZE);
   return (
     <div className="relationship-table-wrap">
+      <p className="table-result-count" role="status">Showing {start + 1}–{start + visible.length} of {views.length} recorded relationships.</p>
       <table className="relationship-table">
-        <caption className="sr-only">Configured relationships equivalent to the map</caption>
+        <caption className="sr-only">Recorded relationships equivalent to the map, with configured and observed evidence distinguished</caption>
         <thead>
           <tr>
             <th>Source</th>
@@ -499,10 +514,10 @@ function RelationshipTable({
           </tr>
         </thead>
         <tbody>
-          {views.map(({ edge, source, target }) => (
+          {visible.map(({ edge, source, target }) => (
             <tr key={edge.id} className={selectedEdgeId === edge.id ? "selected" : ""}>
               <td><strong>{source.label}</strong><small>{kindLabels[source.kind].plain}</small></td>
-              <td>{relationshipLabels[edge.type]}<small>Configured</small></td>
+              <td>{relationshipLabels[edge.type]}<small>{evidenceLabel(edge)}</small></td>
               <td><strong>{target.label}</strong><small>{kindLabels[target.kind].plain}</small></td>
               <td className="mono">{edge.permissions.length > 4 ? `${edge.permissions.slice(0, 4).join(", ")} +${edge.permissions.length - 4} more` : edge.permissions.join(", ") || "—"}</td>
               <td className="table-action-cell"><button className="text-button" onClick={() => onSelect(edge.id)}>Inspect</button></td>
@@ -510,6 +525,11 @@ function RelationshipTable({
           ))}
         </tbody>
       </table>
+      {views.length > TABLE_PAGE_SIZE ? <nav className="detail-actions" aria-label="Relationship table pages">
+        <button type="button" className="button button-secondary" disabled={page === 0} onClick={() => setPage(current => current - 1)}>Previous relationships</button>
+        <span>Page {page + 1} of {Math.ceil(views.length / TABLE_PAGE_SIZE)}</span>
+        <button type="button" className="button button-secondary" disabled={start + TABLE_PAGE_SIZE >= views.length} onClick={() => setPage(current => current + 1)}>Next relationships</button>
+      </nav> : null}
     </div>
   );
 }

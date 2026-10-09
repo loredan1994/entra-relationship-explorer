@@ -78,8 +78,9 @@ export class ReadOnlyGraphClient {
       if (++pages > this.maxPages) throw new GraphRequestError(0, "page_limit", endpoint);
       const page: GraphPage<T> = await this.getPage<T>(nextUrl);
       if (!Array.isArray(page.value)) throw new GraphRequestError(0, "invalid_collection", endpoint);
-      items.push(...page.value);
-      if (items.length > this.maxItems) throw new GraphRequestError(0, "item_limit", endpoint);
+      if (items.length + page.value.length > this.maxItems) throw new GraphRequestError(0, "item_limit", endpoint);
+      // Collections can exceed the runtime's function-argument limit; never spread a page into push.
+      for (const item of page.value) items.push(item);
       onPage?.(items.length);
       nextUrl = page["@odata.nextLink"] ? this.resolveGraphUrl(page["@odata.nextLink"]) : undefined;
     }

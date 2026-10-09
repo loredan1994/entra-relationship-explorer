@@ -20,9 +20,14 @@ export class PostgresBackend implements Backend {
   }
 
   async migrate(): Promise<void> {
-    await this.pool.query(DATABASE_SCHEMA);
-    await this.pool.query("DELETE FROM auth_flows WHERE expires_at <= now()");
-    await this.pool.query("DELETE FROM sessions WHERE expires_at <= now()");
+    await this.transaction(async client => {
+      // Web, worker and migration processes can start together. Take this lock
+      // before touching any schema object so their DDL cannot deadlock each other.
+      await client.query("SELECT pg_advisory_xact_lock(hashtextextended('entra-explorer:migrations', 0))");
+      await client.query(DATABASE_SCHEMA);
+      await client.query("DELETE FROM auth_flows WHERE expires_at <= now()");
+      await client.query("DELETE FROM sessions WHERE expires_at <= now()");
+    });
   }
 
   async health(): Promise<BackendHealth> { await this.pool.query("SELECT 1"); return { ok: true, database: "postgres" }; }
@@ -110,6 +115,7 @@ export class PostgresBackend implements Backend {
       const job = (await client.query("SELECT * FROM scan_jobs WHERE id=$1 AND worker_id=$2 AND status='running' FOR UPDATE", [id, workerId])).rows[0];
       if (!job) throw new Error("The scan job is not owned by this worker.");
       if (snapshot.tenant.tenantId !== job.tenant_id) throw new Error("Snapshot and job tenant boundaries do not match.");
+      await lockTenantSnapshots(client, job.tenant_id);
       const value = encryptJson(snapshot, this.key, snapshotContext(snapshot.id, job.tenant_id, snapshot.scannedAt));
       await client.query("INSERT INTO snapshots (id,tenant_id,scanned_at,completion_status,iv,ciphertext,auth_tag) VALUES ($1,$2,$3,$4,$5,$6,$7)", [snapshot.id, job.tenant_id, snapshot.scannedAt, snapshot.completion.status, value.iv, value.ciphertext, value.authTag]);
       await client.query("UPDATE scan_jobs SET status='complete',stage='complete',collected=$3,detail=$4,snapshot_id=$5,completion=$6,finished_at=now(),updated_at=now(),worker_id=NULL,locked_at=NULL WHERE id=$1 AND worker_id=$2", [id, workerId, snapshot.nodes.length + snapshot.edges.length, `${snapshot.nodes.length} objects and ${snapshot.edges.length} relationships normalized`, snapshot.id, snapshot.completion.status]);
@@ -180,12 +186,15 @@ export class PostgresBackend implements Backend {
   }
 
   async upsertThreatReview(review: ThreatReview, sessionId: string | null, expectedRevision?: string | null): Promise<ThreatReview> {
-    const value = { ...review, revision: randomUUID(), updatedAt: new Date().toISOString() };
-    const payload = encryptJson(value, this.key, reviewContext(value.tenantId, value.snapshotId, value.findingId));
-    const result = await this.pool.query("INSERT INTO threat_reviews (tenant_id,snapshot_id,finding_id,iv,ciphertext,auth_tag,updated_at,revision) SELECT $1,$2,$3,$4,$5,$6,now(),$7 FROM snapshots WHERE tenant_id=$1 AND id=$2 AND scanned_at>=now()-interval '30 days' AND ($9::boolean OR $8::text IS NULL OR EXISTS (SELECT 1 FROM threat_reviews prior WHERE prior.tenant_id=$1 AND prior.snapshot_id=$2 AND prior.finding_id=$3 AND prior.revision=$8::text)) ON CONFLICT (tenant_id,snapshot_id,finding_id) DO UPDATE SET iv=EXCLUDED.iv,ciphertext=EXCLUDED.ciphertext,auth_tag=EXCLUDED.auth_tag,updated_at=now(),revision=EXCLUDED.revision WHERE $9::boolean OR ($8::text IS NOT NULL AND threat_reviews.revision=$8::text)", [value.tenantId, value.snapshotId, value.findingId, payload.iv, payload.ciphertext, payload.authTag, value.revision, expectedRevision ?? null, expectedRevision === undefined]);
-    if (result.rowCount !== 1) throw new Error("Review conflict: the snapshot expired or another decision was saved. Reload before saving.");
-    await this.recordAccess(value.tenantId, sessionId, "update", "threat_review", value.findingId);
-    return value;
+    return this.transaction(async client => {
+      await lockTenantSnapshots(client, review.tenantId);
+      const value = { ...review, revision: randomUUID(), updatedAt: new Date().toISOString() };
+      const payload = encryptJson(value, this.key, reviewContext(value.tenantId, value.snapshotId, value.findingId));
+      const result = await client.query("INSERT INTO threat_reviews (tenant_id,snapshot_id,finding_id,iv,ciphertext,auth_tag,updated_at,revision) SELECT $1,$2,$3,$4,$5,$6,now(),$7 FROM snapshots WHERE tenant_id=$1 AND id=$2 AND scanned_at>=now()-interval '30 days' AND id=(SELECT id FROM snapshots WHERE tenant_id=$1 ORDER BY scanned_at DESC LIMIT 1) AND ($9::boolean OR $8::text IS NULL OR EXISTS (SELECT 1 FROM threat_reviews prior WHERE prior.tenant_id=$1 AND prior.snapshot_id=$2 AND prior.finding_id=$3 AND prior.revision=$8::text)) ON CONFLICT (tenant_id,snapshot_id,finding_id) DO UPDATE SET iv=EXCLUDED.iv,ciphertext=EXCLUDED.ciphertext,auth_tag=EXCLUDED.auth_tag,updated_at=now(),revision=EXCLUDED.revision WHERE $9::boolean OR ($8::text IS NOT NULL AND threat_reviews.revision=$8::text)", [value.tenantId, value.snapshotId, value.findingId, payload.iv, payload.ciphertext, payload.authTag, value.revision, expectedRevision ?? null, expectedRevision === undefined]);
+      if (result.rowCount !== 1) throw new Error("Review conflict: a newer scan is available, the snapshot expired or another decision was saved. Reload before saving.");
+      await client.query("INSERT INTO access_events (tenant_id,session_id,action,resource_type,resource_id) VALUES ($1,$2,$3,$4,$5)", [value.tenantId, sessionId, "update", "threat_review", value.findingId]);
+      return value;
+    });
   }
 
   async close(): Promise<void> { await this.pool.end(); }
@@ -198,6 +207,11 @@ export class PostgresBackend implements Backend {
     catch (error) { await client.query("ROLLBACK"); /* c8 ignore next */ throw error; }
     finally { client.release(); }
   }
+}
+
+/** Publishing a scan and accepting its review are serialized within one tenant. */
+async function lockTenantSnapshots(client: PoolClient, tenantId: string): Promise<void> {
+  await client.query("SELECT pg_advisory_xact_lock(hashtextextended('snapshot-review:' || $1, 0))", [tenantId]);
 }
 
 function encrypted(row: EncryptedRow): EncryptedValue { return { iv: row.iv, ciphertext: row.ciphertext, authTag: row.auth_tag }; }

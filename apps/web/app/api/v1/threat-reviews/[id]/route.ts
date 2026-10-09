@@ -3,7 +3,7 @@ import { NextRequest } from "next/server";
 import { getServerSession, SESSION_COOKIE } from "@/server/auth/session-store";
 import { getBackend } from "@/server/backend";
 import { getEntraConfig } from "@/server/config";
-import { noStoreJson, requireSameOrigin } from "@/server/http";
+import { noStoreJson, readJsonObject, requireSameOrigin } from "@/server/http";
 import { revalidateThreatReview } from "@/server/review-revalidation";
 
 export const dynamic = "force-dynamic";
@@ -41,8 +41,9 @@ export async function PUT(request: NextRequest, route: { params: Promise<{ id: s
   const context = await contextFor(request, id);
   if ("error" in context) return context.error;
   try { requireSameOrigin(request, context.config.redirectUri); } catch { return noStoreJson({ error: "Cross-origin request rejected." }, { status: 403 }); }
-  const body = await request.json().catch(() => null) as Record<string, unknown> | null;
-  if (!body || typeof body.disposition !== "string" || !DISPOSITIONS.has(body.disposition)) return noStoreJson({ error: "A valid disposition is required." }, { status: 400 });
+  const body = await readJsonObject(request);
+  if (body instanceof Response) return body;
+  if (typeof body.disposition !== "string" || !DISPOSITIONS.has(body.disposition)) return noStoreJson({ error: "A valid disposition is required." }, { status: 400 });
   if (!(body.expectedRevision === null || typeof body.expectedRevision === "string")) return noStoreJson({ error: "The current review revision is required." }, { status: 400 });
   const owner = typeof body.owner === "string" ? body.owner.trim().slice(0, 160) : "";
   const assumption = typeof body.assumption === "string" ? body.assumption.trim().slice(0, 4_000) : "";
@@ -70,8 +71,9 @@ export async function POST(request: NextRequest, route: { params: Promise<{ id: 
   const context = await contextFor(request, id);
   if ("error" in context) return context.error;
   try { requireSameOrigin(request, context.config.redirectUri); } catch { return noStoreJson({ error: "Cross-origin request rejected." }, { status: 403 }); }
-  const body = await request.json().catch(() => null) as Record<string, unknown> | null;
-  if (!body || typeof body.sourceSnapshotId !== "string") return noStoreJson({ error: "A prior source snapshot is required." }, { status: 400 });
+  const body = await readJsonObject(request);
+  if (body instanceof Response) return body;
+  if (typeof body.sourceSnapshotId !== "string") return noStoreJson({ error: "A prior source snapshot is required." }, { status: 400 });
   if (!(body.expectedRevision === null || typeof body.expectedRevision === "string")) return noStoreJson({ error: "The current review revision is required." }, { status: 400 });
   const prior = (await context.backend.priorThreatReviews(context.session.tenantId, context.snapshot.id, [id]))[0];
   if (!prior || prior.snapshotId !== body.sourceSnapshotId) return noStoreJson({ error: "The prior review is stale or unavailable." }, { status: 409 });
