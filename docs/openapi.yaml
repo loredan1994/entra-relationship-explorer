@@ -117,11 +117,14 @@ paths:
   /export/relationships.csv:
     get:
       summary: Export the current snapshot as CSV
+      parameters:
+        - { name: snapshot, in: query, required: false, schema: { type: string }, description: Expected displayed snapshot ID; omitted means latest snapshot. Workspace downloads always supply this binding. }
       description: Demo mode exports synthetic sample data. Live mode requires an authenticated tenant session and a retained snapshot; it never falls back to demo data for an unavailable tenant export.
       responses:
         "200": { description: CSV export }
         "401": { description: Authentication required }
         "404": { description: No tenant snapshot }
+        "409": { description: Supplied snapshot differs from the latest scan; review current evidence before exporting }
   /export/evidence-packet.json:
     get:
       summary: Export one current finding or attack path as versioned focused JSON
@@ -129,19 +132,34 @@ paths:
       parameters:
         - { name: kind, in: query, required: true, schema: { type: string, enum: [finding, path] } }
         - { name: id, in: query, required: true, schema: { type: string } }
+        - { name: snapshot, in: query, required: false, schema: { type: string }, description: Expected displayed snapshot ID; omitted means latest snapshot. Workspace downloads always supply this binding. }
       responses:
         "200": { description: Focused versioned JSON evidence packet }
         "400": { description: Missing or invalid subject selector }
         "401": { description: Authentication required }
         "404": { description: Subject absent from the current snapshot }
+        "409": { description: Supplied snapshot differs from the latest scan; review current evidence before exporting }
   /export/evidence-packet.md:
     get:
       summary: Export one current finding or attack path as sanitized Markdown
       parameters:
         - { name: kind, in: query, required: true, schema: { type: string, enum: [finding, path] } }
         - { name: id, in: query, required: true, schema: { type: string } }
+        - { name: snapshot, in: query, required: false, schema: { type: string }, description: Expected displayed snapshot ID; omitted means latest snapshot. Workspace downloads always supply this binding. }
       responses:
         "200": { description: Focused Markdown evidence packet }
         "400": { description: Missing or invalid subject selector }
         "401": { description: Authentication required }
         "404": { description: Subject absent from the current snapshot }
+        "409": { description: Supplied snapshot differs from the latest scan; review current evidence before exporting }
+  /export/attack-flow.json:
+    get:
+      summary: Export one configured attack path as Attack Flow JSON
+      parameters:
+        - { name: path, in: query, required: false, schema: { type: string }, description: Path ID; omitted selects the first configured path }
+        - { name: snapshot, in: query, required: false, schema: { type: string }, description: Expected displayed snapshot ID; omitted means latest snapshot. Workspace downloads always supply this binding. }
+      responses:
+        "200": { description: Attack Flow download }
+        "401": { description: Authentication required }
+        "404": { description: No matching path or retained snapshot }
+        "409": { description: Supplied snapshot differs from the latest scan; review current evidence before exporting }

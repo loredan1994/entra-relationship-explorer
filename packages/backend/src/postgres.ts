@@ -85,7 +85,7 @@ export class PostgresBackend implements Backend {
   async enqueueScan(tenantId: string, sessionId: string): Promise<ScanJob> {
     const id = randomUUID();
     const result = await this.pool.query("INSERT INTO scan_jobs (id,tenant_id,session_id,status,stage,detail) SELECT $1,$2,$3,'queued','applications','Waiting to begin the read-only scan' FROM sessions WHERE id=$3 AND tenant_id=$2 AND expires_at>now() ON CONFLICT DO NOTHING RETURNING *", [id, tenantId, sessionId]);
-    const row = result.rows[0] ?? (await this.pool.query("SELECT * FROM scan_jobs WHERE tenant_id=$1 AND status IN ('queued','running','cancel_requested') ORDER BY created_at DESC LIMIT 1", [tenantId])).rows[0];
+    const row = result.rows[0] ?? (await this.pool.query("SELECT * FROM scan_jobs WHERE tenant_id=$1 AND status IN ('queued','running','cancel_requested') AND EXISTS (SELECT 1 FROM sessions WHERE id=$2 AND tenant_id=$1 AND expires_at>now()) ORDER BY created_at DESC LIMIT 1", [tenantId, sessionId])).rows[0];
     if (!row) throw new Error("A valid tenant session is required.");
     await this.recordAccess(tenantId, sessionId, "enqueue", "scan_job", row.id);
     return mapJob(row);
@@ -95,10 +95,14 @@ export class PostgresBackend implements Backend {
   async getLatestJob(tenantId: string): Promise<ScanJob | null> { const row = (await this.pool.query("SELECT * FROM scan_jobs WHERE tenant_id=$1 ORDER BY created_at DESC LIMIT 1", [tenantId])).rows[0]; return row ? mapJob(row) : null; }
 
   async recoverStaleJobs(tenantId: string, staleBefore: Date): Promise<number> {
-    const cancelled = await this.pool.query("UPDATE scan_jobs SET status='cancelled',worker_id=NULL,locked_at=NULL,detail='Cancellation completed after the previous worker stopped',finished_at=now(),updated_at=now() WHERE tenant_id=$1 AND status='cancel_requested' AND updated_at<$2", [tenantId, staleBefore]);
-    if ((cancelled.rowCount ?? 0) > 0) await this.pool.query("DELETE FROM scan_checkpoints c USING scan_jobs j WHERE c.job_id=j.id AND j.tenant_id=$1 AND j.status='cancelled'", [tenantId]);
-    const result = await this.pool.query("UPDATE scan_jobs SET status='queued',worker_id=NULL,locked_at=NULL,available_at=now(),detail='Recovered after the previous worker stopped',updated_at=now() WHERE tenant_id=$1 AND status='running' AND updated_at<$2", [tenantId, staleBefore]);
-    return (result.rowCount ?? 0) + (cancelled.rowCount ?? 0);
+    return this.transaction(async client => {
+      const cancelled = await client.query("UPDATE scan_jobs SET status='cancelled',worker_id=NULL,locked_at=NULL,detail='Cancellation completed after the previous worker stopped',finished_at=now(),updated_at=now() WHERE tenant_id=$1 AND status='cancel_requested' AND updated_at<$2", [tenantId, staleBefore]);
+      // Publish cancellation only after its unpublished evidence has been erased.
+      // If cleanup fails, the pending cancellation remains eligible for the next poll.
+      if ((cancelled.rowCount ?? 0) > 0) await client.query("DELETE FROM scan_checkpoints c USING scan_jobs j WHERE c.job_id=j.id AND j.tenant_id=$1 AND j.status='cancelled'", [tenantId]);
+      const result = await client.query("UPDATE scan_jobs SET status='queued',worker_id=NULL,locked_at=NULL,available_at=now(),detail='Recovered after the previous worker stopped',updated_at=now() WHERE tenant_id=$1 AND status='running' AND updated_at<$2", [tenantId, staleBefore]);
+      return (result.rowCount ?? 0) + (cancelled.rowCount ?? 0);
+    });
   }
 
   async claimNextJob(workerId: string, tenantId: string): Promise<ScanJob | null> {

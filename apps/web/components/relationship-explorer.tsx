@@ -1,7 +1,6 @@
 "use client";
 
 import {
-  boundedNeighborhood,
   connectedNodes,
   filterRelationships,
   type NodeKind,
@@ -17,6 +16,7 @@ import { layoutGraph, NODE_HEIGHT, NODE_WIDTH } from "./graph-layout";
 import { PermissionPills } from "./permission-pills";
 import { permissionPhrase } from "./permission-utils";
 import { RiskBadge } from "./risk-badge";
+import { MAP_EDGE_LIMIT, MAP_NODE_LIMIT, relationshipMapScope } from "./relationship-map-scope";
 
 const kindLabels: Record<NodeKind, { plain: string; microsoft: string }> = {
   application: { plain: "Blueprint", microsoft: "App registration" },
@@ -52,7 +52,6 @@ const relationshipLabels: Record<RelationshipType, string> = {
   OBSERVED_CALL: "Successful sign-in to resource",
 };
 
-const MAP_NODE_LIMIT = 15;
 const TABLE_PAGE_SIZE = 50;
 const MIN_ZOOM = 0.2;
 const MAX_ZOOM = 1.6;
@@ -100,12 +99,14 @@ export function RelationshipExplorer({ snapshot }: { snapshot: TenantSnapshot })
 function RelationshipWorkspace({ snapshot, initialQuery, initialKinds, initialEdgeId }: { snapshot: TenantSnapshot; initialQuery: string; initialKinds: NodeKind[]; initialEdgeId: string | null }) {
   const [query, setQuery] = useState(initialQuery);
   const [selectedKinds, setSelectedKinds] = useState<NodeKind[]>(initialKinds);
-  const [viewMode, setViewMode] = useState<"map" | "table">(snapshot.mode === "tenant" || snapshot.nodes.length > MAP_NODE_LIMIT ? "table" : "map");
+  const needsBoundedMap = snapshot.nodes.length > MAP_NODE_LIMIT || snapshot.edges.length > MAP_EDGE_LIMIT;
+  const [viewMode, setViewMode] = useState<"map" | "table">(snapshot.mode === "tenant" || needsBoundedMap ? "table" : "map");
   const allViews = useMemo(() => filterRelationships(snapshot, {}), [snapshot]);
-  const initialEdge = allViews.find(({ edge }) => edge.id === initialEdgeId) ??
+  const initialEdge = useMemo(() => allViews.find(({ edge }) => edge.id === initialEdgeId) ??
     allViews.find(({ edge }) => edge.type === "CAN_CALL_AS_APP") ??
-    allViews[0];
+    allViews[0], [allViews, initialEdgeId]);
   const [selectedEdgeId, setSelectedEdgeId] = useState(initialEdge?.edge.id ?? "");
+  const [mapAnchorEdgeId, setMapAnchorEdgeId] = useState(initialEdge?.edge.id);
   const [focusNodeId, setFocusNodeId] = useState<string | null>(null);
   const [savedFilters, setSavedFilters] = useState<SavedFilter[]>([]);
   const [filterStorageStatus, setFilterStorageStatus] = useState("");
@@ -115,19 +116,12 @@ function RelationshipWorkspace({ snapshot, initialQuery, initialKinds, initialEd
   const resultsRef = useRef<HTMLElement>(null);
   const inspectionTrigger = useRef<{ element: HTMLElement; edgeId: string } | null>(null);
   const storageKey = `entra-explorer-filters:${snapshot.tenant.tenantId}`;
-  const neighborhood = useMemo(
-    () => focusNodeId ? boundedNeighborhood(snapshot, focusNodeId, MAP_NODE_LIMIT) : null,
-    [focusNodeId, snapshot],
+  const matchingViews = useMemo(
+    () => filterRelationships(snapshot, { query, nodeKinds: selectedKinds }),
+    [query, selectedKinds, snapshot],
   );
-  const scopedSnapshot = useMemo<TenantSnapshot>(() => neighborhood ? {
-    ...snapshot,
-    nodes: neighborhood.nodes,
-    edges: neighborhood.edges.map(({ edge }) => edge),
-  } : snapshot, [neighborhood, snapshot]);
-  const filteredViews = useMemo(
-    () => filterRelationships(scopedSnapshot, { query, nodeKinds: selectedKinds }),
-    [query, selectedKinds, scopedSnapshot],
-  );
+  const mapScope = useMemo(() => viewMode === "map" ? relationshipMapScope(matchingViews, focusNodeId, mapAnchorEdgeId) : null, [viewMode, matchingViews, focusNodeId, mapAnchorEdgeId]);
+  const filteredViews = mapScope?.views ?? matchingViews;
   // An incoming Inspect link is also an explicit inspection request. Do not
   // focus a fallback relationship when its ID is absent, stale or filtered out.
   const [inspectionRequest, setInspectionRequest] = useState(() => filteredViews.some(({ edge }) => edge.id === initialEdgeId) ? 1 : 0);
@@ -141,9 +135,17 @@ function RelationshipWorkspace({ snapshot, initialQuery, initialKinds, initialEd
   const [panning, setPanning] = useState(false);
   const panState = useRef({ pointerId: -1, startX: 0, startY: 0, panX: 0, panY: 0 });
   const layout = useMemo(() => viewMode === "map" ? layoutGraph(visibleNodes, filteredViews, zoom) : { width: 0, height: 0, nodes: [], edges: [] }, [viewMode, visibleNodes, filteredViews, zoom]);
-  const configuredCount = filteredViews.filter(({ edge }) => edge.evidence.configured).length;
-  const observedCount = filteredViews.filter(({ edge }) => edge.evidence.observed).length;
-  const incompleteCount = filteredViews.filter(({ edge }) => !edge.evidence.configured && !edge.evidence.observed).length;
+  const { configuredCount, observedCount, incompleteCount, unresolvedCount } = useMemo(() => ({
+    configuredCount: filteredViews.filter(({ edge }) => edge.evidence.configured).length,
+    observedCount: filteredViews.filter(({ edge }) => edge.evidence.observed).length,
+    incompleteCount: filteredViews.filter(({ edge }) => !edge.evidence.configured && !edge.evidence.observed).length,
+    unresolvedCount: filteredViews.filter(({ edge }) => edge.evidence.completeness === "unresolved").length,
+  }), [filteredViews]);
+  const kindCounts = useMemo(() => {
+    const counts = new Map<NodeKind, number>();
+    for (const node of snapshot.nodes) counts.set(node.kind, (counts.get(node.kind) ?? 0) + 1);
+    return counts;
+  }, [snapshot.nodes]);
 
   // The graph moves by translating the scaled canvas, not by scrolling overflow,
   // so panning works even when the fitted graph is smaller than the viewport.
@@ -200,7 +202,6 @@ function RelationshipWorkspace({ snapshot, initialQuery, initialKinds, initialEd
     [],
   );
   const selectedView = filteredViews.find(({ edge }) => edge.id === selectedEdgeId) ?? filteredViews[0];
-  const unresolvedCount = filteredViews.filter(({ edge }) => edge.evidence.completeness === "unresolved").length;
 
   useEffect(() => {
     if (!inspectionRequest) return;
@@ -311,6 +312,7 @@ function RelationshipWorkspace({ snapshot, initialQuery, initialKinds, initialEd
   }, [storageKey]);
 
   function toggleKind(kind: NodeKind) {
+    setMapAnchorEdgeId(selectedView?.edge.id);
     setSelectedKinds((current) =>
       current.includes(kind) ? current.filter((item) => item !== kind) : [...current, kind],
     );
@@ -320,6 +322,7 @@ function RelationshipWorkspace({ snapshot, initialQuery, initialKinds, initialEd
     const connection = filteredViews.find(({ source, target }) => source.id === nodeId || target.id === nodeId);
     if (connection) {
       setSelectedEdgeId(connection.edge.id);
+      setMapAnchorEdgeId(connection.edge.id);
       inspectionTrigger.current = { element: trigger, edgeId: connection.edge.id };
     } else {
       inspectionTrigger.current = null;
@@ -328,7 +331,8 @@ function RelationshipWorkspace({ snapshot, initialQuery, initialKinds, initialEd
   }
 
   function showMap() {
-    if (!focusNodeId && snapshot.nodes.length > MAP_NODE_LIMIT) setFocusNodeId(selectedView?.source.id ?? snapshot.nodes[0]?.id ?? null);
+    setMapAnchorEdgeId(selectedView?.edge.id);
+    if (!focusNodeId && needsBoundedMap) setFocusNodeId(selectedView?.source.id ?? snapshot.nodes[0]?.id ?? null);
     setViewMode("map");
   }
 
@@ -341,7 +345,7 @@ function RelationshipWorkspace({ snapshot, initialQuery, initialKinds, initialEd
     setQuery("");
     setSelectedKinds([]);
     setFocusNodeId(null);
-    if (snapshot.nodes.length > MAP_NODE_LIMIT) setViewMode("table");
+    if (needsBoundedMap) setViewMode("table");
   }
 
   function persistFilters(next: SavedFilter[]) {
@@ -386,13 +390,13 @@ function RelationshipWorkspace({ snapshot, initialQuery, initialKinds, initialEd
         <div id="relationship-filter-controls" className={`filter-controls ${mobileFiltersOpen ? "is-open" : ""}`}>
           <label className="map-search">
             <span>Search the map</span>
-            <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Name or permission" />
+            <input value={query} onChange={(event) => { setMapAnchorEdgeId(selectedView?.edge.id); setQuery(event.target.value); }} placeholder="Name or permission" />
           </label>
 
           <fieldset className="filter-group">
             <legend>Object type</legend>
             {(Object.entries(kindLabels) as [NodeKind, (typeof kindLabels)[NodeKind]][]).map(([kind, labels]) => {
-              const count = snapshot.nodes.filter((node) => node.kind === kind).length;
+              const count = kindCounts.get(kind) ?? 0;
               return (
                 <label key={kind}>
                   <input type="checkbox" checked={selectedKinds.includes(kind)} onChange={() => toggleKind(kind)} />
@@ -409,7 +413,7 @@ function RelationshipWorkspace({ snapshot, initialQuery, initialKinds, initialEd
           <section className="saved-filters" aria-label="Saved filters">
             <div><h2>Saved filters</h2><button className="text-button" type="button" onClick={saveFilter}>Save current</button></div>
             <p>Stored only in this browser.</p>
-            {savedFilters.length === 0 ? <small>No saved filters yet.</small> : savedFilters.map((filter) => <div className="saved-filter" key={filter.id}><button type="button" onClick={() => { setQuery(filter.query); setSelectedKinds(filter.nodeKinds); setFocusNodeId(null); if (snapshot.nodes.length > MAP_NODE_LIMIT) setViewMode("table"); }}>{filter.label}</button><button type="button" aria-label={`Remove saved filter ${filter.label}`} onClick={() => persistFilters(savedFilters.filter((item) => item.id !== filter.id))}>×</button></div>)}
+            {savedFilters.length === 0 ? <small>No saved filters yet.</small> : savedFilters.map((filter) => <div className="saved-filter" key={filter.id}><button type="button" onClick={() => { setQuery(filter.query); setSelectedKinds(filter.nodeKinds); setFocusNodeId(null); if (needsBoundedMap) setViewMode("table"); }}>{filter.label}</button><button type="button" aria-label={`Remove saved filter ${filter.label}`} onClick={() => persistFilters(savedFilters.filter((item) => item.id !== filter.id))}>×</button></div>)}
             {filterStorageStatus ? <p role="status">{filterStorageStatus}</p> : null}
           </section>
 
@@ -421,7 +425,7 @@ function RelationshipWorkspace({ snapshot, initialQuery, initialKinds, initialEd
             <p>
               <strong>{filteredViews.length}</strong> connections
             </p>
-            {focusNodeId ? <button className="text-button" type="button" onClick={() => { setFocusNodeId(null); if (snapshot.nodes.length > MAP_NODE_LIMIT) setViewMode("table"); }}>Clear one-hop focus</button> : null}
+            {focusNodeId ? <button className="text-button" type="button" onClick={() => { setFocusNodeId(null); if (needsBoundedMap) setViewMode("table"); }}>Clear one-hop focus</button> : null}
           </div>
 
           <div className="legend">
@@ -461,7 +465,7 @@ function RelationshipWorkspace({ snapshot, initialQuery, initialKinds, initialEd
           {viewMode === "map" ? <span className="map-hint" id="map-controls-help">Drag or scroll to pan · Arrow keys pan · Home fits · ⌘/Ctrl + scroll to zoom</span> : null}
         </div>
 
-        {focusNodeId ? <div className="scope-banner"><strong>One-hop view.</strong> Select an object to expand its direct relationships.{neighborhood?.truncated ? ` Limited to ${MAP_NODE_LIMIT} objects; use the table for the complete result.` : ""}</div> : null}
+        {focusNodeId || mapScope?.truncated ? <div className="scope-banner"><strong>{focusNodeId ? "One-hop view." : "Bounded map."}</strong> Select an object to expand its direct relationships.{mapScope?.truncated ? ` Limited to ${MAP_NODE_LIMIT} objects and ${MAP_EDGE_LIMIT} connections; showing ${filteredViews.length} of ${mapScope.availableCount} matching relationships${focusNodeId ? " for this object" : ""}. Use Table for the complete filtered result.` : ""}</div> : null}
         {unresolvedCount > 0 ? <div className="unresolved-banner" role="status"><strong>{unresolvedCount} unresolved {unresolvedCount === 1 ? "relationship" : "relationships"}.</strong> The source scan was incomplete; inspect evidence before drawing conclusions.</div> : null}
 
         {filteredViews.length === 0 ? (

@@ -2,7 +2,7 @@
 
 The **Evidence engine** screen contains ten local investigation workflows backed by `@entra-explorer/engine`. The engine has no Graph client, token access, database connection, or write transport. It consumes a projection of one tenant’s recorded snapshots and operator-supplied intent. Its public entry point is `packages/engine/src/index.ts`.
 
-Engine version: `1.0.2`. Authorization rule version: `entra-configured/3`. These version the interpretation and replay format, independently of the application release. This revision validates imported evidence types and relationship identity bindings, treats blank provenance as missing, and prevents contracts from passing when referenced identities conflict. It retains the earlier policy, temporal and intermediate-object corrections. Portable packages from older engine/rule versions must be re-exported from their source snapshots; the verifier rejects incompatible versions instead of silently applying new semantics.
+Engine version: `1.0.3`. Authorization rule version: `entra-configured/4`. These version the interpretation and replay format, independently of the application release. This revision requires a user object for delegated consent and group-based application assignment, isolates unrelated conflicting paths, requires a complete compatible temporal witness, and treats contradictory credential metadata as unknown. Earlier evidence-validation and policy corrections remain in place. Portable packages from older engine/rule versions must be re-exported from their source snapshots; the verifier rejects incompatible versions instead of silently applying new semantics.
 
 ## Read the result correctly
 

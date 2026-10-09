@@ -58,7 +58,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
             <div className="setting-row"><div><strong>Microsoft sign-in</strong><p>{config.enabled ? "Single configured tenant only; tokens remain server-side." : config.reason}</p></div><span>{connected ? "Connected" : "Not connected"}</span></div>
             <div className="setting-row"><div><strong>Tenant changes</strong><p>The product exposes no grant, revoke, edit, or remediation action.</p></div><span className="read-only-badge">Read-only</span></div>
             {authMessage ? <p className="notice-banner" role="alert">{authMessage}</p> : null}
-            <ScanControl enabled={config.enabled} connected={connected} initialJob={latestJob} exportAvailable={connected && snapshot.mode === "tenant"} />
+            <ScanControl enabled={config.enabled} connected={connected} initialJob={latestJob} exportAvailable={connected && snapshot.mode === "tenant"} snapshotId={snapshot.id} />
           </div>
         </section>
         <section className="settings-section">

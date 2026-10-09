@@ -45,7 +45,7 @@ it.each(["<script>private-provider-details</script>", "constructor", ["access_de
 it.each(["no-snapshot", "signed-out"] as const)("offers a useful recovery link instead of a broken download in %s state", async state => {
   vi.mocked(loadSnapshotContext).mockResolvedValue({ snapshot: cleanProjectFixture, state, history: [cleanProjectFixture], liveEnabled: true });
   const html = renderToStaticMarkup(await PermissionsPage());
-  expect(html).not.toContain('href="/api/export/relationships.csv"');
+  expect(html).not.toContain('/api/export/relationships.csv');
   expect(html).toContain('href="/settings"');
   expect(html).toContain(state === "signed-out" ? "Sign in to export tenant data" : "Scan tenant to enable exports");
 });
@@ -54,7 +54,7 @@ it("does not offer a tenant export before the first completed scan", async () =>
   vi.mocked(getEntraConfig).mockReturnValue({ enabled: true, tenantId: cleanProjectFixture.tenant.tenantId, graphScopes: [] } as never);
   vi.mocked(getServerSession).mockResolvedValue({ tenantId: cleanProjectFixture.tenant.tenantId } as never);
   const html = renderToStaticMarkup(await SettingsPage({ searchParams: Promise.resolve({}) }));
-  expect(html).not.toContain('href="/api/export/relationships.csv"');
+  expect(html).not.toContain('/api/export/relationships.csv');
   expect(html).toContain("Complete a read-only scan to export tenant relationships.");
 });
 

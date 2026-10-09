@@ -28,11 +28,12 @@ function validatePlan(plan: ContinuityPlan): { start: number; end: number } {
   return { start, end };
 }
 
-function timeBoundaries(plan: ContinuityPlan, metadata: Map<string, CredentialMetadata>, stages: Map<string, DeploymentStage>, missing: Set<string>, start: number, end: number, skew: number): number[] {
+function timeBoundaries(plan: ContinuityPlan, metadata: Map<string, CredentialMetadata>, stages: Map<string, DeploymentStage>, credentialConflicts: Set<string>, missing: Set<string>, start: number, end: number, skew: number): number[] {
   const bounds = new Set([start, end]);
   for (const key of unique(plan.workloads.flatMap(w => w.credentialKeys))) {
     const c = metadata.get(key), d = stages.get(key);
-    if (!c?.startsAt || !c.expiresAt) missing.add(`credential:${key}:validity`);
+    if (credentialConflicts.has(key)) missing.add(`credential:${key}:conflicting-metadata`);
+    else if (!c?.startsAt || !c.expiresAt) missing.add(`credential:${key}:validity`);
     if (!d?.availableFrom || d.unavailableFrom === null) missing.add(`deployment:${key}`);
     const times = [c?.startsAt ? timestamp(c.startsAt) + skew : null, c?.expiresAt ? timestamp(c.expiresAt) - skew : null,
       d?.availableFrom ? timestamp(d.availableFrom) + skew : null, d?.unavailableFrom ? timestamp(d.unavailableFrom) - skew : null];
@@ -45,15 +46,25 @@ export function simulateContinuity(model: EvidenceModel, plan: ContinuityPlan, m
   if (plan.tenantId !== model.tenantId) throw new Error("Cross-tenant plan rejected.");
   bound(maxSteps, 1_000_000, "continuity steps");
   const { start, end } = validatePlan(plan);
-  const metadata = new Map<string, CredentialMetadata>(model.nodes.flatMap(n => (n.credentials ?? []).map(c => [`${n.id}/${c.id}`, c] as const)));
+  const metadata = new Map<string, CredentialMetadata>();
+  const credentialConflicts = new Set<string>();
+  for (const node of model.nodes) for (const credential of node.credentials ?? []) {
+    const key = `${node.id}/${credential.id}`;
+    const prior = metadata.get(key);
+    if (prior && canonical(prior) !== canonical(credential)) credentialConflicts.add(key);
+    else metadata.set(key, credential);
+  }
+  // Nested records do not create object conflicts during snapshot compilation.
+  // Do not let array order select one of two contradictory validity windows.
+  for (const key of credentialConflicts) metadata.delete(key);
   const stages = new Map(plan.deployments.map(d => [d.credentialKey, d]));
   const keys = plan.workloads.flatMap(w => w.credentialKeys);
   const conflicts = model.conflicts.filter(c => c.factId.startsWith("object:") && keys.some(key => key.startsWith(`${c.factId.slice(7)}/`)));
   const missing = new Set<string>(conflicts.map(c => c.factId));
   const skew = plan.clockSkewSeconds * 1_000;
-  const times = timeBoundaries(plan, metadata, stages, missing, start, end, skew);
+  const times = timeBoundaries(plan, metadata, stages, credentialConflicts, missing, start, end, skew);
   function credentialState(key: string, at: number): Verdict {
-    if (conflicts.some(c => key.startsWith(`${c.factId.slice(7)}/`))) return "unknown";
+    if (credentialConflicts.has(key) || conflicts.some(c => key.startsWith(`${c.factId.slice(7)}/`))) return "unknown";
     const c = metadata.get(key), d = stages.get(key);
     if ((c?.startsAt && at < timestamp(c.startsAt) + skew) || (c?.expiresAt && at >= timestamp(c.expiresAt) - skew)) return "refuted";
     if ((d?.availableFrom && at < timestamp(d.availableFrom) + skew) || (d?.unavailableFrom && at >= timestamp(d.unavailableFrom) - skew)) return "refuted";

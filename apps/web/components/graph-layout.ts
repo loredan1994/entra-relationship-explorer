@@ -71,25 +71,80 @@ export interface GraphLayout {
   edges: PlacedEdge[];
 }
 
-/**
- * Longest-path layering. Bounded by the node count so a cyclic graph
- * terminates instead of relaxing forever.
- */
-function assignLayers(nodeIds: string[], views: RelationshipView[]): Map<string, number> {
-  const layers = new Map(nodeIds.map((id) => [id, 0]));
-  for (let pass = 0; pass < nodeIds.length; pass += 1) {
-    let changed = false;
-    for (const { source, target } of views) {
-      if (source.id === target.id) continue;
-      const candidate = (layers.get(source.id) ?? 0) + 1;
-      if (candidate > (layers.get(target.id) ?? 0)) {
-        layers.set(target.id, candidate);
-        changed = true;
+/** Finish-order traversal without recursion, including disconnected objects. */
+function finishOrder(nodeIds: string[], successors: Map<string, string[]>): string[] {
+  const visited = new Set<string>();
+  const finished: string[] = [];
+  for (const id of nodeIds) {
+    if (visited.has(id)) continue;
+    visited.add(id);
+    const pending = [{ id, next: 0 }];
+    while (pending.length) {
+      const frame = pending[pending.length - 1]!;
+      const next = successors.get(frame.id)![frame.next++];
+      if (next === undefined) {
+        finished.push(frame.id);
+        pending.pop();
+      } else if (!visited.has(next)) {
+        visited.add(next);
+        pending.push({ id: next, next: 0 });
       }
     }
-    if (!changed) break;
   }
-  return layers;
+  return finished;
+}
+
+/** Collapse directed cycles before layering, so cycles cannot create empty columns. */
+function stronglyConnectedComponents(nodeIds: string[], views: RelationshipView[]): Map<string, number> {
+  const successors = new Map(nodeIds.map((id) => [id, [] as string[]]));
+  const predecessors = new Map(nodeIds.map((id) => [id, [] as string[]]));
+  for (const { source, target } of views) {
+    successors.get(source.id)!.push(target.id);
+    predecessors.get(target.id)!.push(source.id);
+  }
+
+  const componentOf = new Map<string, number>();
+  let component = 0;
+  for (const id of finishOrder(nodeIds, successors).reverse()) {
+    if (componentOf.has(id)) continue;
+    componentOf.set(id, component);
+    const pending = [id];
+    while (pending.length) {
+      for (const predecessor of predecessors.get(pending.pop()!)!) {
+        if (componentOf.has(predecessor)) continue;
+        componentOf.set(predecessor, component);
+        pending.push(predecessor);
+      }
+    }
+    component += 1;
+  }
+  return componentOf;
+}
+
+/** Longest paths through the acyclic component graph, in linear graph time. */
+function assignLayers(nodeIds: string[], views: RelationshipView[]): Map<string, number> {
+  const componentOf = stronglyConnectedComponents(nodeIds, views);
+  const components = [...new Set(componentOf.values())];
+  const successors = new Map(components.map((component) => [component, new Set<number>()]));
+  const incoming = new Map(components.map((component) => [component, 0]));
+  const layers = new Map(components.map((component) => [component, 0]));
+  for (const { source, target } of views) {
+    const from = componentOf.get(source.id)!;
+    const to = componentOf.get(target.id)!;
+    if (from === to || successors.get(from)!.has(to)) continue;
+    successors.get(from)!.add(to);
+    incoming.set(to, incoming.get(to)! + 1);
+  }
+  const ready = components.filter((component) => incoming.get(component) === 0);
+  for (let index = 0; index < ready.length; index += 1) {
+    const from = ready[index]!;
+    for (const to of successors.get(from)!) {
+      layers.set(to, Math.max(layers.get(to)!, layers.get(from)! + 1));
+      incoming.set(to, incoming.get(to)! - 1);
+      if (incoming.get(to) === 0) ready.push(to);
+    }
+  }
+  return new Map(nodeIds.map((id) => [id, layers.get(componentOf.get(id)!)!]));
 }
 
 /** Median heuristic: reorder each column so edges cross as little as possible. */
