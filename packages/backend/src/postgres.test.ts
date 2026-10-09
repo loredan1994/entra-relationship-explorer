@@ -107,6 +107,7 @@ describe("tenant scoping", () => {
     await backend.recentSnapshots(TENANT).catch(() => {});
     await backend.recentAccessEvents(TENANT);
     await backend.getThreatReview(TENANT, "snap-1", "finding-1").catch(() => {});
+    await backend.currentThreatReviews(TENANT, "snap-1", ["finding-1"]).catch(() => {});
     await backend.priorThreatReviews(TENANT, "snap-2", ["finding-1"]).catch(() => {});
     const tenantScoped = pool.queries.filter((query) => /FROM (sessions|scan_jobs|snapshots|access_events|threat_reviews|scan_checkpoints)/.test(query.sql));
     expect(tenantScoped.length).toBeGreaterThan(0);
@@ -757,4 +758,24 @@ it("caps prior review queries at 5000 distinct finding IDs", async () => {
   await backend.priorThreatReviews(TENANT, "snapshot", ids);
   const query = pool.queries.find(q => q.sql.startsWith("WITH current_snapshot"))!;
   expect(query.params[2]).toEqual(["first", ...Array.from({ length: 4999 }, (_, i) => `finding-${i}`)]);
+});
+
+it("bulk review loading uses one query and returns requested order without an N+1 read", async () => {
+  const { backend, pool } = backendUnderTest();
+  const review: ThreatReview = { findingId: "first", snapshotId: "snapshot", tenantId: TENANT, disposition: "accepted", owner: "IAM", expiresAt: null, assumption: "Synthetic", updatedAt: "2026-10-09T00:00:00Z" };
+  const second = { ...review, findingId: "second" };
+  pool.responder = respondTo("FROM threat_reviews r JOIN snapshots", { rows: [review, second].map(value => encryptedRow(value, `threat-review:${TENANT}:snapshot:${value.findingId}`, { finding_id: value.findingId })) });
+  expect(await backend.currentThreatReviews(TENANT, "snapshot", ["second", "missing", "first", "second", ""])).toEqual([second, review]);
+  expect(pool.queries).toHaveLength(1);
+  expect(pool.queries[0]!.params).toEqual([TENANT, "snapshot", ["second", "missing", "first"]]);
+  expect(await backend.currentThreatReviews(TENANT, "snapshot", [])).toEqual([]);
+  await expect(backend.currentThreatReviews(TENANT, "snapshot", Array.from({ length: 10_001 }, (_, i) => `finding-${i}`))).rejects.toThrow("at most 10,000");
+  expect(pool.queries).toHaveLength(1);
+});
+
+it.each(["tenant", "snapshot", "finding"])("bulk reviews cannot decrypt ciphertext copied from a different %s", async boundary => {
+  const { backend, pool } = backendUnderTest();
+  const context = `threat-review:${boundary === "tenant" ? OTHER_TENANT : TENANT}:${boundary === "snapshot" ? "foreign" : "snapshot"}:${boundary === "finding" ? "foreign" : "finding"}`;
+  pool.responder = respondTo("FROM threat_reviews r JOIN snapshots", { rows: [encryptedRow({ findingId: "finding" }, context, { finding_id: "finding" })] });
+  await expect(backend.currentThreatReviews(TENANT, "snapshot", ["finding"])).rejects.toThrow();
 });

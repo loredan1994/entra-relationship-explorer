@@ -3,6 +3,7 @@ import type { TenantSnapshot } from "@entra-explorer/domain";
 import { Pool, type PoolClient, type QueryResultRow } from "pg";
 import { decryptJson, encryptJson, type EncryptedValue } from "./crypto";
 import { DATABASE_SCHEMA } from "./schema";
+import { canonicalReviewIds } from "./review-ids";
 import type { AccessEvent, Backend, BackendHealth, DurableAuthFlow, DurableSession, ScanCheckpoint, ScanJob, ScanJobStage, ThreatReview } from "./types";
 
 interface PostgresBackendOptions { connectionString: string; encryptionKey: Uint8Array; }
@@ -153,7 +154,9 @@ export class PostgresBackend implements Backend {
   async saveScanCheckpoint(checkpoint: ScanCheckpoint, workerId: string): Promise<void> {
     const value = { ...checkpoint, updatedAt: new Date().toISOString() };
     const payload = encryptJson(value, this.key, checkpointContext(value.jobId, value.tenantId));
-    const result = await this.pool.query("INSERT INTO scan_checkpoints (job_id,tenant_id,iv,ciphertext,auth_tag,updated_at) SELECT id,tenant_id,$3,$4,$5,now() FROM scan_jobs WHERE id=$1 AND tenant_id=$2 AND worker_id=$6 AND status='running' ON CONFLICT (job_id) DO UPDATE SET iv=EXCLUDED.iv,ciphertext=EXCLUDED.ciphertext,auth_tag=EXCLUDED.auth_tag,updated_at=now()", [value.jobId, value.tenantId, payload.iv, payload.ciphertext, payload.authTag, workerId]);
+    // Hold the job row through the upsert. Recovery/cancellation cannot change
+    // its owner while this statement waits for an existing checkpoint row.
+    const result = await this.pool.query("WITH owned_job AS MATERIALIZED (SELECT id,tenant_id FROM scan_jobs WHERE id=$1 AND tenant_id=$2 AND worker_id=$6 AND status='running' FOR UPDATE) INSERT INTO scan_checkpoints (job_id,tenant_id,iv,ciphertext,auth_tag,updated_at) SELECT id,tenant_id,$3,$4,$5,now() FROM owned_job ON CONFLICT (job_id) DO UPDATE SET iv=EXCLUDED.iv,ciphertext=EXCLUDED.ciphertext,auth_tag=EXCLUDED.auth_tag,updated_at=now()", [value.jobId, value.tenantId, payload.iv, payload.ciphertext, payload.authTag, workerId]);
     if (result.rowCount !== 1) throw new Error("The scan checkpoint is not owned by this worker.");
   }
 
@@ -176,6 +179,19 @@ export class PostgresBackend implements Backend {
   async getThreatReview(tenantId: string, snapshotId: string, findingId: string): Promise<ThreatReview | null> {
     const row = (await this.pool.query<EncryptedRow>("SELECT tenant_id,snapshot_id AS id,finding_id,iv,ciphertext,auth_tag,updated_at FROM threat_reviews WHERE tenant_id=$1 AND snapshot_id=$2 AND finding_id=$3 AND EXISTS (SELECT 1 FROM snapshots s WHERE s.tenant_id=$1 AND s.id=$2 AND s.scanned_at>=now()-interval '30 days')", [tenantId, snapshotId, findingId])).rows[0] as (EncryptedRow & { finding_id?: string; updated_at?: Date }) | undefined;
     return row ? decryptJson<ThreatReview>(encrypted(row), this.key, reviewContext(tenantId, snapshotId, findingId)) : null;
+  }
+
+  async currentThreatReviews(tenantId: string, snapshotId: string, findingIds: readonly string[]): Promise<ThreatReview[]> {
+    const wanted = canonicalReviewIds(findingIds);
+    if (wanted.length === 0) return [];
+    const result = await this.pool.query<EncryptedRow & { finding_id: string }>("SELECT r.finding_id,r.iv,r.ciphertext,r.auth_tag FROM threat_reviews r JOIN snapshots s ON s.id=r.snapshot_id AND s.tenant_id=r.tenant_id WHERE r.tenant_id=$1 AND r.snapshot_id=$2 AND r.finding_id=ANY($3::text[]) AND s.scanned_at>=now()-interval '30 days'", [tenantId, snapshotId, wanted]);
+    const byFinding = new Map(result.rows.map(row => [row.finding_id, decryptJson<ThreatReview>(encrypted(row), this.key, reviewContext(tenantId, snapshotId, row.finding_id))]));
+    const reviews: ThreatReview[] = [];
+    for (const findingId of wanted) {
+      const review = byFinding.get(findingId);
+      if (review) reviews.push(review);
+    }
+    return reviews;
   }
 
   async priorThreatReviews(tenantId: string, currentSnapshotId: string, findingIds: string[]): Promise<ThreatReview[]> {

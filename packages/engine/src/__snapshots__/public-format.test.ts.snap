@@ -10,7 +10,7 @@ exports[`version 1 evidence format compatibility > preserves contract failures a
     "2026-10-08T12:00:00.000Z",
   ],
   "contractId": "only-production",
-  "engineVersion": "1.0.1",
+  "engineVersion": "1.0.2",
   "limits": {
     "exhausted": false,
     "maxSteps": 250000,
@@ -18,7 +18,7 @@ exports[`version 1 evidence format compatibility > preserves contract failures a
   },
   "missing": [],
   "queries": 1,
-  "ruleVersion": "entra-configured/2",
+  "ruleVersion": "entra-configured/3",
   "snapshotIds": [
     "synthetic-snapshot",
   ],
@@ -50,7 +50,7 @@ exports[`version 1 evidence format compatibility > preserves contract failures a
           "inputs": [
             "relationship:rogue-grant",
           ],
-          "rule": "entra-configured/2/CAN_CALL_AS_APP",
+          "rule": "entra-configured/3/CAN_CALL_AS_APP",
         },
         {
           "conclusion": "supported",
@@ -62,10 +62,10 @@ exports[`version 1 evidence format compatibility > preserves contract failures a
             "object:resource",
             "object:rogue",
           ],
-          "rule": "entra-configured/2/application-permission",
+          "rule": "entra-configured/3/application-permission",
         },
       ],
-      "engineVersion": "1.0.1",
+      "engineVersion": "1.0.2",
       "evidenceClass": "configured",
       "facts": [
         {
@@ -152,7 +152,7 @@ exports[`version 1 evidence format compatibility > preserves contract failures a
         "resourceId": "resource",
         "tenantId": "synthetic-tenant",
       },
-      "ruleVersion": "entra-configured/2",
+      "ruleVersion": "entra-configured/3",
       "snapshotIds": [
         "synthetic-snapshot",
       ],
@@ -177,7 +177,7 @@ exports[`version 1 evidence format compatibility > preserves contract failures a
       "2026-10-08T12:00:00.000Z",
     ],
     "contractId": "only-production",
-    "engineVersion": "1.0.1",
+    "engineVersion": "1.0.2",
     "limits": {
       "exhausted": false,
       "maxSteps": 250000,
@@ -185,7 +185,7 @@ exports[`version 1 evidence format compatibility > preserves contract failures a
     },
     "missing": [],
     "queries": 1,
-    "ruleVersion": "entra-configured/2",
+    "ruleVersion": "entra-configured/3",
     "snapshotIds": [
       "synthetic-snapshot",
     ],
@@ -217,7 +217,7 @@ exports[`version 1 evidence format compatibility > preserves contract failures a
             "inputs": [
               "relationship:rogue-grant",
             ],
-            "rule": "entra-configured/2/CAN_CALL_AS_APP",
+            "rule": "entra-configured/3/CAN_CALL_AS_APP",
           },
           {
             "conclusion": "supported",
@@ -229,10 +229,10 @@ exports[`version 1 evidence format compatibility > preserves contract failures a
               "object:resource",
               "object:rogue",
             ],
-            "rule": "entra-configured/2/application-permission",
+            "rule": "entra-configured/3/application-permission",
           },
         ],
-        "engineVersion": "1.0.1",
+        "engineVersion": "1.0.2",
         "evidenceClass": "configured",
         "facts": [
           {
@@ -319,7 +319,7 @@ exports[`version 1 evidence format compatibility > preserves contract failures a
           "resourceId": "resource",
           "tenantId": "synthetic-tenant",
         },
-        "ruleVersion": "entra-configured/2",
+        "ruleVersion": "entra-configured/3",
         "snapshotIds": [
           "synthetic-snapshot",
         ],
@@ -337,7 +337,7 @@ exports[`version 1 evidence format compatibility > preserves contract failures a
       "2026-10-08T12:00:00.000Z",
     ],
     "contractId": "only-production",
-    "engineVersion": "1.0.1",
+    "engineVersion": "1.0.2",
     "limits": {
       "exhausted": false,
       "maxSteps": 250000,
@@ -345,7 +345,7 @@ exports[`version 1 evidence format compatibility > preserves contract failures a
     },
     "missing": [],
     "queries": 0,
-    "ruleVersion": "entra-configured/2",
+    "ruleVersion": "entra-configured/3",
     "snapshotIds": [
       "synthetic-snapshot",
     ],
@@ -372,14 +372,14 @@ exports[`version 1 evidence format compatibility > preserves minimized policy sc
     "2026-10-08T12:00:00.000Z",
   ],
   "domainSize": 16,
-  "engineVersion": "1.0.1",
+  "engineVersion": "1.0.2",
   "limits": {
     "exhausted": false,
     "maxSteps": 10000,
     "steps": 16,
   },
   "missing": [],
-  "ruleVersion": "entra-configured/2",
+  "ruleVersion": "entra-configured/3",
   "snapshotIds": [
     "synthetic-snapshot",
   ],
@@ -426,7 +426,7 @@ exports[`version 1 evidence format compatibility > preserves planning alternativ
   "collectedAt": [
     "2026-10-08T12:00:00.000Z",
   ],
-  "engineVersion": "1.0.1",
+  "engineVersion": "1.0.2",
   "limits": {
     "exhausted": false,
     "maxSteps": 100000,
@@ -467,7 +467,7 @@ exports[`version 1 evidence format compatibility > preserves planning alternativ
       "residualPaths": [],
     },
   ],
-  "ruleVersion": "entra-configured/2",
+  "ruleVersion": "entra-configured/3",
   "snapshotIds": [
     "synthetic-snapshot",
   ],
@@ -498,9 +498,9 @@ exports[`version 1 evidence format compatibility > preserves pseudonymized offli
         "object:p000004",
         "relationship:p000002",
       ],
-      "digest": "9bf3e11ec9951d096809c0576b50613061699aeacbbc892cfae26c853d16f9c7",
-      "engineVersion": "1.0.1",
-      "ruleVersion": "entra-configured/2",
+      "digest": "0cd35b30bb859c2f035119d88a18371def7df6a1965bc4f7828ecad424638593",
+      "engineVersion": "1.0.2",
+      "ruleVersion": "entra-configured/3",
     },
     "proof": {
       "assumptions": [
@@ -526,7 +526,7 @@ exports[`version 1 evidence format compatibility > preserves pseudonymized offli
           "inputs": [
             "relationship:p000002",
           ],
-          "rule": "entra-configured/2/CAN_CALL_AS_APP",
+          "rule": "entra-configured/3/CAN_CALL_AS_APP",
         },
         {
           "conclusion": "supported",
@@ -538,10 +538,10 @@ exports[`version 1 evidence format compatibility > preserves pseudonymized offli
             "object:p000001",
             "object:p000004",
           ],
-          "rule": "entra-configured/2/application-permission",
+          "rule": "entra-configured/3/application-permission",
         },
       ],
-      "engineVersion": "1.0.1",
+      "engineVersion": "1.0.2",
       "evidenceClass": "configured",
       "facts": [
         {
@@ -628,7 +628,7 @@ exports[`version 1 evidence format compatibility > preserves pseudonymized offli
         "resourceId": "p000004",
         "tenantId": "p000006",
       },
-      "ruleVersion": "entra-configured/2",
+      "ruleVersion": "entra-configured/3",
       "snapshotIds": [
         "p000005",
       ],
@@ -777,7 +777,7 @@ exports[`version 1 evidence format compatibility > preserves the public proof fi
       "inputs": [
         "relationship:role-link",
       ],
-      "rule": "entra-configured/2/ACTIVE_IN_ROLE",
+      "rule": "entra-configured/3/ACTIVE_IN_ROLE",
     },
     {
       "conclusion": "supported",
@@ -790,10 +790,10 @@ exports[`version 1 evidence format compatibility > preserves the public proof fi
         "object:person",
         "object:role",
       ],
-      "rule": "entra-configured/2/active-role",
+      "rule": "entra-configured/3/active-role",
     },
   ],
-  "engineVersion": "1.0.1",
+  "engineVersion": "1.0.2",
   "evidenceClass": "configured",
   "facts": [
     {
@@ -894,7 +894,7 @@ exports[`version 1 evidence format compatibility > preserves the public proof fi
     "resourceId": "role",
     "tenantId": "synthetic-tenant",
   },
-  "ruleVersion": "entra-configured/2",
+  "ruleVersion": "entra-configured/3",
   "snapshotIds": [
     "synthetic-snapshot",
   ],
@@ -928,7 +928,7 @@ exports[`version 1 evidence format compatibility > preserves the public proof fi
       "inputs": [
         "relationship:grant",
       ],
-      "rule": "entra-configured/2/CAN_CALL_AS_APP",
+      "rule": "entra-configured/3/CAN_CALL_AS_APP",
     },
     {
       "conclusion": "supported",
@@ -940,10 +940,10 @@ exports[`version 1 evidence format compatibility > preserves the public proof fi
         "object:client",
         "object:resource",
       ],
-      "rule": "entra-configured/2/application-permission",
+      "rule": "entra-configured/3/application-permission",
     },
   ],
-  "engineVersion": "1.0.1",
+  "engineVersion": "1.0.2",
   "evidenceClass": "configured",
   "facts": [
     {
@@ -1030,7 +1030,7 @@ exports[`version 1 evidence format compatibility > preserves the public proof fi
     "resourceId": "resource",
     "tenantId": "synthetic-tenant",
   },
-  "ruleVersion": "entra-configured/2",
+  "ruleVersion": "entra-configured/3",
   "snapshotIds": [
     "synthetic-snapshot",
   ],
@@ -1066,10 +1066,10 @@ exports[`version 1 evidence format compatibility > preserves the public proof fi
         "object:client",
         "object:resource",
       ],
-      "rule": "entra-configured/2/application-permission",
+      "rule": "entra-configured/3/application-permission",
     },
   ],
-  "engineVersion": "1.0.1",
+  "engineVersion": "1.0.2",
   "evidenceClass": "configured",
   "facts": [
     {
@@ -1139,7 +1139,7 @@ exports[`version 1 evidence format compatibility > preserves the public proof fi
     "resourceId": "resource",
     "tenantId": "synthetic-tenant",
   },
-  "ruleVersion": "entra-configured/2",
+  "ruleVersion": "entra-configured/3",
   "snapshotIds": [
     "synthetic-snapshot",
   ],
@@ -1184,10 +1184,10 @@ exports[`version 1 evidence format compatibility > preserves the public proof fi
         "object:client",
         "object:resource",
       ],
-      "rule": "entra-configured/2/application-permission",
+      "rule": "entra-configured/3/application-permission",
     },
   ],
-  "engineVersion": "1.0.1",
+  "engineVersion": "1.0.2",
   "evidenceClass": "configured",
   "facts": [
     {
@@ -1257,7 +1257,7 @@ exports[`version 1 evidence format compatibility > preserves the public proof fi
     "resourceId": "resource",
     "tenantId": "synthetic-tenant",
   },
-  "ruleVersion": "entra-configured/2",
+  "ruleVersion": "entra-configured/3",
   "snapshotIds": [
     "synthetic-snapshot",
   ],
@@ -1295,7 +1295,7 @@ exports[`version 1 evidence format compatibility > preserves the public proof fi
       "inputs": [
         "relationship:consent",
       ],
-      "rule": "entra-configured/2/CAN_CALL_DELEGATED",
+      "rule": "entra-configured/3/CAN_CALL_DELEGATED",
     },
     {
       "conclusion": "supported",
@@ -1309,10 +1309,10 @@ exports[`version 1 evidence format compatibility > preserves the public proof fi
         "object:person",
         "object:resource",
       ],
-      "rule": "entra-configured/2/delegated-permission",
+      "rule": "entra-configured/3/delegated-permission",
     },
   ],
-  "engineVersion": "1.0.1",
+  "engineVersion": "1.0.2",
   "evidenceClass": "configured",
   "facts": [
     {
@@ -1425,7 +1425,7 @@ exports[`version 1 evidence format compatibility > preserves the public proof fi
     "tenantId": "synthetic-tenant",
     "userId": "person",
   },
-  "ruleVersion": "entra-configured/2",
+  "ruleVersion": "entra-configured/3",
   "snapshotIds": [
     "synthetic-snapshot",
   ],
@@ -1466,7 +1466,7 @@ exports[`version 1 evidence format compatibility > preserves the public proof fi
       "inputs": [
         "relationship:member",
       ],
-      "rule": "entra-configured/2/MEMBER_OF",
+      "rule": "entra-configured/3/MEMBER_OF",
     },
     {
       "conclusion": "Recorded ASSIGNED_TO: team → resource.",
@@ -1475,7 +1475,7 @@ exports[`version 1 evidence format compatibility > preserves the public proof fi
         "relationship:assignment",
         "path:0:step:0",
       ],
-      "rule": "entra-configured/2/ASSIGNED_TO",
+      "rule": "entra-configured/3/ASSIGNED_TO",
     },
     {
       "conclusion": "supported",
@@ -1490,10 +1490,10 @@ exports[`version 1 evidence format compatibility > preserves the public proof fi
         "object:resource",
         "object:team",
       ],
-      "rule": "entra-configured/2/assignment",
+      "rule": "entra-configured/3/assignment",
     },
   ],
-  "engineVersion": "1.0.1",
+  "engineVersion": "1.0.2",
   "evidenceClass": "configured",
   "facts": [
     {
@@ -1632,7 +1632,7 @@ exports[`version 1 evidence format compatibility > preserves the public proof fi
     "resourceId": "resource",
     "tenantId": "synthetic-tenant",
   },
-  "ruleVersion": "entra-configured/2",
+  "ruleVersion": "entra-configured/3",
   "snapshotIds": [
     "synthetic-snapshot",
   ],
@@ -1669,7 +1669,7 @@ exports[`version 1 evidence format compatibility > preserves the public proof fi
       "inputs": [
         "relationship:role-link",
       ],
-      "rule": "entra-configured/2/ELIGIBLE_FOR_ROLE",
+      "rule": "entra-configured/3/ELIGIBLE_FOR_ROLE",
     },
     {
       "conclusion": "supported",
@@ -1682,10 +1682,10 @@ exports[`version 1 evidence format compatibility > preserves the public proof fi
         "object:person",
         "object:role",
       ],
-      "rule": "entra-configured/2/eligible-role",
+      "rule": "entra-configured/3/eligible-role",
     },
   ],
-  "engineVersion": "1.0.1",
+  "engineVersion": "1.0.2",
   "evidenceClass": "configured",
   "facts": [
     {
@@ -1786,7 +1786,7 @@ exports[`version 1 evidence format compatibility > preserves the public proof fi
     "resourceId": "role",
     "tenantId": "synthetic-tenant",
   },
-  "ruleVersion": "entra-configured/2",
+  "ruleVersion": "entra-configured/3",
   "snapshotIds": [
     "synthetic-snapshot",
   ],
@@ -1831,7 +1831,7 @@ exports[`version 1 evidence format compatibility > preserves the public proof fi
       "inputs": [
         "relationship:trust-to-app",
       ],
-      "rule": "entra-configured/2/FEDERATES_AS",
+      "rule": "entra-configured/3/FEDERATES_AS",
     },
     {
       "conclusion": "Recorded INSTANTIATES_AS: blueprint → client.",
@@ -1840,7 +1840,7 @@ exports[`version 1 evidence format compatibility > preserves the public proof fi
         "relationship:instance",
         "path:0:step:0",
       ],
-      "rule": "entra-configured/2/INSTANTIATES_AS",
+      "rule": "entra-configured/3/INSTANTIATES_AS",
     },
     {
       "conclusion": "Recorded CAN_CALL_AS_APP: client → resource.",
@@ -1849,7 +1849,7 @@ exports[`version 1 evidence format compatibility > preserves the public proof fi
         "relationship:grant",
         "path:0:step:1",
       ],
-      "rule": "entra-configured/2/CAN_CALL_AS_APP",
+      "rule": "entra-configured/3/CAN_CALL_AS_APP",
     },
     {
       "conclusion": "supported",
@@ -1866,10 +1866,10 @@ exports[`version 1 evidence format compatibility > preserves the public proof fi
         "object:resource",
         "object:trust",
       ],
-      "rule": "entra-configured/2/control-path",
+      "rule": "entra-configured/3/control-path",
     },
   ],
-  "engineVersion": "1.0.1",
+  "engineVersion": "1.0.2",
   "evidenceClass": "inferred",
   "facts": [
     {
@@ -2047,7 +2047,7 @@ exports[`version 1 evidence format compatibility > preserves the public proof fi
     "resourceId": "resource",
     "tenantId": "synthetic-tenant",
   },
-  "ruleVersion": "entra-configured/2",
+  "ruleVersion": "entra-configured/3",
   "snapshotIds": [
     "synthetic-snapshot",
   ],
@@ -2083,10 +2083,10 @@ exports[`version 1 evidence format compatibility > preserves the public proof fi
         "object:client",
         "object:resource",
       ],
-      "rule": "entra-configured/2/application-permission",
+      "rule": "entra-configured/3/application-permission",
     },
   ],
-  "engineVersion": "1.0.1",
+  "engineVersion": "1.0.2",
   "evidenceClass": "configured",
   "facts": [
     {
@@ -2155,7 +2155,7 @@ exports[`version 1 evidence format compatibility > preserves the public proof fi
     "resourceId": "resource",
     "tenantId": "synthetic-tenant",
   },
-  "ruleVersion": "entra-configured/2",
+  "ruleVersion": "entra-configured/3",
   "snapshotIds": [
     "synthetic-snapshot",
   ],
@@ -2198,7 +2198,7 @@ exports[`version 1 evidence format compatibility > preserves the public proof fi
       "inputs": [
         "relationship:owner",
       ],
-      "rule": "entra-configured/2/OWNS",
+      "rule": "entra-configured/3/OWNS",
     },
     {
       "conclusion": "Recorded CAN_CALL_AS_APP: client → resource.",
@@ -2207,7 +2207,7 @@ exports[`version 1 evidence format compatibility > preserves the public proof fi
         "relationship:grant",
         "path:0:step:0",
       ],
-      "rule": "entra-configured/2/CAN_CALL_AS_APP",
+      "rule": "entra-configured/3/CAN_CALL_AS_APP",
     },
     {
       "conclusion": "supported",
@@ -2223,10 +2223,10 @@ exports[`version 1 evidence format compatibility > preserves the public proof fi
         "object:person",
         "object:resource",
       ],
-      "rule": "entra-configured/2/control-path",
+      "rule": "entra-configured/3/control-path",
     },
   ],
-  "engineVersion": "1.0.1",
+  "engineVersion": "1.0.2",
   "evidenceClass": "inferred",
   "facts": [
     {
@@ -2378,7 +2378,7 @@ exports[`version 1 evidence format compatibility > preserves the public proof fi
     "resourceId": "resource",
     "tenantId": "synthetic-tenant",
   },
-  "ruleVersion": "entra-configured/2",
+  "ruleVersion": "entra-configured/3",
   "snapshotIds": [
     "synthetic-snapshot",
   ],
@@ -2398,7 +2398,7 @@ exports[`version 1 evidence format compatibility > preserves time windows, uncer
     "2026-10-08T12:00:00.000Z",
     "2026-10-10T12:00:00.000Z",
   ],
-  "engineVersion": "1.0.1",
+  "engineVersion": "1.0.2",
   "limits": {
     "exhausted": false,
     "maxSteps": 100000,
@@ -2431,7 +2431,7 @@ exports[`version 1 evidence format compatibility > preserves time windows, uncer
       "validity": "overlap",
     },
   ],
-  "ruleVersion": "entra-configured/2",
+  "ruleVersion": "entra-configured/3",
   "snapshotIds": [
     "later",
     "synthetic-snapshot",
@@ -2693,7 +2693,7 @@ exports[`version 1 evidence format compatibility > projects allowlisted facts an
       "type": "CAN_CALL_AS_APP",
     },
   ],
-  "engineVersion": "1.0.1",
+  "engineVersion": "1.0.2",
   "nodes": [
     {
       "description": "",
@@ -2879,7 +2879,7 @@ exports[`version 1 evidence format compatibility > projects allowlisted facts an
       "tenantId": "synthetic-tenant",
     },
   ],
-  "ruleVersion": "entra-configured/2",
+  "ruleVersion": "entra-configured/3",
   "snapshotIds": [
     "synthetic-snapshot",
   ],
@@ -2907,9 +2907,9 @@ exports[`version 1 evidence format compatibility > projects allowlisted facts an
         "object:resource",
         "relationship:grant",
       ],
-      "digest": "1871032c8e6c1e514371131e28be15316a3f8946cd23f02884e89d3d0173a376",
-      "engineVersion": "1.0.1",
-      "ruleVersion": "entra-configured/2",
+      "digest": "eb204b5db159aab7a3a04091c90fe7994c551df4301676a0d2a9a8cbd27e7be0",
+      "engineVersion": "1.0.2",
+      "ruleVersion": "entra-configured/3",
     },
     "proof": {
       "assumptions": [
@@ -2935,7 +2935,7 @@ exports[`version 1 evidence format compatibility > projects allowlisted facts an
           "inputs": [
             "relationship:grant",
           ],
-          "rule": "entra-configured/2/CAN_CALL_AS_APP",
+          "rule": "entra-configured/3/CAN_CALL_AS_APP",
         },
         {
           "conclusion": "supported",
@@ -2947,10 +2947,10 @@ exports[`version 1 evidence format compatibility > projects allowlisted facts an
             "object:client",
             "object:resource",
           ],
-          "rule": "entra-configured/2/application-permission",
+          "rule": "entra-configured/3/application-permission",
         },
       ],
-      "engineVersion": "1.0.1",
+      "engineVersion": "1.0.2",
       "evidenceClass": "configured",
       "facts": [
         {
@@ -3037,7 +3037,7 @@ exports[`version 1 evidence format compatibility > projects allowlisted facts an
         "resourceId": "resource",
         "tenantId": "synthetic-tenant",
       },
-      "ruleVersion": "entra-configured/2",
+      "ruleVersion": "entra-configured/3",
       "snapshotIds": [
         "synthetic-snapshot",
       ],
@@ -3171,7 +3171,7 @@ exports[`version 1 evidence format compatibility > retains declared deployment i
   "collectedAt": [
     "2026-10-08T12:00:00.000Z",
   ],
-  "engineVersion": "1.0.1",
+  "engineVersion": "1.0.2",
   "intervals": [
     {
       "credentials": [
@@ -3211,7 +3211,7 @@ exports[`version 1 evidence format compatibility > retains declared deployment i
     "steps": 3,
   },
   "missing": [],
-  "ruleVersion": "entra-configured/2",
+  "ruleVersion": "entra-configured/3",
   "snapshotIds": [
     "synthetic-snapshot",
   ],
@@ -3277,7 +3277,7 @@ exports[`version 1 evidence format compatibility > retains distinct overlap, mis
       "witness": null,
     },
   ],
-  "engineVersion": "1.0.1",
+  "engineVersion": "1.0.2",
   "limits": {
     "exhausted": false,
     "maxSteps": 20000,
@@ -3286,7 +3286,7 @@ exports[`version 1 evidence format compatibility > retains distinct overlap, mis
   "missing": [
     "object:trust-4:exact-trust",
   ],
-  "ruleVersion": "entra-configured/2",
+  "ruleVersion": "entra-configured/3",
   "snapshotIds": [
     "synthetic-snapshot",
   ],
@@ -3307,7 +3307,7 @@ exports[`version 1 evidence format compatibility > retains unknown read prerequi
   "collectedAt": [
     "2026-10-08T12:00:00.000Z",
   ],
-  "engineVersion": "1.0.1",
+  "engineVersion": "1.0.2",
   "limits": {
     "exhausted": false,
     "maxSteps": 100000,
@@ -3341,7 +3341,7 @@ exports[`version 1 evidence format compatibility > retains unknown read prerequi
       ],
     },
   ],
-  "ruleVersion": "entra-configured/2",
+  "ruleVersion": "entra-configured/3",
   "snapshotIds": [
     "synthetic-snapshot",
   ],

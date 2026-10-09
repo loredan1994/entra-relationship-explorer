@@ -135,3 +135,22 @@ it("limits prior context to 5000 distinct findings after de-duplication", async 
   const ids = [...Array(5000).fill("duplicate") as string[], ...Array.from({ length: 4998 }, (_, i) => `absent-${i}`), "last", "overflow"];
   expect(await backend.priorThreatReviews("alpha", "current", ids)).toEqual([expect.objectContaining({ findingId: "last" })]);
 });
+it("reads current decisions in one tenant/snapshot scope, in requested order, without aliases", async () => {
+  const { snapshot } = await publish("reviewed", 30 * DAY);
+  const first = await backend.upsertThreatReview(review(snapshot, "first"), null, null);
+  const second = await backend.upsertThreatReview(review(snapshot, "second"), null, null);
+  await backend.upsertThreatReview(review(snapshot, "unrequested"), null, null);
+  const { snapshot: newer } = await publish("newer");
+  await backend.upsertThreatReview({ ...review(newer, "first"), owner: "Different scan" }, null, null);
+  expect(await backend.currentThreatReviews("alpha", snapshot.id, ["second", "missing", "first", "second", ""])).toEqual([second, first]);
+  expect(await backend.currentThreatReviews("alpha", snapshot.id, [])).toEqual([]);
+  expect(await backend.currentThreatReviews("alpha", "missing", ["first"])).toEqual([]);
+  expect(await backend.currentThreatReviews("foreign", snapshot.id, ["first"])).toEqual([]);
+  const returned = await backend.currentThreatReviews("alpha", snapshot.id, ["first"]);
+  returned[0]!.owner = "Mutated caller copy";
+  expect(await backend.currentThreatReviews("alpha", snapshot.id, ["first"])).toEqual([first]);
+  vi.setSystemTime(NOW + 1);
+  expect(await backend.currentThreatReviews("alpha", snapshot.id, ["first"])).toEqual([]);
+  expect(await backend.currentThreatReviews("alpha", newer.id, ["first"])).toEqual([expect.objectContaining({ owner: "Different scan" })]);
+  await expect(backend.currentThreatReviews("alpha", newer.id, Array.from({ length: 10_001 }, (_, i) => `finding-${i}`))).rejects.toThrow("at most 10,000");
+});

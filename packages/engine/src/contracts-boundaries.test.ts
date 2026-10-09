@@ -38,7 +38,7 @@ it("checks only unapproved application grants to the selected resource", () => {
 });
 it("never passes a contract by selecting the allowed variant of a conflicting record", () => {
   const s = snapshot(); s.nodes.push(node("z-rogue"));
-  s.edges.push({ ...s.edges[0]!, sourceId: "z-rogue" });
+  s.edges.push(edge("grant", "z-rogue", "resource"));
   const result = evaluateContract(compileSnapshot(s), { ...only, allowedPrincipalIds: ["client"] });
   expect(result.status).toBe("unknown"); expect(result.verdict).toBe("unknown"); expect(result.missing).toContain("relationship:grant");
 });

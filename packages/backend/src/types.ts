@@ -102,6 +102,7 @@ export interface Backend {
   recordAccess(tenantId: string, sessionId: string | null, action: string, resourceType: string, resourceId?: string): Promise<void>;
   recentAccessEvents(tenantId: string, limit?: number): Promise<AccessEvent[]>;
   getThreatReview(tenantId: string, snapshotId: string, findingId: string): Promise<ThreatReview | null>;
+  currentThreatReviews(tenantId: string, snapshotId: string, findingIds: readonly string[]): Promise<ThreatReview[]>;
   priorThreatReviews(tenantId: string, currentSnapshotId: string, findingIds: string[]): Promise<ThreatReview[]>;
   upsertThreatReview(review: ThreatReview, sessionId: string | null, expectedRevision?: string | null): Promise<ThreatReview>;
   close(): Promise<void>;

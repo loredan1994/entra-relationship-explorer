@@ -52,11 +52,29 @@ export async function loadSnapshotHistory(limit = 10): Promise<TenantSnapshot[]>
   return (await loadSnapshotContext(limit)).history;
 }
 
-export async function loadPriorThreatReviews(snapshot: TenantSnapshot, findingIds: string[]): Promise<ThreatReview[]> {
+export type ThreatReviewSummary = Pick<ThreatReview, "findingId" | "disposition" | "expiresAt">;
+
+export async function loadThreatReviewContext(snapshot: TenantSnapshot, findingIds: string[]): Promise<{ currentReviews: ThreatReviewSummary[]; priorReviews: ThreatReview[] }> {
   const config = getEntraConfig();
-  if (!config.enabled || snapshot.mode !== "tenant" || findingIds.length === 0) return [];
+  if (!config.enabled || snapshot.mode !== "tenant" || findingIds.length === 0) return { currentReviews: [], priorReviews: [] };
   const cookieStore = await cookies();
   const session = await getServerSession(cookieStore.get(SESSION_COOKIE)?.value, config);
-  if (!session || session.tenantId !== config.tenantId || session.tenantId !== snapshot.tenant.tenantId) return [];
-  return (await getBackend(config)).priorThreatReviews(session.tenantId, snapshot.id, findingIds);
+  if (!session || session.tenantId !== config.tenantId || session.tenantId !== snapshot.tenant.tenantId) return { currentReviews: [], priorReviews: [] };
+  const backend = await getBackend(config);
+  const currentReviews: ThreatReviewSummary[] = [], priorReviews: ThreatReview[] = [];
+  const ids = [...new Set(findingIds)];
+  // Keep each read bounded without silently omitting findings in large tenants.
+  // At most two database reads run concurrently, independent of inventory size.
+  for (let start = 0; start < ids.length; start += 5_000) {
+    const batch = ids.slice(start, start + 5_000);
+    const [current, prior] = await Promise.all([
+      backend.currentThreatReviews(session.tenantId, snapshot.id, batch),
+      backend.priorThreatReviews(session.tenantId, snapshot.id, batch),
+    ]);
+    currentReviews.push(...current.map(({ findingId, disposition, expiresAt }) => ({ findingId, disposition, expiresAt })));
+    priorReviews.push(...prior);
+  }
+  // Queue summaries omit notes, owners, flow drafts and edit revisions. Opening
+  // a finding still loads its current record before editing or saving it.
+  return { currentReviews, priorReviews };
 }

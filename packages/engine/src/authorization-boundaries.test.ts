@@ -24,7 +24,7 @@ it.each(["FEDERATES_AS", "INSTANTIATES_AS"] as const)("composes only typed %s co
   for (const source of kinds) for (const target of kinds) {
     const s = snapshot([edge("hop", "a", "b", type), edge("grant", "b", "resource")]); s.nodes.push(node("a", source), node("b", target));
     // A blueprint needs an instantiation step before a permission grant.
-    if (target === "application") { s.edges[1]!.sourceId = "client"; s.edges.push(edge("instance", "b", "client", "INSTANTIATES_AS")); }
+    if (target === "application") { s.edges[1] = edge("grant", "client", "resource"); s.edges.push(edge("instance", "b", "client", "INSTANTIATES_AS")); }
     const allowed = type === "FEDERATES_AS" ? source === "federatedCredential" && ["application", "managedIdentity"].includes(target) : source === "application" && ["servicePrincipal", "managedIdentity"].includes(target);
     expect(evaluateAuthorization(compileSnapshot(s), { ...query, principalId: "a", kind: "control-path" }).verdict).toBe(allowed ? "supported" : "refuted");
   }

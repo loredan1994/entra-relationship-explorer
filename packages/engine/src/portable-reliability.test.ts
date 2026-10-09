@@ -82,11 +82,15 @@ it("pseudonymizes a complete escaped non-GUID identifier without splitting its c
   expect((await verifyInvestigation(canonical(result.package))).verified).toBe(true);
 });
 
-it("pseudonymizes explicit evidence object IDs even when they differ from graph endpoints", async () => {
+it("pseudonymizes explicit evidence object IDs consistently with graph endpoints", async () => {
   const s = snapshot();
+  s.nodes[0]!.id = "source-record-object";
+  s.nodes[1]!.id = guid;
+  s.edges[0]!.sourceId = "source-record-object";
+  s.edges[0]!.targetId = guid;
   s.edges[0]!.evidence.sourceObjectId = "source-record-object";
   s.edges[0]!.evidence.targetObjectId = guid;
-  const result = await exportInvestigation(compileSnapshot(s), query, "pseudonymized");
+  const result = await exportInvestigation(compileSnapshot(s), { ...query, principalId: "source-record-object", resourceId: guid }, "pseudonymized");
   const text = canonical(result.package);
   expect(text).not.toContain("source-record-object");
   expect(text).not.toContain(guid);

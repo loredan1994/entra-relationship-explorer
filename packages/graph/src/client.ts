@@ -19,6 +19,19 @@ export interface ReadOnlyGraphClientOptions {
 }
 
 export type AccessTokenProvider = string | (() => Promise<string>);
+/** Rejects when the caller no longer owns or wants this read; never retried as a transport failure. */
+export type GraphReadGuard = () => Promise<void>;
+
+/** SDK middleware options are scoped to one request, including its token refresh. */
+class ReadGuardOptions {
+  interruption?: { reason: unknown };
+  constructor(private readonly checkActive?: GraphReadGuard) {}
+
+  async verify(): Promise<void> {
+    try { await this.checkActive?.(); }
+    catch (reason) { this.interruption = { reason }; throw reason; }
+  }
+}
 
 export class GraphRequestError extends Error {
   constructor(
@@ -69,14 +82,14 @@ export class ReadOnlyGraphClient {
     return { maxPagesPerEndpoint: this.maxPages, maxItemsPerEndpoint: this.maxItems };
   }
 
-  async getAll<T>(endpoint: string, onPage?: (totalItems: number) => void): Promise<T[]> {
+  async getAll<T>(endpoint: string, onPage?: (totalItems: number) => void, checkActive?: GraphReadGuard): Promise<T[]> {
     let nextUrl: string | undefined = this.resolveGraphUrl(endpoint);
     const items: T[] = [];
     let pages = 0;
 
     while (nextUrl) {
       if (++pages > this.maxPages) throw new GraphRequestError(0, "page_limit", endpoint);
-      const page: GraphPage<T> = await this.getPage<T>(nextUrl);
+      const page: GraphPage<T> = await this.getPage<T>(nextUrl, checkActive);
       if (!Array.isArray(page.value)) throw new GraphRequestError(0, "invalid_collection", endpoint);
       if (items.length + page.value.length > this.maxItems) throw new GraphRequestError(0, "item_limit", endpoint);
       // Collections can exceed the runtime's function-argument limit; never spread a page into push.
@@ -88,31 +101,41 @@ export class ReadOnlyGraphClient {
     return items;
   }
 
-  async getOne<T>(endpoint: string): Promise<T> {
-    return this.getJson<T>(this.resolveGraphUrl(endpoint), endpoint);
+  async getOne<T>(endpoint: string, checkActive?: GraphReadGuard): Promise<T> {
+    return this.getJson<T>(this.resolveGraphUrl(endpoint), endpoint, checkActive);
   }
 
-  private async getPage<T>(url: string): Promise<GraphPage<T>> {
-    return this.getJson<GraphPage<T>>(url, new URL(this.resolveGraphUrl(url)).pathname);
+  private async getPage<T>(url: string, checkActive?: GraphReadGuard): Promise<GraphPage<T>> {
+    return this.getJson<GraphPage<T>>(url, new URL(this.resolveGraphUrl(url)).pathname, checkActive);
   }
 
-  private async getJson<T>(url: string, endpoint: string): Promise<T> {
+  private async getJson<T>(url: string, endpoint: string, checkActive?: GraphReadGuard): Promise<T> {
     const safeUrl = this.resolveGraphUrl(url);
 
     for (let attempt = 0; attempt <= this.maxRetries; attempt++) {
+      await checkActive?.();
+      const readGuard = new ReadGuardOptions(checkActive);
       let response: Response;
       try {
-        response = await this.sdkClient.api(safeUrl).responseType(ResponseType.RAW).get() as Response;
+        response = await this.sdkClient.api(safeUrl).middlewareOptions([readGuard]).responseType(ResponseType.RAW).get() as Response;
       } catch {
+        // The SDK wraps middleware errors. Preserve the caller's original stop reason.
+        if (readGuard.interruption) throw readGuard.interruption.reason;
+        await checkActive?.();
         if (attempt >= this.maxRetries) throw new GraphRequestError(0, "network_error", endpoint);
-        await this.waitBeforeRetry(safeUrl, 0, attempt, null);
+        await this.waitBeforeRetry(safeUrl, 0, attempt, null, checkActive);
         continue;
       }
 
-      if (response.ok) return response.json() as Promise<T>;
+      await checkActive?.();
+      if (response.ok) {
+        const value = await response.json() as T;
+        await checkActive?.();
+        return value;
+      }
 
       if ([408, 429, 500, 502, 503, 504].includes(response.status) && attempt < this.maxRetries) {
-        await this.waitBeforeRetry(safeUrl, response.status, attempt, response.headers);
+        await this.waitBeforeRetry(safeUrl, response.status, attempt, response.headers, checkActive);
         continue;
       }
 
@@ -123,10 +146,18 @@ export class ReadOnlyGraphClient {
     throw new GraphRequestError(0, "retry_exhausted", endpoint);
   }
 
-  private async waitBeforeRetry(url: string, status: number, attempt: number, headers: Headers | null): Promise<void> {
+  private async waitBeforeRetry(url: string, status: number, attempt: number, headers: Headers | null, checkActive?: GraphReadGuard): Promise<void> {
     const delayMs = Math.min(retryDelay(headers, attempt, this.random), this.maxRetryDelayMs);
     this.onRetry?.({ endpoint: new URL(url).pathname, status, attempt: attempt + 1, delayMs });
-    await this.sleep(delayMs);
+    if (!checkActive) { await this.sleep(delayMs); return; }
+    await checkActive();
+    // A long Retry-After must not prevent cancellation or keep a lost lease alive.
+    for (let remaining = delayMs; remaining > 0;) {
+      const interval = Math.min(remaining, 1_000);
+      await this.sleep(interval);
+      await checkActive();
+      remaining -= interval;
+    }
   }
 
   private resolveGraphUrl(value: string): string {
@@ -156,6 +187,8 @@ export function createReadOnlyMiddleware(options: {
       const method = context.options?.method ?? "GET";
       if (method !== "GET") throw new GraphRequestError(0, "write_method_rejected", new URL(String(context.request)).pathname);
       const token = typeof options.accessToken === "string" ? options.accessToken : await options.accessToken();
+      const readGuard = context.middlewareControl?.getMiddlewareOptions(ReadGuardOptions) as ReadGuardOptions | undefined;
+      await readGuard?.verify();
       if (!token.trim()) throw new Error("token_unavailable");
       context.response = await options.fetchImpl(context.request, {
         ...context.options,
