@@ -39,7 +39,7 @@ Breaking changes are always called out under **Changed** with a migration note.
 
 - Review input limits are enforced explicitly: invalid or oversized fields return HTTP 400 without saving, instead of silently truncating a successful write. Existing documented limits and stored reviews remain compatible.
 - CSV export is available for the synthetic demo. Live exports still require an authenticated tenant and retained snapshot; unavailable exports offer connection/scan guidance.
-- Version the corrected interpretation as engine `1.0.2` / authorization rules `entra-configured/3`. Re-export older portable investigations from their source snapshots; incompatible replay versions are explicitly rejected. Stored snapshots remain readable.
+- Version the corrected interpretation as engine `1.0.3` / authorization rules `entra-configured/4`. Re-export older portable investigations from their source snapshots; incompatible replay versions are explicitly rejected. Stored snapshots remain readable.
 - Cache container dependency installation separately from product sources; exclude package stores and nested environment files from the build context.
 - Load engine history only for workflows that use it, and skip graph layout in table view.
 - Refresh the pinned Node 24 Alpine build image to the reviewed digest from dependency PR #46.
@@ -59,6 +59,13 @@ Breaking changes are always called out under **Changed** with a migration note.
   or from a git-ignored `.env.local`, instead of a hard-coded vault.
 
 ### Fixed
+
+- Bound map rendering to 15 objects and 50 connections after filtering, retain the inspected relationship, and keep the complete inventory in Table. Collapse cycles before assigning columns to prevent unusably wide layouts.
+- Keep review drafts usable when browser storage is denied, full or malformed. Recover valid neighboring drafts independently, report unsaved changes honestly, and support retrying saves and failed live review reads without discarding other edits.
+- Download evidence only after an explicit click. Bind workspace exports to the displayed snapshot and reject a newer scan with HTTP 409 before generating or recording an export. Show session, stale-snapshot and network failures inline while preserving review drafts.
+- Require actual user context for delegated consent and direct user membership for group application assignments. Keep disconnected contradictions out of path proofs, require a complete temporal witness, and prevent credential order from deciding continuity when duplicate metadata conflicts.
+- Reject scan reuse for missing, expired or foreign-tenant sessions. Commit recovered cancellation and unpublished checkpoint deletion atomically so a failed cleanup remains retryable.
+- Retry transient Graph body-read failures after successful response headers through the same bounded read-only loop, preserving cancellation, lease ownership and completed pages. Malformed JSON fails with a sanitized error.
 
 - Make Inspect reveal and focus the selected evidence, including incoming evidence links, with a return action to the matching relationship. Keep the inspector inside desktop/tablet bounds and preserve readable table columns with a reachable Inspect action on narrow screens.
 - Recenter the map on Fit/Home, restore canvas controls after an empty search, reset stale URL filters, and show all filtered relationships when leaving a bounded map for the table.

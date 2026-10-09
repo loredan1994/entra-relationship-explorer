@@ -74,9 +74,9 @@ it("reports exhausted temporal path search even when it found some witnesses", (
   expect(result.paths).toHaveLength(128);
 });
 
-it("retains a complete collected witness when unrelated inventory coverage is partial", () => {
+it("retains a complete collected witness while disclosing partial inventory coverage", () => {
   const s = source(); s.completion.collectors!.find(c => c.id === "federatedIdentityCredentials")!.state = "partial";
-  expect(reconstructPaths([compileSnapshot(s)], q)).toMatchObject({ verdict: "supported", missing: [] });
+  expect(reconstructPaths([compileSnapshot(s)], q)).toMatchObject({ verdict: "supported", missing: ["coverage:federatedIdentityCredentials"] });
 });
 
 it("sorts distinct paths independently of which retained snapshot first records them", () => {

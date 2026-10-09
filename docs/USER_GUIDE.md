@@ -12,6 +12,8 @@ An app registration is the blueprint; an enterprise application (service princip
 
 In the relationship table, **Inspect** brings the selected evidence into view and moves keyboard focus to it. **Back to selected relationship** returns to the matching control. Narrow tables scroll horizontally while keeping the Inspect column reachable. **Fit** or **Home** recenters the graph; switching to **Table** leaves a selected object's one-hop map and shows the complete filtered relationship list.
 
+Map shows at most 15 objects and 50 connections at once. Searches and filters apply before that visual limit; the selected connection stays visible. A scope message states what was omitted. Use **Table** to inspect and page through the complete filtered inventory, including dense parallel grants.
+
 ## Reload the page or collect fresh data
 
 Browser reload reads the latest stored snapshot; it does not start another Microsoft Graph scan. To collect fresh evidence, open **Settings**, sign in if requested, then **Start read-only scan**. Wait for the scan to finish and check its coverage. If your session expires during polling, the tool stops retrying and offers a sign-in action. A reload also discards unsaved in-memory scenario and engine choices.
@@ -60,6 +62,10 @@ The activity collector covers user sign-ins, not complete service-principal/work
 - No hosted multi-tenancy, notification delivery, unattended scan schedule or remediation is provided.
 
 Review drafts allow 20 steps, 500 characters per narrative, a 160-character owner and a 4,000-character rationale. Oversized API writes fail without changing the saved record. When a generated source explanation is longer than an editable narrative, the UI marks its shortened copy and keeps the complete source explanation available. Saved analyst text is never silently cut down. All flow controls pause while a live review is loading or saving.
+
+If browser storage is unavailable, your edits remain usable in the current page and the save warning explains that they are not persisted. **Retry browser save** tries again after storage recovers. Invalid saved demo records are ignored independently so valid neighboring decisions can still load. A failed live review read has **Retry review load**; it does not discard unsaved edits on another finding.
+
+Exports begin only after selecting a download action. Finding, path and CSV downloads are bound to the displayed snapshot. A newer scan requires reviewing the current evidence first; an expired session requires sign-in. Errors appear beside the export action and preserve the open review. Copy any unsaved drafts before deliberately reloading or leaving to sign in.
 
 For rule contributions, use the **Rule laboratory** with synthetic declarative cases and follow [RULE_LAB.md](RULE_LAB.md). For deployment and upgrade procedures, use [LOCAL_OPERATIONS.md](LOCAL_OPERATIONS.md) and [CHANGELOG.md](../CHANGELOG.md).
 

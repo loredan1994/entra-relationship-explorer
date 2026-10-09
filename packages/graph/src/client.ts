@@ -118,20 +118,22 @@ export class ReadOnlyGraphClient {
       let response: Response;
       try {
         response = await this.sdkClient.api(safeUrl).middlewareOptions([readGuard]).responseType(ResponseType.RAW).get() as Response;
-      } catch {
+        await readGuard.verify();
+        if (response.ok) {
+          // Fetch resolves at headers. A connection can still fail or time out
+          // while its body is read; keep that work inside the guarded retry.
+          const value = await response.json() as T;
+          await readGuard.verify();
+          return value;
+        }
+      } catch (error) {
         // The SDK wraps middleware errors. Preserve the caller's original stop reason.
         if (readGuard.interruption) throw readGuard.interruption.reason;
         await checkActive?.();
+        if (error instanceof SyntaxError) throw new GraphRequestError(0, "invalid_json", endpoint);
         if (attempt >= this.maxRetries) throw new GraphRequestError(0, "network_error", endpoint);
         await this.waitBeforeRetry(safeUrl, 0, attempt, null, checkActive);
         continue;
-      }
-
-      await checkActive?.();
-      if (response.ok) {
-        const value = await response.json() as T;
-        await checkActive?.();
-        return value;
       }
 
       if ([408, 429, 500, 502, 503, 504].includes(response.status) && attempt < this.maxRetries) {

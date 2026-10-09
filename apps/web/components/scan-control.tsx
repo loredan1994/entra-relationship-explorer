@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { ExportLink } from "./export-link";
 
 interface JobView {
   id: string;
@@ -56,7 +57,7 @@ async function request(url: string, method: string, signal: AbortSignal, failure
   }
 }
 
-export function ScanControl({ enabled, connected, initialJob, exportAvailable = false }: { enabled: boolean; connected: boolean; initialJob: JobView | null; exportAvailable?: boolean }) {
+export function ScanControl({ enabled, connected, initialJob, exportAvailable = false, snapshotId }: { enabled: boolean; connected: boolean; initialJob: JobView | null; exportAvailable?: boolean; snapshotId?: string }) {
   const [job, setJob] = useState<JobView | null>(initialJob);
   const [busy, setBusy] = useState<"start" | "cancel" | "sign-out" | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -171,7 +172,7 @@ export function ScanControl({ enabled, connected, initialJob, exportAvailable = 
         <div className="scan-actions">
           <button className="button button-primary" type="button" disabled={Boolean(busy) || active} onClick={startScan}>{busy === "start" ? "Starting scan…" : active ? "Scan in progress" : "Start read-only scan"}</button>
           {active ? <button className="button button-secondary" type="button" disabled={Boolean(busy) || job?.status === "cancel_requested"} onClick={cancelScan}>{busy === "cancel" ? "Requesting cancellation…" : job?.status === "cancel_requested" ? "Cancelling safely" : "Cancel scan"}</button> : null}
-          {exportAvailable ? <a className="button button-secondary" href="/api/export/relationships.csv">Export relationship table</a> : <span>Complete a read-only scan to export tenant relationships.</span>}
+          {exportAvailable && snapshotId ? <ExportLink className="button button-secondary" href={`/api/export/relationships.csv?snapshot=${encodeURIComponent(snapshotId)}`}>Export relationship table</ExportLink> : <span>Complete a read-only scan to export tenant relationships.</span>}
           <button className="text-button" type="button" disabled={Boolean(busy)} onClick={signOut}>{busy === "sign-out" ? "Signing out…" : "Sign out"}</button>
         </div>
       )}

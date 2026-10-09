@@ -22,8 +22,10 @@ const { loadExportSnapshot, loadExportSnapshotHistory } = await import("./export
 const liveConfig = { enabled: true, tenantId: TENANT };
 
 /** `null` stands for a request with no session cookie at all; the default is a present one. */
-function request(cookieValue: string | null = "session-cookie"): NextRequest {
-  return { cookies: { get: () => (cookieValue === null ? undefined : { value: cookieValue }) } } as unknown as NextRequest;
+function request(cookieValue: string | null = "session-cookie", snapshot?: string): NextRequest {
+  const nextUrl = new URL("http://localhost/api/export/evidence-packet.json");
+  if (snapshot !== undefined) nextUrl.searchParams.set("snapshot", snapshot);
+  return { nextUrl, cookies: { get: () => (cookieValue === null ? undefined : { value: cookieValue }) } } as unknown as NextRequest;
 }
 
 function tenantSnapshot(id = "snap-1"): TenantSnapshot {
@@ -35,6 +37,7 @@ beforeEach(() => {
   getEntraConfig.mockReturnValue(liveConfig);
   getServerSession.mockResolvedValue({ id: "session-1", tenantId: TENANT });
   recentSnapshots.mockResolvedValue([tenantSnapshot()]);
+  recordAccess.mockResolvedValue(undefined);
 });
 
 describe("demo exports", () => {
@@ -99,6 +102,47 @@ describe("snapshot availability", () => {
     expect(await loadExportSnapshotHistory(request(), "findings_csv")).toEqual([newest, prior]);
     expect(recentSnapshots).toHaveBeenCalledWith(TENANT, 20);
     expect(recordAccess).toHaveBeenCalledWith(TENANT, "session-1", "export", "findings_csv", "snap-newest");
+  });
+});
+
+describe("displayed evidence binding", () => {
+  it("refuses a stale displayed snapshot before recording or generating an export", async () => {
+    recentSnapshots.mockResolvedValue([tenantSnapshot("newer-scan"), tenantSnapshot("displayed-scan")]);
+    const result = await loadExportSnapshotHistory(request("session-cookie", "displayed-scan"), "evidence_packet_json");
+    expect(result).toBeInstanceOf(Response);
+    expect((result as Response).status).toBe(409);
+    expect(await (result as Response).text()).toContain("Reload the workspace");
+    expect(recordAccess).not.toHaveBeenCalled();
+  });
+
+  it("exports the exact displayed snapshot and its history when the binding matches", async () => {
+    const snapshots = [tenantSnapshot("displayed-scan"), tenantSnapshot("previous-scan")];
+    recentSnapshots.mockResolvedValue(snapshots);
+    expect(await loadExportSnapshotHistory(request("session-cookie", "displayed-scan"), "evidence_packet_json")).toEqual(snapshots);
+    expect(recordAccess).toHaveBeenCalledWith(TENANT, "session-1", "export", "evidence_packet_json", "displayed-scan");
+  });
+
+  it("does not treat an explicitly empty snapshot as permission to export the latest scan", async () => {
+    const result = await loadExportSnapshot(request("session-cookie", ""), "attack_flow_json");
+    expect((result as Response).status).toBe(409);
+    expect(recordAccess).not.toHaveBeenCalled();
+  });
+
+  it("requires authentication before revealing that the displayed scan is stale", async () => {
+    getServerSession.mockResolvedValue(null);
+    const result = await loadExportSnapshot(request(null, "stale-scan"), "attack_flow_json");
+    expect((result as Response).status).toBe(401);
+    expect(recentSnapshots).not.toHaveBeenCalled();
+    expect(recordAccess).not.toHaveBeenCalled();
+  });
+
+  it("also rejects a stale sample binding without reading tenant storage", async () => {
+    getEntraConfig.mockReturnValue({ enabled: false });
+    expect(await loadExportSnapshot(request(null, cleanProjectFixture.id), "attack_flow_json")).toBe(cleanProjectFixture);
+    const result = await loadExportSnapshot(request(null, "old-sample"), "attack_flow_json");
+    expect((result as Response).status).toBe(409);
+    expect(recentSnapshots).not.toHaveBeenCalled();
+    expect(recordAccess).not.toHaveBeenCalled();
   });
 });
 

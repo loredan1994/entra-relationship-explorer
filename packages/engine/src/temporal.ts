@@ -1,6 +1,6 @@
 import type { RelationshipEdge } from "@entra-explorer/domain";
 import { canonical, compare, timestamp, unique } from "./canonical";
-import { evaluateAuthorization } from "./authorization";
+import { evaluateAuthorization, pathMissing } from "./authorization";
 import { assertTenant, context } from "./model";
 import type { AuthorizationQuery, EvidenceModel, TimeWindow, WorkflowResult } from "./types";
 
@@ -47,17 +47,25 @@ export function reconstructPaths(history: EvidenceModel[], query: AuthorizationQ
   const ordered = [...history].sort((a, b) => timestamp(a.collectedAt[0]!) - timestamp(b.collectedAt[0]!) || compare(a.snapshotIds[0]!, b.snapshotIds[0]!));
   const groups = new Map<string, TemporalPath>();
   const missing: string[] = [];
-  let steps = 0, exhausted = false;
+  let steps = 0, exhausted = false, uncertain = false, completeWitness = false;
   for (const model of ordered) {
     const proof = evaluateAuthorization(model, query);
     steps += proof.limits.steps; exhausted ||= proof.limits.exhausted;
-    if (proof.verdict === "unknown" || proof.verdict === "conflicting") missing.push(...proof.missing, ...proof.conflicts.map(c => c.factId));
+    missing.push(...proof.missing, ...proof.conflicts.map(c => c.factId));
+    if (proof.verdict === "unknown" || proof.verdict === "conflicting") {
+      uncertain = true;
+    }
     const edgesById = new Map(model.edges.map(edge => [edge.id, edge]));
     for (const path of proof.paths) {
       const edges = path.map(id => edgesById.get(id)!);
       // Same IDs with changed semantics are distinct temporal paths.
       const key = canonical(edges.map(e => ({ id: e.id, type: e.type, source: e.sourceId, target: e.targetId, permissionIds: e.permissionIds, consent: e.consent, scope: e.scope, validity: e.validity })));
       const temporal = groups.get(key) ?? { edges: path, snapshots: [], collectedInstants: [], ...validity(edges), uncertainIntervals: [] };
+      // Authorization can be supported by one complete path while returning
+      // incomplete alternatives. Temporal compatibility needs its own complete
+      // witness; a disjoint complete path cannot validate another path's source.
+      const gaps = pathMissing(query, edges);
+      completeWitness ||= gaps.length === 0 && temporal.validity !== "disjoint";
       temporal.snapshots.push(...model.snapshotIds);
       temporal.collectedInstants.push(...model.collectedAt);
       groups.set(key, temporal);
@@ -69,7 +77,7 @@ export function reconstructPaths(history: EvidenceModel[], query: AuthorizationQ
       uncertainIntervals: instants.slice(1).map((end, i) => ({ startsAt: instants[i]!, endsAt: end })) };
   }).sort((a, b) => compare(canonical(a.edges), canonical(b.edges)));
   return { ...context(ordered[0]!), snapshotIds: unique(ordered.flatMap(m => m.snapshotIds)), collectedAt: unique(ordered.flatMap(m => m.collectedAt)),
-    verdict: exhausted || missing.length ? "unknown" : paths.some(p => p.validity !== "disjoint") ? "supported" : paths.length ? "refuted" : "unknown",
+    verdict: exhausted || uncertain ? "unknown" : completeWitness ? "supported" : missing.length ? "unknown" : paths.length ? "refuted" : "unknown",
     paths, auditContext: "not-used-to-infer-continuity", missing: unique([...missing, ...(!paths.length ? ["path-coexistence-between-observations"] : [])]),
     assumptions: ["A collected-snapshot witness assumes consistency of that scan; collection is not an atomic transaction.", "Source-declared validity intersects as half-open intervals. Repeated observations, event ordering, and missing audit windows do not prove uninterrupted existence."],
     limits: { steps, maxSteps: history.length * 50_000, exhausted } };

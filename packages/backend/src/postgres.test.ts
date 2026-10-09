@@ -618,11 +618,13 @@ describe("statement parameters", () => {
     expect(pool.only("INSERT INTO access_events").params).toEqual([TENANT, "session-1", "enqueue", "scan_job", "job-1"]);
   });
 
-  it("falls back to the tenant's own active job when the insert matched no session", async () => {
+  it("requires the requesting session when falling back to the tenant's active job", async () => {
     const { backend, pool } = backendUnderTest();
     pool.responder = (sql) => (sql.includes("SELECT * FROM scan_jobs WHERE tenant_id=$1 AND status IN") ? rows(jobRow({ status: "running" })) : { rows: [], rowCount: 0 });
     await backend.enqueueScan(TENANT, "session-1");
-    expect(pool.only("SELECT * FROM scan_jobs WHERE tenant_id=$1 AND status IN").params).toEqual([TENANT]);
+    const fallback = pool.only("SELECT * FROM scan_jobs WHERE tenant_id=$1 AND status IN");
+    expect(fallback.params).toEqual([TENANT, "session-1"]);
+    expect(fallback.sql).toContain("EXISTS (SELECT 1 FROM sessions WHERE id=$2 AND tenant_id=$1 AND expires_at>now())");
   });
 
   it("scopes every job read to the tenant or the owning worker", async () => {

@@ -33,8 +33,24 @@ describe("scanTenant", () => {
 
   it("resumes after a completed encrypted-checkpoint boundary without repeating earlier reads", async () => {
     const checkpoint: RawTenantScan = { tenantId: "11111111-1111-4111-8111-111111111111", scannedAt: "2026-08-26T00:00:00.000Z", applications: [], servicePrincipals: [], appRoleAssignments: [], oauth2PermissionGrants: [], applicationOwners: [], servicePrincipalOwners: [], users: [], groups: [], groupMemberships: [], roleDefinitions: [], roleAssignments: [], roleEligibilities: [], conditionalAccessPolicies: [], signIns: [], crossTenantPartners: [], collectedEndpoints: ["/applications"], skippedEndpoints: [], errors: [], completedStages: ["applications"] };
-    const fetchImpl = vi.fn<typeof fetch>().mockResolvedValue(new Response(JSON.stringify({ value: [] }), { status: 200, headers: { "content-type": "application/json" } }));
-    await scanTenant(new ReadOnlyGraphClient("token", { fetchImpl }), checkpoint.tenantId, { concurrency: 1, resumeFrom: checkpoint });
-    expect(fetchImpl.mock.calls.some(([request]) => String(request).includes("/applications?"))).toBe(false);
+    // Each HTTP read owns a fresh body. Reusing a Response would manufacture
+    // body-consumption failures after the first successful collection.
+    const fetchImpl = vi.fn<typeof fetch>(async () => Response.json({ value: [] }));
+    const sleep = vi.fn(async () => {});
+    const scan = await scanTenant(new ReadOnlyGraphClient("token", { fetchImpl, sleep }), checkpoint.tenantId, { concurrency: 1, resumeFrom: checkpoint });
+    expect(fetchImpl.mock.calls.map(([request]) => new URL(String(request)).pathname)).toEqual([
+      "/v1.0/servicePrincipals", "/v1.0/servicePrincipals", "/v1.0/users", "/v1.0/groups",
+      "/v1.0/devices", "/v1.0/directory/administrativeUnits", "/v1.0/oauth2PermissionGrants",
+    ]);
+    expect(scan.errors).toEqual([]);
+    expect(scan.skippedEndpoints).toEqual([]);
+    expect(scan.completedStages).toEqual([
+      "applications", "servicePrincipals", "federatedIdentityCredentials", "usersAndGroups", "groupMemberships",
+      "devices", "administrativeUnits", "delegatedPermissionGrants", "appRoleAssignments", "owners", "roles",
+      "conditionalAccess", "authorizationPolicy", "permissionGrantPolicies", "crossTenantAccess", "activity", "directoryAudits",
+    ]);
+    expect(scan.scannedAt).toBe(checkpoint.scannedAt);
+    expect(checkpoint.completedStages).toEqual(["applications"]);
+    expect(sleep).not.toHaveBeenCalled();
   });
 });

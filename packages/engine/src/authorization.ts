@@ -37,7 +37,24 @@ export function relevantEdges(model: EvidenceModel, query: AuthorizationQuery): 
     ((query.kind === "assignment" || query.kind === "active-role" || query.kind === "eligible-role") && e.targetId === query.resourceId)
   );
   const conflictingIds = new Set(model.conflicts.filter(c => c.factId.startsWith("relationship:") && c.variants.some(v => matches(JSON.parse(v) as RelationshipEdge))).map(c => c.factId));
-  return model.edges.filter(e => matches(e) || conflictingIds.has(`relationship:${e.id}`));
+  const candidates = model.edges.filter(e => matches(e) || conflictingIds.has(`relationship:${e.id}`));
+  if (query.kind !== "control-path" && query.kind !== "membership") return candidates;
+  // Only the source-reachable region can supply (or contradict) a path. Include
+  // every conflicting source variant so canonical ordering cannot hide a hop.
+  const variants = model.conflicts.filter(c => conflictingIds.has(c.factId)).flatMap(c => c.variants.map(v => JSON.parse(v) as RelationshipEdge));
+  const outgoing = new Map<string, RelationshipEdge[]>();
+  for (const edge of [...candidates, ...variants]) {
+    if (!types.includes(edge.type)) continue;
+    const bucket = outgoing.get(edge.sourceId);
+    if (bucket) bucket.push(edge);
+    else outgoing.set(edge.sourceId, [edge]);
+  }
+  const queue = [query.principalId], reached = new Set(queue), included = new Set<string>();
+  for (let index = 0; index < queue.length; index++) for (const edge of outgoing.get(queue[index]!) ?? []) {
+    included.add(edge.id);
+    if (canContinue(query, edge) && !reached.has(edge.targetId)) { reached.add(edge.targetId); queue.push(edge.targetId); }
+  }
+  return candidates.filter(e => included.has(e.id));
 }
 
 export function queryFingerprint(model: EvidenceModel, query: AuthorizationQuery, budget: Budget): string {
@@ -62,8 +79,8 @@ function validStep(nodes: Map<string, EvidenceModel["nodes"][number]>, query: Au
   const source = nodes.get(edge.sourceId);
   const target = nodes.get(edge.targetId);
   if (!source || !target || !edge.evidence.configured) return false;
-  if (query.kind === "delegated-permission") return (source.kind === "servicePrincipal" || source.kind === "managedIdentity") && target.kind === "servicePrincipal";
-  if (edge.type === "MEMBER_OF") return target.kind === "group" && (query.kind === "membership" || path.length === 0);
+  if (query.kind === "delegated-permission") return (!query.userId || nodes.get(query.userId)?.kind === "user") && (source.kind === "servicePrincipal" || source.kind === "managedIdentity") && target.kind === "servicePrincipal";
+  if (edge.type === "MEMBER_OF") return target.kind === "group" && (query.kind === "membership" || path.length === 0) && (query.kind !== "assignment" || source.kind === "user");
   if (query.kind === "assignment") return edge.type === "ASSIGNED_TO" && (source.kind === "user" || source.kind === "group") && target.kind === "servicePrincipal";
   if (query.kind === "active-role" || query.kind === "eligible-role") return ["user", "group", "servicePrincipal", "managedIdentity"].includes(source.kind) && target.kind === "directoryRole" && edge.type === (query.kind === "active-role" ? "ACTIVE_IN_ROLE" : "ELIGIBLE_FOR_ROLE");
   return controlStep(source.kind, target.kind, edge.type);
@@ -122,7 +139,7 @@ function pathsFor(nodes: Map<string, EvidenceModel["nodes"][number]>, query: Aut
   return result;
 }
 
-function pathMissing(query: AuthorizationQuery, path: RelationshipEdge[]): string[] {
+export function pathMissing(query: AuthorizationQuery, path: RelationshipEdge[]): string[] {
   const missing = path.filter(e => e.evidence.completeness !== "complete" || !e.evidence.sourceEndpoint.trim() || !e.evidence.sourceRecordIds.length || e.evidence.sourceRecordIds.some(id => !id.trim())).map(e => `relationship:${e.id}:complete-source`);
   const last = path.at(-1)!;
   if (query.permissionId && !last.permissionIds) missing.push(`relationship:${last.id}:permission-ids`);

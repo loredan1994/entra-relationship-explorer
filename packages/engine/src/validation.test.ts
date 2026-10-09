@@ -134,8 +134,11 @@ it("deep freezing preserves non-object values and does not revisit frozen getter
   for (const primitive of [null, undefined, 1, "text", true]) expect(immutable(primitive)).toBe(primitive);
 });
 it("permits exact inventory capacity through the size check before diagnosing malformed facts", () => {
-  const s = snapshot(); s.nodes = Array(100_000).fill({ ...node("bad"), id: "" });
-  expect(() => compileSnapshot(s)).toThrow("Every fact requires an ID.");
-  s.nodes = []; s.edges = Array(500_000).fill({ ...edge("bad", "a", "b"), id: "" });
-  expect(() => compileSnapshot(s)).toThrow("Every fact requires an ID.");
+  // A malformed first record proves that the capacity guard accepted equality.
+  // Validating 500,000 duplicate records before an unrelated ID error adds no
+  // boundary evidence and can time out under mutation instrumentation.
+  const s = snapshot(); s.nodes = Array(100_000).fill(null);
+  expect(() => compileSnapshot(s)).toThrow("Invalid engine evidence structure or field type.");
+  s.nodes = []; s.edges = Array(500_000).fill(null);
+  expect(() => compileSnapshot(s)).toThrow("Invalid engine evidence structure or field type.");
 });

@@ -28,10 +28,11 @@ Review decisions use a revision check and are serialized with snapshot publicati
 - Concurrent startup migrations acquire a database-wide transaction lock before schema changes and expired-auth cleanup. Other instances wait for the migration to commit; failures roll back and release the lock.
 - A stopped web service does not lose sessions or jobs. Checkpoint writes lock the owning job row so a recovered worker’s progress cannot be overwritten by its predecessor.
 - Cancellation and lost worker ownership are checked between pages and before request dispatch. Retry backoff sleeps are split into intervals of at most one second, with an ownership check after each interval; database latency can delay those checks. An already-running HTTP request retains its bounded timeout.
+- Recovery commits cancellation and deletion of unpublished checkpoints together. If deletion fails, the transaction rolls back and the next recovery poll can retry; it cannot mark cleanup finished while leaving stranded ciphertext.
 - A worker interrupted during a scan leaves its job durable. On startup, jobs whose worker lease has been stale for ten minutes return to the queue.
 
 Removing the named volume is intentionally not part of the normal runbook because that permanently deletes encrypted sessions, snapshots, job history, and access events.
 
 ## Throttling and partial data
 
-The Graph client honors `Retry-After` and `x-ms-retry-after-ms`, uses jittered exponential fallback, retries bounded transient failures, refreshes tokens between pages when necessary, and exposes retry state through the durable job progress. If an endpoint exhausts retries, its evidence is retained as skipped and the snapshot is marked partial rather than presented as complete.
+The Graph client honors `Retry-After` and `x-ms-retry-after-ms`, uses jittered exponential fallback, retries bounded transient failures (including interrupted response bodies after successful headers), refreshes tokens between pages when necessary, and exposes retry state through the durable job progress. If an endpoint exhausts retries, its evidence is retained as skipped and the snapshot is marked partial rather than presented as complete.
