@@ -1,21 +1,13 @@
 import { NextRequest } from "next/server";
 import { relationships } from "@entra-explorer/domain";
-import { getServerSession, SESSION_COOKIE } from "@/server/auth/session-store";
-import { getEntraConfig } from "@/server/config";
-import { getBackend } from "@/server/backend";
+import { loadExportSnapshot } from "@/server/export-snapshot";
 import { csvRow } from "@/server/csv";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest) {
-  const config = getEntraConfig();
-  if (!config.enabled) return new Response("Live Entra access is disabled.", { status: 404 });
-  const session = await getServerSession(request.cookies.get(SESSION_COOKIE)?.value, config);
-  if (!session || session.tenantId !== config.tenantId) return new Response("Authentication required.", { status: 401 });
-  const backend = await getBackend(config);
-  const snapshot = (await backend.recentSnapshots(session.tenantId, 1))[0];
-  if (!snapshot) return new Response("No tenant snapshot is available.", { status: 404 });
-  await backend.recordAccess(session.tenantId, session.id, "export", "snapshot", snapshot.id);
+  const snapshot = await loadExportSnapshot(request, "snapshot");
+  if (snapshot instanceof Response) return snapshot;
   const header = ["sourceName", "sourceObjectId", "relationshipType", "targetName", "targetObjectId", "permissions", "directoryScopeId", "scopeObjectId", "sourceEndpoint", "sourceRecordIds", "scannedAt", "completeness"];
   const rows = relationships(snapshot).map(({ edge, source, target }) => [source.label, source.id, edge.type, target.label, target.id, edge.permissions.join("; "), edge.scope?.directoryScopeId ?? "", edge.scope?.objectId ?? "", edge.evidence.sourceEndpoint, edge.evidence.sourceRecordIds.join("; "), edge.evidence.scannedAt, edge.evidence.completeness]);
   const csv = [header, ...rows].map(csvRow).join("\r\n");

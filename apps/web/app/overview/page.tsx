@@ -25,6 +25,7 @@ export default async function OverviewPage() {
   const spotlightPermissions = spotlight ? rankPermissions(spotlight.permissions) : [];
   const intelligence = analyzeTenantIntelligence(snapshot);
   const priorityPath = intelligence.paths[0];
+  const priorityFinding = priorityPath ? intelligence.findings.find(finding => finding.attackPathId === priorityPath.id) : undefined;
   const activityCollected = snapshot.completion.collectedEndpoints.some((endpoint) => endpoint.startsWith("/auditLogs/signIns"));
   const collectedEndpointPatterns = new Set(snapshot.completion.collectedEndpoints.map((endpoint) =>
     endpoint.replace(/\/(applications|servicePrincipals|groups)\/[0-9a-f-]{36}(?=\/)/gi, "/$1/{id}"),
@@ -62,7 +63,7 @@ export default async function OverviewPage() {
             <span>Reachable attack paths</span>
             <small>Chains of configured access an attacker could follow — inferred, not observed</small>
           </Link>
-          <Link href="/security">
+          <Link href="/security?category=ownership">
             <strong>{unowned.length}</strong>
             <span>No owner recorded</span>
             <small>Review owner coverage before concluding an identity is unowned</small>
@@ -83,7 +84,7 @@ export default async function OverviewPage() {
           <div className="priority-path-steps" aria-label={`${priorityPath.steps.length} attack path steps`}>
             {priorityPath.steps.map((item, index) => <span key={item.edgeId}><i>{index + 1}</i>{item.source.label}<b aria-hidden="true">→</b>{item.target.label}</span>)}
           </div>
-          <Link className="button button-primary" href="/security">Review attack path</Link>
+          <Link className="button button-primary" href={priorityFinding ? `/security?finding=${encodeURIComponent(priorityFinding.id)}` : "/security"}>Review attack path</Link>
         </section> : null}
 
         <div className="overview-grid">
@@ -132,6 +133,7 @@ export default async function OverviewPage() {
                   <div>
                     <strong>{finding.title}</strong>
                     <p>{finding.summary}</p>
+                    <Link className="text-link" href={`/security?finding=${encodeURIComponent(finding.id)}`}>Review finding <span className="sr-only">{finding.title}</span><span aria-hidden="true"> →</span></Link>
                   </div>
                 </article>
               ))}

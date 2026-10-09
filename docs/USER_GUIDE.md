@@ -10,6 +10,12 @@ Follow the [README quick start](../README.md#try-it-in-two-minutes), open **Over
 
 An app registration is the blueprint; an enterprise application (service principal) is its tenant identity. A caller receives configured access to a resource. Names are labels; object and application IDs establish identity.
 
+In the relationship table, **Inspect** brings the selected evidence into view and moves keyboard focus to it. **Back to selected relationship** returns to the matching control. Narrow tables scroll horizontally while keeping the Inspect column reachable. **Fit** or **Home** recenters the graph; switching to **Table** leaves a selected object's one-hop map and shows the complete filtered relationship list.
+
+## Reload the page or collect fresh data
+
+Browser reload reads the latest stored snapshot; it does not start another Microsoft Graph scan. To collect fresh evidence, open **Settings**, sign in if requested, then **Start read-only scan**. Wait for the scan to finish and check its coverage. If your session expires during polling, the tool stops retrying and offers a sign-in action. A reload also discards unsaved in-memory scenario and engine choices.
+
 ## Your first tenant investigation
 
 1. **Connect and scan.** Follow [tenant setup](../README.md#connect-your-own-tenant). Review the configured scopes in Settings and start a read-only scan. The source banner distinguishes sample data from a tenant snapshot, including when you are signed out or no scan has completed.
@@ -22,6 +28,8 @@ An app registration is the blueprint; an enterprise application (service princip
 ## Investigate a change or credential
 
 **Changes** compares a selected earlier/later pair of retained snapshots. Review field values and source coverage before treating a disappearance as confirmed. Newly collected fields in an older schema are not established configuration changes. Credential and trust history includes validity changes, additions and removals.
+
+Finding lifecycle is evaluated only through the selected later snapshot. Selecting the earliest retained snapshot leaves no earlier comparison; use the reset action to return to the latest pair.
 
 **Credentials and federation** shows individual password/certificate identifiers and validity dates alongside federated trust. Dates are evaluated at scan time. “Valid” describes an interval, not deployment or use; a credential crossing its expiry date is not itself a configuration edit. No secret value or certificate material is displayed or retained in snapshots.
 
@@ -51,6 +59,8 @@ The activity collector covers user sign-ins, not complete service-principal/work
 - Explicit exports can contain names, IDs and sensitive relationships. Sanitization removes unsupported/raw fields, not all identifying information. Review recipients and handling before sharing.
 - No hosted multi-tenancy, notification delivery, unattended scan schedule or remediation is provided.
 
+Review drafts allow 20 steps, 500 characters per narrative, a 160-character owner and a 4,000-character rationale. Oversized API writes fail without changing the saved record. When a generated source explanation is longer than an editable narrative, the UI marks its shortened copy and keeps the complete source explanation available. Saved analyst text is never silently cut down. All flow controls pause while a live review is loading or saving.
+
 For rule contributions, use the **Rule laboratory** with synthetic declarative cases and follow [RULE_LAB.md](RULE_LAB.md). For deployment and upgrade procedures, use [LOCAL_OPERATIONS.md](LOCAL_OPERATIONS.md) and [CHANGELOG.md](../CHANGELOG.md).
 
 ## Use the custom evidence engine
@@ -58,3 +68,5 @@ For rule contributions, use the **Rule laboratory** with synthetic declarative c
 Open **Evidence engine** to reproduce an access proof, inspect time-consistent paths, propose constrained local changes, search policy counterexamples, compare federation trusts, simulate declared credential rotation, plan missing reads, evaluate an access contract, or verify an offline investigation. Every result shows its version, assumptions, missing facts and search limits. Start with a recorded application grant and inspect its exact permission ID. Then export a pseudonymized investigation and import it into the verifier to replay the result without a tenant connection.
 
 Rotation dates and policy scenarios are supplied assumptions. Protected integrations constrain proposed plans. The engine cannot consent, execute a proposed read, or apply changes. Older snapshots and unavailable optional scopes produce unknown where appropriate. See the [engine guide and support matrix](CUSTOM_ENGINE.md) for all ten workflows, schema examples and CLI commands.
+
+Access contracts and offline package import are available independently of the current access query. Package export requires a valid evaluated query and the export acknowledgment. Import/export shows pending status; selecting a newer file or changing the evaluated query or disclosure options prevents old asynchronous work from publishing a stale result or download.

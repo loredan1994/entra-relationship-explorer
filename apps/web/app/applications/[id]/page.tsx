@@ -2,6 +2,7 @@ import { cleanProjectFixture, nodeById, relationships } from "@entra-explorer/do
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
+import { applicationIdentityPair } from "@/components/application-identity";
 import { PageHeading } from "@/components/page-heading";
 import { RiskBadge } from "@/components/risk-badge";
 import { loadCurrentSnapshot } from "@/server/current-snapshot";
@@ -20,11 +21,7 @@ export default async function ApplicationDetailPage({ params }: { params: Promis
   const selected = nodeById(snapshot, id);
   if (!selected || (selected.kind !== "application" && selected.kind !== "servicePrincipal")) notFound();
 
-  const sameApplication = snapshot.nodes.filter(
-    (node) => node.appId === selected.appId && (node.kind === "application" || node.kind === "servicePrincipal"),
-  );
-  const blueprint = sameApplication.find((node) => node.kind === "application");
-  const tenantIdentity = sameApplication.find((node) => node.kind === "servicePrincipal");
+  const { nodes: sameApplication, blueprint, tenantIdentity, status: pairStatus } = applicationIdentityPair(snapshot, selected);
   const connections = relationships(snapshot).filter(
     ({ source, target }) => sameApplication.some((node) => node.id === source.id || node.id === target.id),
   );
@@ -42,9 +39,10 @@ export default async function ApplicationDetailPage({ params }: { params: Promis
 
         <div className="identity-pair-grid">
           <EntityCard title="Blueprint" microsoftTerm="App registration" node={blueprint} />
-          <div className="pair-join" aria-label="The blueprint creates the tenant identity"><span>Same application ID</span><i aria-hidden="true">→</i></div>
+          <div className="pair-join" aria-label={pairStatus === "matched" ? "The blueprint and tenant identity share an application ID" : "Application pairing is not established"}><span>{pairStatus === "matched" ? "Same application ID" : "Pair not established"}</span>{pairStatus === "matched" ? <i aria-hidden="true">→</i> : null}</div>
           <EntityCard title="Tenant identity" microsoftTerm="Enterprise application (service principal)" node={tenantIdentity} />
         </div>
+        {pairStatus === "missing-app-id" ? <p className="trust-note">The application ID is missing. Only the selected object is shown; unrelated objects are not paired.</p> : pairStatus === "ambiguous" ? <p className="trust-note">Multiple objects share this application ID. The matching identity is ambiguous, so only the selected object is shown.</p> : null}
 
         {federatedCredentials.length > 0 ? (
           <section className="panel detail-connections">
@@ -58,6 +56,7 @@ export default async function ApplicationDetailPage({ params }: { params: Promis
         <section className="panel detail-connections">
           <div className="section-heading"><div><p className="eyebrow">Connected facts</p><h2>{connections.length} explainable relationships</h2></div></div>
           <div className="connection-list">
+            {connections.length === 0 ? <p>No relationships were recorded for this object. Check collection coverage before concluding it has no access.</p> : null}
             {connections.map(({ edge, source, target }) => (
               <article key={edge.id}>
                 <div><strong>{source.label}</strong><span>{edge.plainLabel}</span><strong>{target.label}</strong></div>
@@ -92,7 +91,7 @@ function EntityCard({
   node: ReturnType<typeof nodeById>;
 }) {
   if (!node) {
-    return <section className="entity-detail-card missing"><p>No matching {title.toLocaleLowerCase()} exists in this snapshot.</p></section>;
+    return <section className="entity-detail-card missing"><p>No unique matching {title.toLocaleLowerCase()} is established in this snapshot.</p></section>;
   }
   return (
     <section className={`entity-detail-card detail-${node.kind}`}>
@@ -100,8 +99,8 @@ function EntityCard({
       <p>{node.description}</p>
       <dl>
         <div><dt>Object ID</dt><dd><code>{node.id}</code></dd></div>
-        <div><dt>Application ID</dt><dd><code>{node.appId}</code></dd></div>
-        <div><dt>Publisher</dt><dd>{node.publisher}</dd></div>
+        <div><dt>Application ID</dt><dd><code>{node.appId?.trim() ? node.appId : "Not recorded"}</code></dd></div>
+        <div><dt>Publisher</dt><dd>{node.publisher || "Not recorded"}</dd></div>
         <div><dt>Owners</dt><dd>{node.ownerIds.length || "None recorded"}</dd></div>
         <div><dt>Credentials</dt><dd>{describeCredential(node.credential)}</dd></div>
       </dl>

@@ -37,6 +37,8 @@ Breaking changes are always called out under **Changed** with a migration note.
 
 ### Changed
 
+- Review input limits are enforced explicitly: invalid or oversized fields return HTTP 400 without saving, instead of silently truncating a successful write. Existing documented limits and stored reviews remain compatible.
+- CSV export is available for the synthetic demo. Live exports still require an authenticated tenant and retained snapshot; unavailable exports offer connection/scan guidance.
 - Version the corrected interpretation as engine `1.0.2` / authorization rules `entra-configured/3`. Re-export older portable investigations from their source snapshots; incompatible replay versions are explicitly rejected. Stored snapshots remain readable.
 - Cache container dependency installation separately from product sources; exclude package stores and nested environment files from the build context.
 - Load engine history only for workflows that use it, and skip graph layout in table view.
@@ -57,6 +59,14 @@ Breaking changes are always called out under **Changed** with a migration note.
   or from a git-ignored `.env.local`, instead of a hard-coded vault.
 
 ### Fixed
+
+- Make Inspect reveal and focus the selected evidence, with a return action to the matching relationship. Keep the inspector inside desktop/tablet bounds and preserve readable table columns with a reachable Inspect action on narrow screens.
+- Recenter the map on Fit/Home, restore canvas controls after an empty search, reset stale URL filters, and show all filtered relationships when leaving a bounded map for the table.
+- Report browser-storage failures when saving filters. Link overview review items to their actual findings, and pair application objects only through an unambiguous nonempty application ID within the tenant.
+- Recover expired scan sessions with a sign-in action; display authentication failures and accurately describe permission sorting and export availability.
+- Bind comparison selectors and lifecycle results to the selected historical snapshots; explain an earliest-snapshot selection without falsely claiming that only one scan exists.
+- Reveal selected application/finding detail, explain empty credential filters, and disable all review-flow edits while loading or saving. Keep generated editable summaries within limits while preserving full source explanations.
+- Keep independent contract and package-import tools available without a valid access query. Preserve cleared rotation editors, explain missing federation evidence, and prevent obsolete imports or exports from replacing newer user actions.
 
 - Stop paginated Graph reads and retry backoff promptly after cancellation or worker lease loss.
 - Lock checkpoint writes to the current job owner so stale workers cannot overwrite newer progress or recreate cancelled checkpoints.

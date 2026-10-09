@@ -29,6 +29,10 @@ function readJob(payload: Record<string, unknown>, expectedId?: string): JobView
   return job as JobView;
 }
 
+class AuthenticationRequiredError extends Error {
+  constructor() { super("Your session has expired. Sign in again to refresh scan status and start or cancel scans."); }
+}
+
 async function request(url: string, method: string, signal: AbortSignal, failure: string): Promise<Record<string, unknown>> {
   const deadline = new AbortController();
   const timer = window.setTimeout(() => deadline.abort(), 15_000);
@@ -37,6 +41,7 @@ async function request(url: string, method: string, signal: AbortSignal, failure
       method, cache: "no-store", signal: AbortSignal.any([signal, deadline.signal]),
       ...(method === "GET" ? {} : { headers: { "content-type": "application/json" } }),
     });
+    if (response.status === 401) throw new AuthenticationRequiredError();
     const payload: unknown = await response.json();
     if (!payload || typeof payload !== "object" || Array.isArray(payload)) throw new Error(failure);
     const body = payload as Record<string, unknown>;
@@ -51,12 +56,13 @@ async function request(url: string, method: string, signal: AbortSignal, failure
   }
 }
 
-export function ScanControl({ enabled, connected, initialJob }: { enabled: boolean; connected: boolean; initialJob: JobView | null }) {
+export function ScanControl({ enabled, connected, initialJob, exportAvailable = false }: { enabled: boolean; connected: boolean; initialJob: JobView | null; exportAvailable?: boolean }) {
   const [job, setJob] = useState<JobView | null>(initialJob);
   const [busy, setBusy] = useState<"start" | "cancel" | "sign-out" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pollError, setPollError] = useState<string | null>(null);
   const [pollEpoch, setPollEpoch] = useState(0);
+  const [authenticationRequired, setAuthenticationRequired] = useState(false);
   const mounted = useRef(false);
   const actionRequest = useRef<AbortController | null>(null);
   const pollRequest = useRef<AbortController | null>(null);
@@ -73,7 +79,7 @@ export function ScanControl({ enabled, connected, initialJob }: { enabled: boole
   }, []);
 
   useEffect(() => {
-    if (!enabled || !connected || !active || !jobId || busy) return;
+    if (!enabled || !connected || authenticationRequired || !active || !jobId || busy) return;
     const controller = new AbortController();
     pollRequest.current = controller;
     let failures = 0;
@@ -91,6 +97,12 @@ export function ScanControl({ enabled, connected, initialJob }: { enabled: boole
         if (next.status === "complete") window.location.reload();
       } catch (error) {
         if (controller.signal.aborted) return;
+        if (error instanceof AuthenticationRequiredError) {
+          keepPolling = false;
+          setAuthenticationRequired(true);
+          setPollError(error.message);
+          return;
+        }
         failures += 1;
         setPollError(`${error instanceof Error ? error.message : "Scan status could not be refreshed."} Retrying automatically.`);
       } finally {
@@ -104,7 +116,7 @@ export function ScanControl({ enabled, connected, initialJob }: { enabled: boole
       window.clearTimeout(timer);
       if (pollRequest.current === controller) pollRequest.current = null;
     };
-  }, [enabled, connected, active, jobId, busy, pollEpoch]);
+  }, [enabled, connected, authenticationRequired, active, jobId, busy, pollEpoch]);
 
   function beginAction(action: NonNullable<typeof busy>) {
     if (actionRequest.current) return null;
@@ -126,7 +138,10 @@ export function ScanControl({ enabled, connected, initialJob }: { enabled: boole
       const payload = await request(url, method, controller.signal, failure);
       if (mounted.current && !controller.signal.aborted) apply(payload);
     } catch (error) {
-      if (mounted.current && !controller.signal.aborted) setError(error instanceof Error ? error.message : failure);
+      if (mounted.current && !controller.signal.aborted) {
+        if (error instanceof AuthenticationRequiredError) setAuthenticationRequired(true);
+        setError(error instanceof Error ? error.message : failure);
+      }
     } finally {
       if (actionRequest.current === controller) actionRequest.current = null;
       if (mounted.current) setBusy(null);
@@ -152,16 +167,17 @@ export function ScanControl({ enabled, connected, initialJob }: { enabled: boole
 
   return (
     <div className="scan-control">
-      {!enabled ? <p>To protect the boundary, there is no sign-in or consent action until live mode is configured locally.</p> : !connected ? <a className="button button-primary" href="/api/auth/sign-in">Sign in to configured tenant</a> : (
+      {!enabled ? <p>To protect the boundary, there is no sign-in or consent action until live mode is configured locally.</p> : !connected || authenticationRequired ? <a className="button button-primary" href="/api/auth/sign-in">{authenticationRequired ? "Sign in again" : "Sign in to configured tenant"}</a> : (
         <div className="scan-actions">
           <button className="button button-primary" type="button" disabled={Boolean(busy) || active} onClick={startScan}>{busy === "start" ? "Starting scan…" : active ? "Scan in progress" : "Start read-only scan"}</button>
           {active ? <button className="button button-secondary" type="button" disabled={Boolean(busy) || job?.status === "cancel_requested"} onClick={cancelScan}>{busy === "cancel" ? "Requesting cancellation…" : job?.status === "cancel_requested" ? "Cancelling safely" : "Cancel scan"}</button> : null}
-          <a className="button button-secondary" href="/api/export/relationships.csv">Export relationship table</a>
+          {exportAvailable ? <a className="button button-secondary" href="/api/export/relationships.csv">Export relationship table</a> : <span>Complete a read-only scan to export tenant relationships.</span>}
           <button className="text-button" type="button" disabled={Boolean(busy)} onClick={signOut}>{busy === "sign-out" ? "Signing out…" : "Sign out"}</button>
         </div>
       )}
       {error ? <p role="alert">{error}</p> : null}
       {pollError ? <p role="alert">{pollError}</p> : null}
+      {authenticationRequired && job ? <p>Progress below is the last known status. Sign in again to check whether the scan is still running.</p> : null}
       {job ? <div className="scan-progress" role="status" aria-live="polite"><strong>{job.status === "complete" ? "Scan complete" : job.status === "failed" ? "Scan stopped" : job.status === "cancelled" ? "Scan cancelled" : job.status === "cancel_requested" ? "Cancellation requested" : job.stage}</strong><span>{job.detail} · {job.collected} records</span>{job.error ? <small>{job.error}</small> : null}</div> : null}
     </div>
   );
