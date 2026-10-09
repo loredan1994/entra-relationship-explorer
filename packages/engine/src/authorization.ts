@@ -123,7 +123,7 @@ function pathsFor(nodes: Map<string, EvidenceModel["nodes"][number]>, query: Aut
 }
 
 function pathMissing(query: AuthorizationQuery, path: RelationshipEdge[]): string[] {
-  const missing = path.filter(e => e.evidence.completeness !== "complete" || !e.evidence.sourceEndpoint || !e.evidence.sourceRecordIds.length).map(e => `relationship:${e.id}:complete-source`);
+  const missing = path.filter(e => e.evidence.completeness !== "complete" || !e.evidence.sourceEndpoint.trim() || !e.evidence.sourceRecordIds.length || e.evidence.sourceRecordIds.some(id => !id.trim())).map(e => `relationship:${e.id}:complete-source`);
   const last = path.at(-1)!;
   if (query.permissionId && !last.permissionIds) missing.push(`relationship:${last.id}:permission-ids`);
   if (query.kind === "delegated-permission") {

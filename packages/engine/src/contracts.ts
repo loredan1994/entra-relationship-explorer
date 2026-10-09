@@ -61,8 +61,13 @@ export function evaluateContract(model: EvidenceModel, input: AccessContract, ma
   const collectors = QUERY_COLLECTORS[contract.kind === "no-control-path" ? "control-path" : "application-permission"];
   const missing = unique([...collectors.filter(c => !complete(model, c)).map(c => `coverage:${c}`), ...results.flatMap(r => r.missing),
     ...results.flatMap(r => r.conflicts.map(c => c.factId)), ...(exhausted ? ["budget:contract"] : [])]);
-  const targetIds = contract.kind === "no-control-path" ? [...contract.sourceIds, ...contract.resourceIds] : [contract.resourceId];
-  for (const id of targetIds) if (!model.nodes.some(n => n.id === id)) missing.push(`object:${id}`);
+  // An allowlist may generate no authorization queries. Its target still needs
+  // one unambiguous identity; contradictory records cannot establish absence.
+  const identityIds = contract.kind === "no-control-path" ? [...contract.sourceIds, ...contract.resourceIds]
+    : contract.kind === "require-grant" ? [contract.principalId, contract.resourceId] : [contract.resourceId];
+  const objectIds = new Set(model.nodes.map(n => n.id));
+  const conflictIds = new Set(model.conflicts.map(c => c.factId));
+  for (const id of identityIds) if (!objectIds.has(id) || conflictIds.has(`object:${id}`)) missing.push(`object:${id}`);
   const status = violations.length ? "fail" : missing.length || results.some(r => ["unknown", "conflicting"].includes(r.verdict)) ? "unknown" : "pass";
   const witnesses = violations.map(r => ({ ...r, paths: [...r.paths].sort((a, b) => a.length - b.length || compare(canonical(a), canonical(b))).slice(0, 1) }));
   return { ...context(model), contractId: contract.id, status, verdict: status === "pass" ? "supported" : status === "fail" ? "refuted" : "unknown", witnesses, queries: results.length,

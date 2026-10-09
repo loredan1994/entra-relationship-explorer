@@ -26,7 +26,8 @@ Review decisions use a revision check and are serialized with snapshot publicati
 - `docker compose down` stops services while preserving the named PostgreSQL volume.
 - Starting again applies migrations before web and worker become available.
 - Concurrent startup migrations acquire a database-wide transaction lock before schema changes and expired-auth cleanup. Other instances wait for the migration to commit; failures roll back and release the lock.
-- A stopped web service does not lose sessions or jobs.
+- A stopped web service does not lose sessions or jobs. Checkpoint writes lock the owning job row so a recovered worker’s progress cannot be overwritten by its predecessor.
+- Cancellation and lost worker ownership are checked between pages, before request dispatch, and at most one second apart during retry backoff. An already-running HTTP request retains its bounded timeout.
 - A worker interrupted during a scan leaves its job durable. On startup, jobs whose worker lease has been stale for ten minutes return to the queue.
 
 Removing the named volume is intentionally not part of the normal runbook because that permanently deletes encrypted sessions, snapshots, job history, and access events.

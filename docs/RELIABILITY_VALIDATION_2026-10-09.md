@@ -74,3 +74,18 @@ Current optional policy collection is disabled, group-membership evidence is par
 ## Interpretation limits
 
 The tool remains a local, single-tenant workspace. Optional source coverage and collection windows can limit conclusions; configured grants do not prove observed use or effective authorization. Policy evaluation is the documented offline subset. Search/work limits establish uncertainty when exhausted. Pseudonymization reduces direct identifiers but does not anonymize topology or timestamps. Synthetic scale tests are not production load certification.
+
+## Subsequent final sweep
+
+The next sweep corrects six additional failure modes, with interpretation version `1.0.2` / rules `entra-configured/3`:
+
+- Cancellation and lease loss now interrupt pagination, retries and long backoff waits; a request also rechecks after asynchronous token acquisition before dispatch. In-flight HTTP requests retain their existing timeout.
+- Checkpoint writes hold the owning job row until the upsert finishes, so recovery or cancellation cannot leave a stale worker overwriting newer progress. Real PostgreSQL concurrency tests reproduce both original races.
+- The threat queue loads minimal current review summaries in bounded batches. Saved statuses and acceptance-due filters work before an individual finding is opened; full records and revisions still load before editing.
+- Imported engine inputs validate interpreted primitive fields before producing proofs. Arbitrary ignored metadata and absent optional historical fields remain compatible; whitespace-only provenance remains unknown.
+- Relationship evidence cannot silently contradict its source and target object IDs. Existing inventory size limits are checked before examining records; oversized-array regressions use throwing element getters to verify this boundary.
+- Contracts check referenced identity conflicts even when an allowlist generates no queries; before/after comparisons cannot call those results complete.
+
+The regressions use synthetic fixtures and an isolated database. Existing public-format fixtures now keep their recorded source IDs consistent with graph endpoints; expected authorization semantics are unchanged. Versioned format snapshots were reviewed after the interpretation bump. The same unchanged 95% per-package mutation and maintainability gates apply to these changes.
+
+The final-sweep verification passed 2,321 unit/integration tests (domain 552, engine 800, Graph 475, backend 225, web 269), 72 browser checks (62 desktop/mobile plus ten database persistence scenarios), and 18 offline CLI checks. The review-queue browser regression reproduces the original incorrect open status before the fix and passes afterward. All 17 cancellation regressions fail against the original behavior and pass after the correction.

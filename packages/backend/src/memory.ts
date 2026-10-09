@@ -1,5 +1,6 @@
 import { randomUUID, timingSafeEqual } from "node:crypto";
 import type { TenantSnapshot } from "@entra-explorer/domain";
+import { canonicalReviewIds } from "./review-ids";
 import type { AccessEvent, Backend, BackendHealth, DurableAuthFlow, DurableSession, ScanCheckpoint, ScanJob, ScanJobStage, ThreatReview } from "./types";
 
 function copy<T>(value: T): T {
@@ -198,6 +199,17 @@ export class MemoryBackend implements Backend {
   }
   // Stryker disable next-line ArrayDeclaration: a seeded string has no matching ID or finite scannedAt and is discarded by the retention predicate.
   async getThreatReview(tenantId: string, snapshotId: string, findingId: string): Promise<ThreatReview | null> { const retained = (this.snapshots.get(tenantId) ?? []).some(s => s.id === snapshotId && Date.parse(s.scannedAt) >= Date.now() - 30 * 86_400_000); const value = retained ? this.threatReviews.get(`${tenantId}:${snapshotId}:${findingId}`) : null; return value ? copy(value) : null; }
+  async currentThreatReviews(tenantId: string, snapshotId: string, findingIds: readonly string[]): Promise<ThreatReview[]> {
+    const wanted = canonicalReviewIds(findingIds);
+    const retained = this.snapshots.get(tenantId)?.some(snapshot => snapshot.id === snapshotId && Date.parse(snapshot.scannedAt) >= Date.now() - 30 * 86_400_000);
+    if (!retained) return [];
+    const reviews: ThreatReview[] = [];
+    for (const findingId of wanted) {
+      const review = this.threatReviews.get(`${tenantId}:${snapshotId}:${findingId}`);
+      if (review) reviews.push(copy(review));
+    }
+    return reviews;
+  }
   async priorThreatReviews(tenantId: string, currentSnapshotId: string, findingIds: string[]): Promise<ThreatReview[]> {
   // Stryker disable next-line ArrayDeclaration: a seeded string has no matching ID or finite scannedAt and is discarded by the retention predicate.
     const history = (this.snapshots.get(tenantId) ?? []).filter(s => Date.parse(s.scannedAt) >= Date.now() - 30 * 86_400_000);

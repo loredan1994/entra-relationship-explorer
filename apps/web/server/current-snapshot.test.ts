@@ -8,17 +8,18 @@ const getEntraConfig = vi.fn();
 const getServerSession = vi.fn();
 const recentSnapshots = vi.fn();
 const priorThreatReviews = vi.fn();
+const currentThreatReviews = vi.fn();
 const cookieGet = vi.fn();
 
 vi.mock("./config", () => ({ getEntraConfig: () => getEntraConfig() }));
-vi.mock("./backend", () => ({ getBackend: async () => ({ recentSnapshots, priorThreatReviews }) }));
+vi.mock("./backend", () => ({ getBackend: async () => ({ recentSnapshots, priorThreatReviews, currentThreatReviews }) }));
 vi.mock("./auth/session-store", () => ({
   SESSION_COOKIE: "entra_explorer_session",
   getServerSession: (...args: unknown[]) => getServerSession(...args),
 }));
 vi.mock("next/headers", () => ({ cookies: async () => ({ get: cookieGet }) }));
 
-const { loadCurrentSnapshot, loadPriorThreatReviews, loadSnapshotContext, loadSnapshotHistory } = await import("./current-snapshot");
+const { loadCurrentSnapshot, loadThreatReviewContext, loadSnapshotContext, loadSnapshotHistory } = await import("./current-snapshot");
 
 const liveConfig = { enabled: true, tenantId: TENANT };
 
@@ -34,6 +35,7 @@ beforeEach(() => {
   getServerSession.mockResolvedValue({ id: "session-1", tenantId: TENANT });
   recentSnapshots.mockResolvedValue([]);
   priorThreatReviews.mockResolvedValue([]);
+  currentThreatReviews.mockResolvedValue([]);
 });
 
 describe("demo mode", () => {
@@ -156,41 +158,74 @@ describe("prior review context", () => {
   it("batch-loads only reviews for the authenticated snapshot tenant", async () => {
     const snapshot = tenantSnapshot("snap-current");
     priorThreatReviews.mockResolvedValue([{ findingId: "finding-1" }]);
-    expect(await loadPriorThreatReviews(snapshot, ["finding-1"])).toEqual([{ findingId: "finding-1" }]);
+    expect(await loadThreatReviewContext(snapshot, ["finding-1"])).toEqual({ currentReviews: [], priorReviews: [{ findingId: "finding-1" }] });
     expect(priorThreatReviews).toHaveBeenCalledWith(TENANT, snapshot.id, ["finding-1"]);
   });
 
+  it("includes all current queue decisions without exposing notes, ownership, flow drafts or edit revisions", async () => {
+    const snapshot = tenantSnapshot("snap-current");
+    currentThreatReviews.mockResolvedValue([
+      { findingId: "finding-1", disposition: "accepted", expiresAt: "2026-10-10", assumption: "Private rationale", owner: "Private owner", flowDraft: [{ title: "Private draft" }], revision: "opaque-edit-revision", tenantId: TENANT, snapshotId: snapshot.id },
+      { findingId: "finding-2", disposition: "mitigating", expiresAt: null },
+    ]);
+    const result = await loadThreatReviewContext(snapshot, ["finding-1", "finding-2"]);
+    expect(result).toEqual({ currentReviews: [
+      { findingId: "finding-1", disposition: "accepted", expiresAt: "2026-10-10" },
+      { findingId: "finding-2", disposition: "mitigating", expiresAt: null },
+    ], priorReviews: [] });
+    expect(currentThreatReviews).toHaveBeenCalledWith(TENANT, snapshot.id, ["finding-1", "finding-2"]);
+    expect(getServerSession).toHaveBeenCalledOnce();
+  });
+
+  it.each([5_000, 5_001, 10_000, 10_001])("batches all %i requested findings without duplicating or truncating decisions", async count => {
+    const snapshot = tenantSnapshot("snap-large");
+    const ids = Array.from({ length: count }, (_, i) => `finding-${i}`);
+    currentThreatReviews.mockImplementation(async (_tenant, _snapshot, batch: string[]) => batch.map(findingId => ({ findingId, disposition: "accepted", expiresAt: "2026-10-10" })));
+    priorThreatReviews.mockImplementation(async (_tenant, _snapshot, batch: string[]) => batch.map(findingId => ({ findingId, snapshotId: "prior" })));
+    const result = await loadThreatReviewContext(snapshot, [...ids, ids[0]!]);
+    expect(result.currentReviews.map(review => review.findingId)).toEqual(ids);
+    expect(result.priorReviews.map(review => review.findingId)).toEqual(ids);
+    for (const read of [currentThreatReviews, priorThreatReviews]) {
+      expect(read).toHaveBeenCalledTimes(Math.ceil(count / 5_000));
+      for (let start = 0; start < ids.length; start += 5_000) {
+        expect(read).toHaveBeenNthCalledWith(start / 5_000 + 1, TENANT, snapshot.id, ids.slice(start, start + 5_000));
+      }
+    }
+  });
+
   it("does not query reviews for fixtures, empty input, signed-out sessions, or a mismatched tenant", async () => {
-    expect(await loadPriorThreatReviews(cleanProjectFixture, ["finding-1"])).toEqual([]);
-    expect(await loadPriorThreatReviews(tenantSnapshot("snap"), [])).toEqual([]);
+    expect(await loadThreatReviewContext(cleanProjectFixture, ["finding-1"])).toEqual({ currentReviews: [], priorReviews: [] });
+    expect(await loadThreatReviewContext(tenantSnapshot("snap"), [])).toEqual({ currentReviews: [], priorReviews: [] });
     getServerSession.mockResolvedValue(null);
-    expect(await loadPriorThreatReviews(tenantSnapshot("snap"), ["finding-1"])).toEqual([]);
+    expect(await loadThreatReviewContext(tenantSnapshot("snap"), ["finding-1"])).toEqual({ currentReviews: [], priorReviews: [] });
     getServerSession.mockResolvedValue({ id: "session-1", tenantId: OTHER_TENANT });
-    expect(await loadPriorThreatReviews(tenantSnapshot("snap"), ["finding-1"])).toEqual([]);
+    expect(await loadThreatReviewContext(tenantSnapshot("snap"), ["finding-1"])).toEqual({ currentReviews: [], priorReviews: [] });
     expect(priorThreatReviews).not.toHaveBeenCalled();
+    expect(currentThreatReviews).not.toHaveBeenCalled();
   });
 
   it("keeps every independent live-mode and tenant guard effective", async () => {
     const tenant = tenantSnapshot("snap");
     getEntraConfig.mockReturnValue({ enabled: false, reason: "off" });
-    expect(await loadPriorThreatReviews(tenant, ["finding-1"])).toEqual([]);
+    expect(await loadThreatReviewContext(tenant, ["finding-1"])).toEqual({ currentReviews: [], priorReviews: [] });
 
     getEntraConfig.mockReturnValue(liveConfig);
-    expect(await loadPriorThreatReviews({ ...tenant, mode: "fixture" }, ["finding-1"])).toEqual([]);
+    expect(await loadThreatReviewContext({ ...tenant, mode: "fixture" }, ["finding-1"])).toEqual({ currentReviews: [], priorReviews: [] });
 
     const otherSnapshot = { ...tenant, tenant: { tenantId: OTHER_TENANT, tenantLabel: "Other" }, nodes: tenant.nodes.map((item) => ({ ...item, tenantId: OTHER_TENANT })), edges: tenant.edges.map((item) => ({ ...item, tenantId: OTHER_TENANT })) };
     getServerSession.mockResolvedValue({ id: "session-1", tenantId: OTHER_TENANT });
-    expect(await loadPriorThreatReviews(otherSnapshot, ["finding-1"])).toEqual([]);
+    expect(await loadThreatReviewContext(otherSnapshot, ["finding-1"])).toEqual({ currentReviews: [], priorReviews: [] });
 
     getServerSession.mockResolvedValue({ id: "session-1", tenantId: TENANT });
-    expect(await loadPriorThreatReviews(otherSnapshot, ["finding-1"])).toEqual([]);
+    expect(await loadThreatReviewContext(otherSnapshot, ["finding-1"])).toEqual({ currentReviews: [], priorReviews: [] });
     expect(priorThreatReviews).not.toHaveBeenCalled();
+    expect(currentThreatReviews).not.toHaveBeenCalled();
   });
 
   it("handles an absent session cookie without dereferencing it", async () => {
     cookieGet.mockReturnValue(undefined);
     getServerSession.mockResolvedValue(null);
-    expect(await loadPriorThreatReviews(tenantSnapshot("snap"), ["finding-1"])).toEqual([]);
+    expect(await loadThreatReviewContext(tenantSnapshot("snap"), ["finding-1"])).toEqual({ currentReviews: [], priorReviews: [] });
     expect(getServerSession).toHaveBeenCalledWith(undefined, liveConfig);
   });
 });

@@ -52,6 +52,12 @@ interface ScanRun {
   readonly options: ScanTenantOptions;
   readonly concurrency: number;
   readonly completedStages: ScanStage[];
+  interruption?: { reason: unknown };
+}
+
+/** Keep read guards separate from source failures without changing the caller's error. */
+class ScanReadInterruptedError extends Error {
+  constructor(readonly reason: unknown) { super("The scan read was interrupted."); }
 }
 
 const APPLICATIONS_ENDPOINT = "/applications?$select=id,appId,displayName,publisherDomain,appRoles,passwordCredentials,keyCredentials,requiredResourceAccess,signInAudience,verifiedPublisher";
@@ -169,6 +175,7 @@ async function runStage(run: ScanRun, stage: ScanStage, work: () => Promise<void
 }
 
 async function completeStage(run: ScanRun, stage: ScanStage): Promise<void> {
+  await ensureActive(run);
   recordStageCoverage(run.scan, stage, run.options.enabledScopes, run.options.collectDirectoryAudits);
   // Every scanner stage has just recorded its collector coverage.
   const coverage = run.scan.coverage!.find(c => c.id === stage)!;
@@ -178,7 +185,27 @@ async function completeStage(run: ScanRun, stage: ScanStage): Promise<void> {
 }
 
 async function ensureActive(run: ScanRun): Promise<void> {
-  if (await run.options.shouldCancel?.()) throw new ScanCancelledError();
+  throwIfInterrupted(run);
+  try {
+    const cancelled = await run.options.shouldCancel?.();
+    // Another concurrent read can stop the scan while this guard awaits its check.
+    throwIfInterrupted(run);
+    if (cancelled) throw new ScanCancelledError();
+  } catch (reason) {
+    run.interruption = { reason };
+    throw reason;
+  }
+}
+
+function throwIfInterrupted(run: ScanRun): void {
+  if (run.interruption) throw run.interruption.reason;
+}
+
+function readGuard(run: ScanRun): () => Promise<void> {
+  return async () => {
+    try { await ensureActive(run); }
+    catch (reason) { throw new ScanReadInterruptedError(reason); }
+  };
 }
 
 function report(run: ScanRun, stage: ScanStage, collected: number, detail: string): void {
@@ -196,12 +223,12 @@ function read<TInput, TOutput>(
   sanitize: (record: TInput) => TOutput,
   onPage?: (count: number) => void,
 ): Promise<Sourced<TOutput>[]> {
-  return collect(run.client, endpoint, sanitize, run.scan, onPage);
+  return collect(run.client, endpoint, sanitize, run.scan, onPage, readGuard(run));
 }
 
 async function readOne<TInput, TOutput>(run: ScanRun, endpoint: string, sanitize: (record: TInput) => TOutput): Promise<Sourced<TOutput> | null> {
   try {
-    const record = sanitize(await run.client.getOne<TInput>(endpoint));
+    const record = sanitize(await run.client.getOne<TInput>(endpoint, readGuard(run)));
     run.scan.collectedEndpoints.push(endpoint);
     return { endpoint, record };
   } catch (error) {
@@ -407,9 +434,10 @@ async function collect<TInput, TOutput>(
   sanitize: (record: TInput) => TOutput,
   scan: RawTenantScan,
   onPage?: (count: number) => void,
+  checkActive?: () => Promise<void>,
 ): Promise<Sourced<TOutput>[]> {
   try {
-    const records = await client.getAll<TInput>(endpoint, onPage);
+    const records = await client.getAll<TInput>(endpoint, onPage, checkActive);
     // Sanitize before claiming coverage: a record that fails validation leaves the
     // endpoint skipped, so downstream findings never read absence as assurance.
     const collected = records.map((record) => ({ endpoint, record: sanitize(record) }));
@@ -422,6 +450,7 @@ async function collect<TInput, TOutput>(
 }
 
 function recordCollectionError(scan: RawTenantScan, endpoint: string, error: unknown): void {
+  if (error instanceof ScanReadInterruptedError) throw error.reason;
   const graphError = error instanceof GraphRequestError ? error : null;
   scan.skippedEndpoints.push(endpoint);
   scan.errors.push({ endpoint, code: graphError?.code ?? "unexpected_error", message: graphError?.message ?? "The read failed without exposing response data." });

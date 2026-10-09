@@ -37,7 +37,7 @@ Breaking changes are always called out under **Changed** with a migration note.
 
 ### Changed
 
-- Version the corrected interpretation as engine `1.0.1` / authorization rules `entra-configured/2`. Re-export older portable investigations from their source snapshots; incompatible replay versions are explicitly rejected. Stored snapshots remain readable.
+- Version the corrected interpretation as engine `1.0.2` / authorization rules `entra-configured/3`. Re-export older portable investigations from their source snapshots; incompatible replay versions are explicitly rejected. Stored snapshots remain readable.
 - Cache container dependency installation separately from product sources; exclude package stores and nested environment files from the build context.
 - Load engine history only for workflows that use it, and skip graph layout in table view.
 - Refresh the pinned Node 24 Alpine build image to the reviewed digest from dependency PR #46.
@@ -57,6 +57,11 @@ Breaking changes are always called out under **Changed** with a migration note.
   or from a git-ignored `.env.local`, instead of a hard-coded vault.
 
 ### Fixed
+
+- Stop paginated Graph reads and retry backoff promptly after cancellation or worker lease loss.
+- Lock checkpoint writes to the current job owner so stale workers cannot overwrite newer progress or recreate cancelled checkpoints.
+- Load saved review decisions for the entire finding queue, including acceptance-due counts before a finding is selected.
+- Reject malformed imported evidence and mismatched relationship identity bindings; keep blank provenance and conflicting contract targets uncertain.
 
 - Serialize concurrent startup migrations to prevent PostgreSQL DDL deadlocks. Index identity lookups while normalizing observed sign-ins, preserving first-match behavior.
 - Preserve uncertainty for missing or conflicting intermediate identities, conflicting policy variants, and partially known validity windows. Apply explicit work limits to change planning.
