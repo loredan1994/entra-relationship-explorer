@@ -37,8 +37,8 @@ describe("bounded incidence-based change planning", () => {
     expect(result.plans.map(({ changes, cost }) => ({ changes, cost }))).toEqual(expected);
     expect(result.limits.work).toBeLessThanOrEqual(result.limits.maxWork);
   });
-  it("interrupts a large greedy seed within its separately declared work budget", () => {
-    const result = solveChanges({ ...independent(200), maxSteps: 1 });
+  it.each([80, 200])("interrupts a %i-path greedy seed within its separately declared work budget", size => {
+    const result = solveChanges({ ...independent(size), maxSteps: 1 });
     expect(result).toMatchObject({ status: "bounded", verdict: "unknown", plans: [], upperBound: null, limits: { steps: 0, maxSteps: 1, exhausted: true, work: 10_000, maxWork: 10_000 } });
     expect(result.lowerBound).toBe(3);
   });
@@ -103,11 +103,38 @@ describe("bounded incidence-based change planning", () => {
   it("keeps search states with multi-digit candidate indices distinct", () => {
     const candidates = Array.from({ length: 24 }, (_, i) => ({ id: `c${String(i).padStart(2, "0")}`, cost: i === 23 ? 3 : 1, removes: [`d${i}`], description: "" }));
     const result = solveChanges({ ...base, candidates,
-      paths: [{ id: "one", dependencies: ["d1"] }, { id: "two", dependencies: ["d2", "d23"] }, { id: "three", dependencies: ["d3", "d23"] }],
+      paths: [{ id: "01", dependencies: ["d1"] }, { id: "02", dependencies: ["d2", "d23"] }, { id: "03", dependencies: ["d3", "d23"] }],
       protectedIntegrations: [{ id: "integration", alternatives: [{ id: "left", dependencies: ["d2"] }, { id: "right", dependencies: ["d23"] }] }],
     });
     expect(result.status).toBe("optimal");
     expect(result.plans.map(({ changes, cost }) => ({ changes, cost }))).toEqual([{ changes: ["c01", "c02", "c03"], cost: 3 }, { changes: ["c01", "c23"], cost: 4 }]);
+  });
+  it("a bounded seed chooses lower cost before a lexically earlier expensive exclusion", () => {
+    const result = solveChanges({ ...base, maxSteps: 1,
+      paths: [{ id: "target", dependencies: ["cheap", "expensive"] }],
+      candidates: [{ id: "a-expensive", cost: 100, removes: ["expensive"], description: "" }, { id: "z-cheap", cost: 1, removes: ["cheap"], description: "" }],
+    });
+    expect(result).toMatchObject({ status: "bounded", upperBound: 1, plans: [{ changes: ["z-cheap"], cost: 1 }] });
+  });
+  it("minimizes a bounded seed by discarding the more expensive redundant exclusion first", () => {
+    const result = solveChanges({ ...base, maxSteps: 1,
+      paths: ["one", "two", "three", "four"].map(id => ({ id, dependencies: [id] })),
+      candidates: [
+        { id: "a", cost: 1, removes: ["one", "two"], description: "" },
+        { id: "b", cost: 2, removes: ["two", "three"], description: "" },
+        { id: "c", cost: 5, removes: ["one", "three", "four"], description: "" },
+      ],
+    });
+    expect(result).toMatchObject({ status: "bounded", upperBound: 6, plans: [{ changes: ["a", "c"], cost: 6 }] });
+  });
+  it("discards lower-ranked plans instead of accumulating an unbounded history of alternatives", () => {
+    const result = solveChanges({ ...base, maxPlans: 1, maxSteps: 1000,
+      paths: [{ id: "target", dependencies: ["shared"] }],
+      candidates: Array.from({ length: 700 }, (_, i) => ({ id: `c${String(i).padStart(3, "0")}`, cost: 1, removes: ["shared"], description: "" })),
+    });
+    expect(result.status).toBe("optimal");
+    expect(result.limits.exhausted).toBe(false);
+    expect(result.plans).toEqual([{ changes: ["c000"], cost: 1, brokenPaths: ["target"], residualPaths: [], preservedIntegrations: [] }]);
   });
   it("caps total work even when the requested search-state budget is maximal", () => {
     const result = solveChanges({ ...base, maxSteps: 1_000_000 });
