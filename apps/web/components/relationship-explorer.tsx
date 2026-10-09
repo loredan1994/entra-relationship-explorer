@@ -110,10 +110,10 @@ function RelationshipWorkspace({ snapshot, initialQuery, initialKinds, initialEd
   const [savedFilters, setSavedFilters] = useState<SavedFilter[]>([]);
   const [filterStorageStatus, setFilterStorageStatus] = useState("");
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
+  const [filtersReady, setFiltersReady] = useState(false);
   const inspectorRef = useRef<HTMLElement>(null);
   const resultsRef = useRef<HTMLElement>(null);
   const inspectionTrigger = useRef<{ element: HTMLElement; edgeId: string } | null>(null);
-  const [inspectionRequest, setInspectionRequest] = useState(0);
   const storageKey = `entra-explorer-filters:${snapshot.tenant.tenantId}`;
   const neighborhood = useMemo(
     () => focusNodeId ? boundedNeighborhood(snapshot, focusNodeId, MAP_NODE_LIMIT) : null,
@@ -128,6 +128,9 @@ function RelationshipWorkspace({ snapshot, initialQuery, initialKinds, initialEd
     () => filterRelationships(scopedSnapshot, { query, nodeKinds: selectedKinds }),
     [query, selectedKinds, scopedSnapshot],
   );
+  // An incoming Inspect link is also an explicit inspection request. Do not
+  // focus a fallback relationship when its ID is absent, stale or filtered out.
+  const [inspectionRequest, setInspectionRequest] = useState(() => filteredViews.some(({ edge }) => edge.id === initialEdgeId) ? 1 : 0);
   const visibleNodes = useMemo(() => connectedNodes(filteredViews), [filteredViews]);
   const hasRelationships = filteredViews.length > 0;
   const canvasRef = useRef<HTMLDivElement>(null);
@@ -158,6 +161,10 @@ function RelationshipWorkspace({ snapshot, initialQuery, initialKinds, initialEd
   };
   const panBoundsRef = useRef(panBounds);
   panBoundsRef.current = panBounds;
+
+  // Streamed HTML can arrive before this component's event handlers. Exposing
+  // an enabled toggle then would silently discard a visitor's first click.
+  useEffect(() => { setFiltersReady(true); }, []);
 
   useEffect(() => {
     const element = canvasRef.current;
@@ -366,6 +373,7 @@ function RelationshipWorkspace({ snapshot, initialQuery, initialKinds, initialEd
             <button
               className="button button-secondary mobile-filter-toggle"
               type="button"
+              disabled={!filtersReady}
               aria-expanded={mobileFiltersOpen}
               aria-controls="relationship-filter-controls"
               onClick={() => setMobileFiltersOpen((open) => !open)}

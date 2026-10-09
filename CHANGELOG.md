@@ -60,8 +60,9 @@ Breaking changes are always called out under **Changed** with a migration note.
 
 ### Fixed
 
-- Make Inspect reveal and focus the selected evidence, with a return action to the matching relationship. Keep the inspector inside desktop/tablet bounds and preserve readable table columns with a reachable Inspect action on narrow screens.
+- Make Inspect reveal and focus the selected evidence, including incoming evidence links, with a return action to the matching relationship. Keep the inspector inside desktop/tablet bounds and preserve readable table columns with a reachable Inspect action on narrow screens.
 - Recenter the map on Fit/Home, restore canvas controls after an empty search, reset stale URL filters, and show all filtered relationships when leaving a bounded map for the table.
+- Keep mobile Filters disabled until its interaction handler has loaded, preventing a lost first click during slow navigation.
 - Report browser-storage failures when saving filters. Link overview review items to their actual findings, and pair application objects only through an unambiguous nonempty application ID within the tenant.
 - Recover expired scan sessions with a sign-in action; display authentication failures and accurately describe permission sorting and export availability.
 - Bind comparison selectors and lifecycle results to the selected historical snapshots; explain an earliest-snapshot selection without falsely claiming that only one scan exists.

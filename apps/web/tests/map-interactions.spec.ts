@@ -9,6 +9,44 @@ async function openFilters(page: Page) {
   await expect(page.getByPlaceholder("Name or permission", { exact: true })).toBeVisible();
 }
 
+test("incoming evidence links from Permissions focus and reveal the requested relationship", async ({ page }) => {
+  await page.goto("/permissions");
+  const inspect = page.getByRole("link", { name: "Inspect", exact: true }).first();
+  const target = await inspect.getAttribute("href");
+  expect(target).toMatch(/^\/map\?edge=/);
+  await inspect.click();
+  await expect(page).toHaveURL(target!);
+  const inspector = page.getByRole("complementary", { name: "Selected relationship evidence" });
+  await expect(inspector).toBeFocused();
+  await expect(inspector.locator(".inspector-header h2")).toBeInViewport();
+  await expect(inspector).toContainText("Api.Write");
+  await inspector.getByRole("button", { name: "Back to selected relationship" }).click();
+  // On narrow screens, graph labels are intentionally hidden; the results region
+  // is the accessible fallback. Table presentation still reaches the exact row.
+  await page.getByRole("button", { name: "Table", exact: true }).click();
+  await inspector.getByRole("button", { name: "Back to selected relationship" }).click();
+  await expect(page.locator('.relationship-table button[aria-pressed="true"]')).toBeFocused();
+});
+
+test("incoming evidence deep links reveal evidence at the tablet breakpoint", async ({ page }) => {
+  await page.setViewportSize({ width: 980, height: 800 });
+  await page.goto("/map?edge=70000000-0000-4000-8000-000000000002");
+  const inspector = page.getByRole("complementary", { name: "Selected relationship evidence" });
+  await expect(inspector).toBeFocused();
+  await expect(inspector.getByRole("heading", { name: "Creates a tenant identity", exact: true })).toBeInViewport();
+  await expect(inspector.locator(".entity-pair")).toContainText("Clean Project API");
+  await expect(inspector.locator(".entity-pair")).not.toContainText("Clean Project Orchestrator");
+});
+
+test("absent or invalid incoming evidence keeps ordinary map browsing in place", async ({ page }) => {
+  for (const route of ["/map", "/map?edge=not-a-recorded-relationship", "/map?edge=70000000-0000-4000-8000-000000000002&q=no-such-relationship"]) {
+    await page.goto(route);
+    await expect(page.getByRole("heading", { name: "Relationship map", exact: true })).toBeInViewport();
+    await expect(page.locator("#relationship-evidence")).not.toBeFocused();
+    await expect(page.getByRole("button", { name: "Back to selected relationship" })).toHaveCount(0);
+  }
+});
+
 test("Inspect reveals the selected evidence and returns keyboard focus to its row", async ({ page }) => {
   await page.goto("/map");
   await page.getByRole("button", { name: "Table", exact: true }).click();
@@ -137,6 +175,33 @@ test("global search has an explicit submit action that opens matching evidence",
   await page.getByRole("button", { name: "Table", exact: true }).click();
   await expect(page.getByRole("row")).toHaveCount(2);
   await expect(page.getByRole("cell", { name: /Api.Read.*Api.Write/ })).toBeVisible();
+});
+
+test("mobile filters become available only when their interaction can be handled", async ({ page }) => {
+  await page.setViewportSize({ width: 393, height: 851 });
+  let releaseScripts!: () => void;
+  const scriptsReady = new Promise<void>(resolve => { releaseScripts = resolve; });
+  await page.route("**/_next/static/chunks/*.js", async route => {
+    await scriptsReady;
+    await route.continue();
+  });
+  try {
+    // Keep server-rendered content visible while deliberately withholding the
+    // handlers, reproducing a cold or slow document navigation after Search.
+    await page.goto("/map?q=Api.Write", { waitUntil: "commit" });
+    const toggle = page.locator(".mobile-filter-toggle");
+    await expect(toggle).toBeVisible();
+    await expect(toggle).toBeDisabled();
+    await expect(page.getByPlaceholder("Name or permission", { exact: true })).toBeHidden();
+    releaseScripts();
+    await expect(toggle).toBeEnabled();
+    await toggle.click();
+    await expect(toggle).toHaveAttribute("aria-expanded", "true");
+    await expect(page.getByPlaceholder("Name or permission", { exact: true })).toBeVisible();
+    await expect(page.getByPlaceholder("Name or permission", { exact: true })).toHaveValue("Api.Write");
+  } finally {
+    releaseScripts();
+  }
 });
 
 test("the evidence panel stays reachable at the tablet layout breakpoint", async ({ page }) => {
