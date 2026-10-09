@@ -3,7 +3,7 @@ import { cleanProjectFixture, type TenantSnapshot } from "@entra-explorer/domain
 import { Pool } from "pg";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { PostgresBackend } from "./postgres";
-import { blockedTransactions } from "./test-support";
+import { blockedTransactions, createIsolatedTestDatabase } from "./test-support";
 import type { DurableSession, ScanJob } from "./types";
 
 const connectionString = process.env.TEST_DATABASE_URL;
@@ -15,8 +15,10 @@ if (connectionString) {
 describe.skipIf(!connectionString)("PostgreSQL session authorization at snapshot publication", () => {
   const applicationName = `entra-publication-session-${randomUUID()}`;
   const workerId = "synthetic-publication-worker";
-  const tenantIds: string[] = [];
+  let database: Awaited<ReturnType<typeof createIsolatedTestDatabase>>;
   let backend: PostgresBackend;
+  let unrelatedDatabase: Awaited<ReturnType<typeof createIsolatedTestDatabase>>;
+  let unrelatedBackend: PostgresBackend;
   let sql: Pool;
   let tenantId: string;
   let session: DurableSession;
@@ -24,16 +26,18 @@ describe.skipIf(!connectionString)("PostgreSQL session authorization at snapshot
   let snapshot: TenantSnapshot;
 
   beforeAll(async () => {
-    const backendUrl = new URL(connectionString!);
+    database = await createIsolatedTestDatabase(connectionString!, Pool);
+    const backendUrl = new URL(database.connectionString);
     backendUrl.searchParams.set("application_name", applicationName);
     backend = new PostgresBackend({ connectionString: backendUrl.toString(), encryptionKey: randomBytes(32) });
-    sql = new Pool({ connectionString });
-    await backend.migrate();
+    unrelatedDatabase = await createIsolatedTestDatabase(connectionString!, Pool);
+    unrelatedBackend = new PostgresBackend({ connectionString: unrelatedDatabase.connectionString, encryptionKey: randomBytes(32) });
+    sql = database.sql;
+    await Promise.all([backend.migrate(), unrelatedBackend.migrate()]);
   });
 
   beforeEach(async () => {
     tenantId = randomUUID();
-    tenantIds.push(tenantId);
     session = { id: randomUUID(), tenantId, account: {}, accessToken: "synthetic-token", tokenCache: "synthetic-cache", accessTokenExpiresAt: Date.now() - 1000, sessionExpiresAt: Date.now() + 3_600_000 };
     await backend.createSession(session);
     job = await backend.enqueueScan(tenantId, session.id);
@@ -44,13 +48,8 @@ describe.skipIf(!connectionString)("PostgreSQL session authorization at snapshot
   });
 
   afterAll(async () => {
-    if (sql) {
-      for (const table of ["scan_checkpoints", "scan_jobs", "snapshots", "sessions", "access_events"]) {
-        await sql.query(`DELETE FROM ${table} WHERE tenant_id=ANY($1::uuid[])`, [tenantIds]);
-      }
-      await sql.end();
-    }
-    await backend?.close();
+    try { await Promise.all([backend?.close(), unrelatedBackend?.close()]); }
+    finally { await Promise.all([database?.close(), unrelatedDatabase?.close()]); }
   });
 
   async function expectUnpublished() {
@@ -75,12 +74,18 @@ describe.skipIf(!connectionString)("PostgreSQL session authorization at snapshot
     if (invalid === "foreign") {
       const foreignTenantId = randomUUID();
       const foreignSessionId = randomUUID();
-      tenantIds.push(foreignTenantId);
       await backend.createSession({ ...session, id: foreignSessionId, tenantId: foreignTenantId });
       await sql.query("UPDATE scan_jobs SET session_id=$1 WHERE id=$2 AND tenant_id=$3", [foreignSessionId, job.id, tenantId]);
     }
     const jobBefore = await backend.getJob(job.id, tenantId);
     const checkpointBefore = await backend.getScanCheckpoint(job.id, tenantId);
+    // Force another suite's startup cleanup into the exact rollback-check window.
+    if (invalid === "expired") {
+      const unrelatedSession = { ...session, id: randomUUID(), sessionExpiresAt: Date.now() - 1000 };
+      await unrelatedBackend.createSession(unrelatedSession);
+      await Promise.all([unrelatedBackend.migrate(), unrelatedBackend.migrate()]);
+      expect((await unrelatedDatabase.sql.query("SELECT id FROM sessions WHERE id=$1", [unrelatedSession.id])).rows).toEqual([]);
+    }
     await expect(backend.completeJob(job.id, workerId, snapshot, new Date(0))).rejects.toThrow("The scan job is not owned by this worker.");
     expect(await backend.getJob(job.id, tenantId)).toEqual(jobBefore);
     expect(await backend.getScanCheckpoint(job.id, tenantId)).toEqual(checkpointBefore);

@@ -2,6 +2,7 @@ import { randomBytes, randomUUID } from "node:crypto";
 import { Pool } from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { PostgresBackend } from "./postgres";
+import { createIsolatedTestDatabase } from "./test-support";
 
 const connectionString = process.env.TEST_DATABASE_URL;
 if (connectionString) {
@@ -12,22 +13,21 @@ if (connectionString) {
 describe.skipIf(!connectionString)("atomic scan enqueue and access record", () => {
   const tenantId = randomUUID();
   const sessionId = randomUUID();
+  let database: Awaited<ReturnType<typeof createIsolatedTestDatabase>>;
   let backend: PostgresBackend;
   let sql: Pool;
   const createSession = async (id: string) => backend.createSession({ id, tenantId, account: {}, accessToken: "synthetic-only", tokenCache: "synthetic-only", accessTokenExpiresAt: Date.now() + 3600000, sessionExpiresAt: Date.now() + 3600000 });
 
   beforeAll(async () => {
-    backend = new PostgresBackend({ connectionString: connectionString!, encryptionKey: randomBytes(32) });
-    sql = new Pool({ connectionString });
+    database = await createIsolatedTestDatabase(connectionString!, Pool);
+    backend = new PostgresBackend({ connectionString: database.connectionString, encryptionKey: randomBytes(32) });
+    sql = database.sql;
     await backend.migrate();
     await createSession(sessionId);
   });
   afterAll(async () => {
-    if (sql) {
-      for (const table of ["scan_checkpoints", "scan_jobs", "sessions", "access_events"]) await sql.query(`DELETE FROM ${table} WHERE tenant_id=$1`, [tenantId]);
-      await sql.end();
-    }
-    await backend?.close();
+    try { await backend?.close(); }
+    finally { await database?.close(); }
   });
 
   it("leaves no claimable scan when its required enqueue access record fails, then retries cleanly", async () => {

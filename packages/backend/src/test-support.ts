@@ -1,8 +1,40 @@
 /**
- * Test fixture builders. Excluded from mutation and coverage reports: this file
- * exists only to stand in for `pg` so the Postgres backend's SQL, tenant scoping,
- * and error branches can be exercised without a live database.
+ * Test fixture builders and database isolation. Excluded from mutation and
+ * coverage reports: this file provides only test setup and `pg` substitutes.
  */
+import { randomUUID } from "node:crypto";
+
+/** Isolate destructive expiry/DDL fixtures while preserving concurrent transactions. */
+export async function createIsolatedTestDatabase(connectionString: string, Pool: typeof import("pg").Pool) {
+  const url = new URL(connectionString);
+  // pg accepts host query overrides and socket: URLs; neither may bypass the
+  // explicit hostname/database boundary checked here before creating a pool.
+  if (!["postgres:", "postgresql:"].includes(url.protocol) || url.searchParams.has("host") || !["localhost", "127.0.0.1"].includes(url.hostname) || url.pathname !== "/entra_review_test") throw new Error("Integration tests require an isolated loopback entra_review_test database.");
+  // The identifier is generated here, never interpolated from configuration.
+  const schema = `entra_test_${randomUUID().replaceAll("-", "")}`;
+  const admin = new Pool({ connectionString, max: 1 });
+  try {
+    await admin.query(`CREATE SCHEMA "${schema}"`);
+  } catch (error) {
+    await admin.end();
+    throw error;
+  }
+  // Do not append public: unqualified DDL must never fall back to another suite.
+  url.searchParams.set("options", `-c search_path=${schema}`);
+  const scopedConnectionString = url.toString();
+  const sql = new Pool({ connectionString: scopedConnectionString });
+  return {
+    connectionString: scopedConnectionString,
+    sql,
+    async close() {
+      try { await sql.end(); }
+      finally {
+        try { await admin.query(`DROP SCHEMA "${schema}" CASCADE`); }
+        finally { await admin.end(); }
+      }
+    },
+  };
+}
 
 export interface RecordedQuery {
   sql: string;

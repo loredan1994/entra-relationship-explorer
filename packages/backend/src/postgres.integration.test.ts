@@ -3,7 +3,7 @@ import { Pool } from "pg";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { cleanProjectFixture } from "@entra-explorer/domain";
 import { PostgresBackend } from "./postgres";
-import { blockedTransactions } from "./test-support";
+import { blockedTransactions, createIsolatedTestDatabase } from "./test-support";
 import type { ThreatReview } from "./types";
 
 const connectionString = process.env.TEST_DATABASE_URL;
@@ -15,6 +15,7 @@ describe.skipIf(!connectionString)("real PostgreSQL boundaries", () => {
   const tenantId = randomUUID();
   const key = randomBytes(32);
   const applicationName = `postgres-boundaries-${tenantId}`;
+  let database: Awaited<ReturnType<typeof createIsolatedTestDatabase>>;
   let backend: PostgresBackend;
   let sql: Pool;
   const sessionId = randomUUID();
@@ -28,19 +29,17 @@ describe.skipIf(!connectionString)("real PostgreSQL boundaries", () => {
     return snapshot;
   }
   beforeAll(async () => {
-    const backendUrl = new URL(connectionString!);
+    database = await createIsolatedTestDatabase(connectionString!, Pool);
+    const backendUrl = new URL(database.connectionString);
     backendUrl.searchParams.set("application_name", applicationName);
     backend = new PostgresBackend({ connectionString: backendUrl.toString(), encryptionKey: key });
-    sql = new Pool({ connectionString });
+    sql = database.sql;
     await backend.migrate(); await backend.migrate();
     await backend.createSession({ id: sessionId, tenantId, account: {}, accessToken: "synthetic-only", accessTokenExpiresAt: Date.now() + 3600000, sessionExpiresAt: Date.now() + 3600000, tokenCache: "synthetic" });
   });
   afterAll(async () => {
-    if (sql) {
-      for (const table of ["threat_reviews", "scan_checkpoints", "scan_jobs", "snapshots", "sessions", "auth_flows", "access_events"]) await sql.query(`DELETE FROM ${table} WHERE tenant_id=$1`, [tenantId]);
-      await sql.end();
-    }
-    await backend?.close();
+    try { await backend?.close(); }
+    finally { await database?.close(); }
   });
   it("round-trips encrypted evidence and accepts exactly one competing decision", async () => {
     const snapshot = await saveSnapshot();

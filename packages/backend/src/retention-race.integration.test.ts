@@ -3,7 +3,7 @@ import { cleanProjectFixture } from "@entra-explorer/domain";
 import { Pool, type PoolClient } from "pg";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { PostgresBackend } from "./postgres";
-import { blockedTransactions } from "./test-support";
+import { blockedTransactions, createIsolatedTestDatabase } from "./test-support";
 import type { ThreatReview } from "./types";
 
 const connectionString = process.env.TEST_DATABASE_URL;
@@ -16,24 +16,27 @@ describe.skipIf(!connectionString)("retention while a review crosses its snapsho
   const tenantId = randomUUID();
   const sessionId = randomUUID();
   const applicationName = `entra-retention-race-${tenantId}`;
+  let database: Awaited<ReturnType<typeof createIsolatedTestDatabase>>;
   let backend: PostgresBackend;
+  let unrelatedDatabase: Awaited<ReturnType<typeof createIsolatedTestDatabase>>;
+  let unrelatedBackend: PostgresBackend;
   let sql: Pool;
 
   beforeAll(async () => {
-    const backendUrl = new URL(connectionString!);
+    database = await createIsolatedTestDatabase(connectionString!, Pool);
+    const backendUrl = new URL(database.connectionString);
     backendUrl.searchParams.set("application_name", applicationName);
     backend = new PostgresBackend({ connectionString: backendUrl.toString(), encryptionKey: randomBytes(32) });
-    sql = new Pool({ connectionString });
-    await backend.migrate();
+    unrelatedDatabase = await createIsolatedTestDatabase(connectionString!, Pool);
+    unrelatedBackend = new PostgresBackend({ connectionString: unrelatedDatabase.connectionString, encryptionKey: randomBytes(32) });
+    sql = database.sql;
+    await Promise.all([backend.migrate(), unrelatedBackend.migrate()]);
     await backend.createSession({ id: sessionId, tenantId, account: {}, accessToken: "synthetic-only", tokenCache: "synthetic-only", accessTokenExpiresAt: Date.now() + 3600000, sessionExpiresAt: Date.now() + 3600000 });
   });
 
   afterAll(async () => {
-    if (sql) {
-      for (const table of ["threat_reviews", "scan_checkpoints", "scan_jobs", "snapshots", "sessions", "access_events"]) await sql.query(`DELETE FROM ${table} WHERE tenant_id=$1`, [tenantId]);
-      await sql.end();
-    }
-    await backend?.close();
+    try { await Promise.all([backend?.close(), unrelatedBackend?.close()]); }
+    finally { await Promise.all([database?.close(), unrelatedDatabase?.close()]); }
   });
 
   it("deletes a newly committed decision together with its expired snapshot instead of orphaning ciphertext", async () => {
@@ -99,6 +102,11 @@ describe.skipIf(!connectionString)("retention while a review crosses its snapsho
     const snapshot = { ...cleanProjectFixture, id: randomUUID(), tenant: { tenantId, tenantLabel: "Synthetic publication race" }, scannedAt: new Date().toISOString() };
     await backend.saveScanCheckpoint({ jobId: job.id, tenantId, payload: { stage: "synthetic-completed-read" }, updatedAt: "" }, "publishing-worker");
     await sql.query("UPDATE sessions SET expires_at=now()-interval '1 second' WHERE tenant_id=$1 AND id=$2", [tenantId, sessionId]);
+    // Force unrelated startup cleanup before establishing this test's row gate.
+    const unrelatedSessionId = randomUUID();
+    await unrelatedBackend.createSession({ id: unrelatedSessionId, tenantId, account: {}, accessToken: "synthetic-only", tokenCache: "synthetic-only", accessTokenExpiresAt: Date.now() - 1000, sessionExpiresAt: Date.now() - 1000 });
+    await Promise.all([unrelatedBackend.migrate(), unrelatedBackend.migrate()]);
+    expect((await unrelatedDatabase.sql.query("SELECT id FROM sessions WHERE id=$1", [unrelatedSessionId])).rows).toEqual([]);
     const sessionGate = await sql.connect();
     let pruning: Promise<PromiseSettledResult<void>> | undefined;
     let publication: Promise<PromiseSettledResult<void>> | undefined;

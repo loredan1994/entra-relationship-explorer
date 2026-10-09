@@ -3,6 +3,7 @@ import { cleanProjectFixture } from "@entra-explorer/domain";
 import { Pool } from "pg";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { PostgresBackend } from "./postgres";
+import { createIsolatedTestDatabase } from "./test-support";
 import type { DurableSession, ScanJob } from "./types";
 
 const connectionString = process.env.TEST_DATABASE_URL;
@@ -12,8 +13,8 @@ if (connectionString) {
 }
 
 describe.skipIf(!connectionString)("PostgreSQL worker access to a claimed scan", () => {
-  const tenantIds: string[] = [];
   const workerId = "synthetic-scan-access-owner";
+  let database: Awaited<ReturnType<typeof createIsolatedTestDatabase>>;
   let backend: PostgresBackend;
   let sql: Pool;
   let tenantId: string;
@@ -21,27 +22,22 @@ describe.skipIf(!connectionString)("PostgreSQL worker access to a claimed scan",
   let job: ScanJob;
 
   beforeAll(async () => {
-    backend = new PostgresBackend({ connectionString: connectionString!, encryptionKey: randomBytes(32) });
-    sql = new Pool({ connectionString });
+    database = await createIsolatedTestDatabase(connectionString!, Pool);
+    backend = new PostgresBackend({ connectionString: database.connectionString, encryptionKey: randomBytes(32) });
+    sql = database.sql;
     await backend.migrate();
   });
 
   beforeEach(async () => {
     tenantId = randomUUID();
-    tenantIds.push(tenantId);
     session = { id: randomUUID(), tenantId, account: {}, accessToken: "synthetic-token", tokenCache: "synthetic-cache", accessTokenExpiresAt: Date.now() - 1000, sessionExpiresAt: Date.now() + 3_600_000 };
     await backend.createSession(session);
     job = await backend.enqueueScan(tenantId, session.id);
   });
 
   afterAll(async () => {
-    if (sql) {
-      for (const table of ["scan_checkpoints", "scan_jobs", "snapshots", "sessions", "access_events"]) {
-        await sql.query(`DELETE FROM ${table} WHERE tenant_id=ANY($1::uuid[])`, [tenantIds]);
-      }
-      await sql.end();
-    }
-    await backend?.close();
+    try { await backend?.close(); }
+    finally { await database?.close(); }
   });
 
   const state = () => backend.getScanAccessState(job.id, workerId, tenantId);
@@ -79,7 +75,6 @@ describe.skipIf(!connectionString)("PostgreSQL worker access to a claimed scan",
     await claim();
     const foreignTenantId = randomUUID();
     const foreignSessionId = randomUUID();
-    tenantIds.push(foreignTenantId);
     await backend.createSession({ ...session, id: foreignSessionId, tenantId: foreignTenantId });
     // A legacy/corrupt reference must not cross a tenant boundary through the session join.
     await sql.query("UPDATE scan_jobs SET session_id=$1 WHERE id=$2 AND tenant_id=$3", [foreignSessionId, job.id, tenantId]);

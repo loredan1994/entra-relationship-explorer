@@ -2,6 +2,7 @@ import { randomBytes, randomUUID } from "node:crypto";
 import { Pool } from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { PostgresBackend } from "./postgres";
+import { createIsolatedTestDatabase } from "./test-support";
 
 const connectionString = process.env.TEST_DATABASE_URL;
 if (connectionString) {
@@ -13,6 +14,7 @@ describe.skipIf(!connectionString)("queue recovery during authentication and dat
   const tenantId = randomUUID();
   const otherTenantId = randomUUID();
   const sessionId = randomUUID();
+  let database: Awaited<ReturnType<typeof createIsolatedTestDatabase>>;
   let backend: PostgresBackend;
   let sql: Pool;
 
@@ -22,20 +24,16 @@ describe.skipIf(!connectionString)("queue recovery during authentication and dat
   });
 
   beforeAll(async () => {
-    backend = new PostgresBackend({ connectionString: connectionString!, encryptionKey: randomBytes(32) });
-    sql = new Pool({ connectionString });
+    database = await createIsolatedTestDatabase(connectionString!, Pool);
+    backend = new PostgresBackend({ connectionString: database.connectionString, encryptionKey: randomBytes(32) });
+    sql = database.sql;
     await backend.migrate();
     await createSession(sessionId);
   });
 
   afterAll(async () => {
-    if (sql) {
-      for (const table of ["scan_checkpoints", "scan_jobs", "sessions", "access_events"]) {
-        await sql.query(`DELETE FROM ${table} WHERE tenant_id=ANY($1::uuid[])`, [[tenantId, otherTenantId]]);
-      }
-      await sql.end();
-    }
-    await backend?.close();
+    try { await backend?.close(); }
+    finally { await database?.close(); }
   });
 
   it.each(["missing", "expired", "other tenant"])("rejects a %s session even when its requested tenant already has an active scan", async invalid => {

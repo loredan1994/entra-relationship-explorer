@@ -3,6 +3,7 @@ import { cleanProjectFixture } from "@entra-explorer/domain";
 import { Pool } from "pg";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { PostgresBackend } from "./postgres";
+import { createIsolatedTestDatabase } from "./test-support";
 
 const connectionString = process.env.TEST_DATABASE_URL;
 if (connectionString) {
@@ -14,20 +15,21 @@ describe.skipIf(!connectionString)("migration coordination with runtime transact
   const tenantId = randomUUID();
   const applicationName = `runtime-migration-${tenantId}`;
   const sessionId = randomUUID();
+  let database: Awaited<ReturnType<typeof createIsolatedTestDatabase>>;
   let backend: PostgresBackend;
   let sql: Pool;
   beforeAll(async () => {
-    const url = new URL(connectionString!);
+    database = await createIsolatedTestDatabase(connectionString!, Pool);
+    const url = new URL(database.connectionString);
     url.searchParams.set("application_name", applicationName);
     backend = new PostgresBackend({ connectionString: url.toString(), encryptionKey: randomBytes(32) });
-    sql = new Pool({ connectionString });
+    sql = database.sql;
     await backend.migrate();
     await backend.createSession({ id: sessionId, tenantId, account: {}, accessToken: "synthetic", tokenCache: "synthetic", accessTokenExpiresAt: Date.now() + 3600000, sessionExpiresAt: Date.now() + 3600000 });
   });
   afterAll(async () => {
-    for (const table of ["threat_reviews", "scan_checkpoints", "scan_jobs", "snapshots", "sessions", "access_events"]) await sql.query(`DELETE FROM ${table} WHERE tenant_id=$1`, [tenantId]);
-    await backend.close();
-    await sql.end();
+    try { await backend?.close(); }
+    finally { await database?.close(); }
   });
 
   it.each(["publication", "pruning"] as const)("waits before DDL while %s already owns a runtime transaction", async operation => {

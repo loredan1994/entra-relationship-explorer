@@ -2,6 +2,7 @@ import { randomBytes, randomUUID } from "node:crypto";
 import { Pool } from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { PostgresBackend } from "./postgres";
+import { createIsolatedTestDatabase } from "./test-support";
 import type { DurableSession } from "./types";
 
 const connectionString = process.env.TEST_DATABASE_URL;
@@ -12,19 +13,18 @@ if (connectionString) {
 
 describe.skipIf(!connectionString)("session expiry during credential refresh", () => {
   const tenantId = randomUUID();
+  let database: Awaited<ReturnType<typeof createIsolatedTestDatabase>>;
   let backend: PostgresBackend;
   let sql: Pool;
   beforeAll(async () => {
-    backend = new PostgresBackend({ connectionString: connectionString!, encryptionKey: randomBytes(32) });
-    sql = new Pool({ connectionString });
+    database = await createIsolatedTestDatabase(connectionString!, Pool);
+    backend = new PostgresBackend({ connectionString: database.connectionString, encryptionKey: randomBytes(32) });
+    sql = database.sql;
     await backend.migrate();
   });
   afterAll(async () => {
-    if (sql) {
-      await sql.query("DELETE FROM sessions WHERE tenant_id=$1", [tenantId]);
-      await sql.end();
-    }
-    await backend?.close();
+    try { await backend?.close(); }
+    finally { await database?.close(); }
   });
 
   async function createSession(): Promise<DurableSession> {

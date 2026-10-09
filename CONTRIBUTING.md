@@ -99,6 +99,13 @@ The maintainability report fails when a function exceeds CRAP 30. New logic is e
 were wrong — not tests that merely execute it. Shared fixtures live in each
 package's `test-support.ts`; prefer extending those over inventing new ones.
 
+PostgreSQL suites use the isolated-schema fixture in
+[`packages/backend/src/test-support.ts`](packages/backend/src/test-support.ts).
+Unique tenant IDs alone do not isolate tests from startup's expired-session
+cleanup. Keep concurrent operations within the same owned schema and retain
+exact rollback/state assertions. The fixture rejects unsafe database targets
+before opening a pool and removes only the schema it created.
+
 Mutation survivors must be reviewed for an observable behavioral difference. Add a
 regression that fails for the mutation, or simplify redundant logic. Narrow Stryker
 exclusions are reserved for proven equivalent mutations with an explanation beside
