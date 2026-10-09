@@ -8,12 +8,13 @@ import { analyzeTenantSecurity } from "@/server/tenant-security";
 export const dynamic = "force-dynamic";
 
 export default async function PermissionsPage() {
-  const { snapshot, state } = await loadSnapshotContext(1);
+  const context = await loadSnapshotContext(1);
+  const { snapshot, state } = context;
   const security = analyzeTenantSecurity(snapshot);
   const { summary } = security;
 
   return (
-    <AppShell>
+    <AppShell context={context}>
       <div className="page-container">
         <PageHeading
           eyebrow="Configured access inventory"

@@ -18,6 +18,8 @@ Map shows at most 15 objects and 50 connections at once. Searches and filters ap
 
 Browser reload reads the latest stored snapshot; it does not start another Microsoft Graph scan. To collect fresh evidence, open **Settings**, sign in if requested, then **Start read-only scan**. Wait for the scan to finish and check its coverage. If your session expires during polling, the tool stops retrying and offers a sign-in action. A reload also discards unsaved in-memory scenario and engine choices.
 
+Page content and the source banner describe the same snapshot. A historical comparison names its selected later scan in the banner. If a bookmarked application is missing or hidden by a search, the workspace explains that state and offers recovery instead of selecting a different application.
+
 ## Your first tenant investigation
 
 1. **Connect and scan.** Follow [tenant setup](../README.md#connect-your-own-tenant). Review the configured scopes in Settings and start a read-only scan. The source banner distinguishes sample data from a tenant snapshot, including when you are signed out or no scan has completed.
@@ -40,6 +42,8 @@ Optional directory-audit events can be correlated with changed object IDs and th
 ## Model a review plan
 
 The **What-if planner** excludes selected configured relationships from an in-memory copy and compares bounded paths. It does not revoke access, predict business impact or account for credentials/sessions already possessed. Alternative paths and incomplete coverage remain visible.
+
+Choosing another import, resetting the scenario, editing its exclusions or selecting a candidate supersedes an unfinished file import. A delayed file cannot replace those newer choices; import feedback describes only the current plan.
 
 An explicitly exported review plan can be imported only for the same tenant, snapshot ID and scan time. Results are recomputed locally. Imports are limited to 100 KB and 100 exclusions; invalid or stale plans leave the current scenario intact. Refreshing the page discards unsaved in-memory choices.
 

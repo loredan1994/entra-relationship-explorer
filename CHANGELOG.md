@@ -37,9 +37,10 @@ Breaking changes are always called out under **Changed** with a migration note.
 
 ### Changed
 
+- Run fresh mutation checks in separate hosted package jobs, each with its own database, while requiring every package and coverage check to pass the final quality gate. The 95% thresholds and tested scopes are unchanged.
 - Review input limits are enforced explicitly: invalid or oversized fields return HTTP 400 without saving, instead of silently truncating a successful write. Existing documented limits and stored reviews remain compatible.
 - CSV export is available for the synthetic demo. Live exports still require an authenticated tenant and retained snapshot; unavailable exports offer connection/scan guidance.
-- Version the corrected interpretation as engine `1.0.3` / authorization rules `entra-configured/4`. Re-export older portable investigations from their source snapshots; incompatible replay versions are explicitly rejected. Stored snapshots remain readable.
+- Version the corrected interpretation as engine `1.0.4` / authorization rules `entra-configured/4`. Re-export older portable investigations from their source snapshots; incompatible replay versions are explicitly rejected. Stored snapshots remain readable.
 - Cache container dependency installation separately from product sources; exclude package stores and nested environment files from the build context.
 - Load engine history only for workflows that use it, and skip graph layout in table view.
 - Refresh the pinned Node 24 Alpine build image to the reviewed digest from dependency PR #46.
@@ -60,6 +61,13 @@ Breaking changes are always called out under **Changed** with a migration note.
 
 ### Fixed
 
+- Use one authorized snapshot context for page content and its header, including historical comparisons. Missing or filtered application bookmarks offer recovery instead of silently showing another identity.
+- Prevent delayed What-if imports from overwriting newer imports, resets, manual edits or selected candidates; clear obsolete import feedback when the plan changes.
+- Reject malformed authentication cookies and scan identifiers before database lookup, normalize UUID case consistently with encrypted storage, and allow sign-out to clear a damaged cookie. Retry database initialization after transient startup failure.
+- Reject session refreshes after expiry or sign-out; revalidate scan session and worker ownership during collection. Serialize retention cleanup with snapshot publication and review writes to prevent orphaned encrypted decisions.
+- Commit scan enqueue and its creation audit event together; failed audit writes cannot leave a claimable job, and concurrent reuse does not duplicate creation events.
+- Coordinate startup schema changes with active runtime transactions, preventing deadlocks during snapshot publication, checkpoint saves and session deletion.
+- Select a complete violating contract witness with matching derivation references, preserve conflicting facts as unresolved evidence gaps, and include role definitions and managed-identity federation in proposed collection reads.
 - Bound map rendering to 15 objects and 50 connections after filtering, retain the inspected relationship, and keep the complete inventory in Table. Collapse cycles before assigning columns to prevent unusably wide layouts.
 - Keep review drafts usable when browser storage is denied, full or malformed. Recover valid neighboring drafts independently, report unsaved changes honestly, and support retrying saves and failed live review reads without discarding other edits.
 - Download evidence only after an explicit click. Bind workspace exports to the displayed snapshot and reject a newer scan with HTTP 409 before generating or recording an export. Show session, stale-snapshot and network failures inline while preserving review drafts.

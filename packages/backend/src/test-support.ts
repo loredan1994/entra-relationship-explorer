@@ -91,3 +91,8 @@ export function jobRow(overrides: Record<string, unknown> = {}): Record<string, 
     ...overrides,
   };
 }
+
+/** Follow blockers through the startup migration gate without serializing concurrency tests. */
+export async function blockedTransactions(pool: import("pg").Pool, applicationName: string, blockerPids: number[], excludePid = 0) {
+  return pool.query<{ pid: number; started_at: string }>("WITH RECURSIVE waiting AS (SELECT a.pid,unnest(pg_blocking_pids(a.pid)) AS blocker FROM pg_stat_activity a WHERE a.application_name=$1 UNION SELECT w.pid,unnest(pg_blocking_pids(w.blocker)) FROM waiting w) SELECT DISTINCT w.pid,a.xact_start::text AS started_at FROM waiting w JOIN pg_stat_activity a ON a.pid=w.pid WHERE w.blocker=ANY($2::int[]) AND w.pid<>$3", [applicationName, blockerPids, excludePid]);
+}

@@ -31,6 +31,14 @@ describe("backend-only configuration", () => {
 });
 
 describe("Phase 1 configuration boundary", () => {
+  it("canonicalizes uppercase tenant and client UUIDs for Microsoft identity comparisons", () => {
+    const tenant = "ABCDEFAB-CDEF-4ABC-8DEF-ABCDEFABCDEF";
+    const client = "FEDCBAFE-DCBA-4FED-8CBA-FEDCBAFEDCBA";
+    expect(parseEntraConfig({ ...validEnvironment, ENTRA_TENANT_ID: ` ${tenant} `, ENTRA_CLIENT_ID: client })).toMatchObject({
+      tenantId: tenant.toLowerCase(), clientId: client.toLowerCase(), authority: `https://login.microsoftonline.com/${tenant.toLowerCase()}`,
+    });
+  });
+
   it("stays disabled unless explicitly enabled", () => {
     expect(parseEntraConfig({ NODE_ENV: "test" }).enabled).toBe(false);
   });

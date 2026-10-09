@@ -7,8 +7,17 @@ let singleton: { databaseUrl: string; backend: PostgresBackend; ready: Promise<v
 export async function getBackend(config: LiveEntraConfig): Promise<PostgresBackend> {
   if (!singleton || singleton.databaseUrl !== config.databaseUrl) {
     const backend = new PostgresBackend({ connectionString: config.databaseUrl, encryptionKey: config.dataEncryptionKey });
-    singleton = { databaseUrl: config.databaseUrl, backend, ready: backend.migrate() };
+    const connection = { databaseUrl: config.databaseUrl, backend, ready: backend.migrate() };
+    connection.ready = connection.ready.catch(async error => {
+      // All callers share this cleanup. A later request can retry after the
+      // database recovers, without replacing a newer connection's initialization.
+      if (singleton === connection) singleton = undefined;
+      try { await backend.close(); } catch { /* Preserve the initialization error. */ }
+      throw error;
+    });
+    singleton = connection;
   }
-  await singleton.ready;
-  return singleton.backend;
+  const connection = singleton;
+  await connection.ready;
+  return connection.backend;
 }

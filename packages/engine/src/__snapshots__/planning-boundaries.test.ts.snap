@@ -31,9 +31,10 @@ exports[`publishes read-only prerequisites for every supported collector 1`] = `
     ],
   },
   {
-    "cost": 1,
+    "cost": 2,
     "endpoints": [
       "/applications/{id}/federatedIdentityCredentials",
+      "/servicePrincipals?$select=id,servicePrincipalType&$expand=federatedIdentityCredentials($select=id,name,issuer,subject,audiences,description)",
     ],
     "id": "federatedIdentityCredentials",
     "requirement": "Application reader access. All pages and object instances must succeed; a read may still be denied or partial.",
@@ -117,8 +118,9 @@ exports[`publishes read-only prerequisites for every supported collector 1`] = `
     ],
   },
   {
-    "cost": 2,
+    "cost": 3,
     "endpoints": [
+      "/roleManagement/directory/roleDefinitions",
       "/roleManagement/directory/roleAssignments",
       "/roleManagement/directory/roleEligibilitySchedules",
     ],

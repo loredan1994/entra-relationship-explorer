@@ -64,7 +64,9 @@ it("limits total contract traversal, reports unfinished queries and never overru
   const partial = compareContract(m, m, required, 2); expect(partial.complete).toBe(false); expect(partial.addedPaths).toEqual([]); expect(partial.removedPaths).toEqual([]);
   for (const value of [0, 250_001]) expect(() => evaluateContract(m, required, value)).toThrow("Invalid contract steps budget.");
   const chain = { ...control, sourceIds: ["person", "other"] }; const limits = evaluateContract(m, chain, 2).limits;
-  expect(limits).toEqual({ steps: 1, maxSteps: 2, exhausted: true });
+  expect(limits).toMatchObject({ steps: 1, maxSteps: 2, exhausted: true, maxWork: 10_000 });
+  expect(limits.work).toBeGreaterThan(0);
+  expect(limits.work).toBeLessThanOrEqual(limits.maxWork);
 });
 it("reports semantic removals, incomplete comparisons and cross-tenant rejection", () => {
   const before = compileSnapshot(snapshot()), after = compileSnapshot(snapshot([]));

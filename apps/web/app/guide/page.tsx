@@ -1,12 +1,14 @@
 import Link from "next/link";
+import { loadSnapshotContext } from "@/server/current-snapshot";
 import { AppShell } from "@/components/app-shell";
 import { PageHeading } from "@/components/page-heading";
 import { workspaceTools } from "@/components/workspace-tools";
 
 export const dynamic = "force-dynamic";
 
-export default function GuidePage() {
-  return <AppShell><div className="page-container workspace-guide">
+export default async function GuidePage() {
+  const context = await loadSnapshotContext(1);
+  return <AppShell context={context}><div className="page-container workspace-guide">
     <PageHeading eyebrow="Workspace guide" title="Understand access. Follow the evidence."
       description="Entra Relationship Explorer helps administrators and reviewers investigate one Microsoft Entra tenant from a read-only snapshot. Start with a question, inspect the recorded facts, and keep your review beside the evidence."
       actions={<Link className="button button-primary" href="/map">Open relationship map</Link>} />

@@ -5,7 +5,7 @@ import { AppShell } from "@/components/app-shell";
 import { applicationIdentityPair } from "@/components/application-identity";
 import { PageHeading } from "@/components/page-heading";
 import { RiskBadge } from "@/components/risk-badge";
-import { loadCurrentSnapshot } from "@/server/current-snapshot";
+import { loadSnapshotContext } from "@/server/current-snapshot";
 
 export const dynamic = "force-dynamic";
 
@@ -17,7 +17,8 @@ export function generateStaticParams() {
 
 export default async function ApplicationDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const snapshot = await loadCurrentSnapshot();
+  const context = await loadSnapshotContext(1);
+  const { snapshot } = context;
   const selected = nodeById(snapshot, id);
   if (!selected || (selected.kind !== "application" && selected.kind !== "servicePrincipal")) notFound();
 
@@ -28,7 +29,7 @@ export default async function ApplicationDetailPage({ params }: { params: Promis
   const federatedCredentials = snapshot.nodes.filter((node) => node.kind === "federatedCredential" && sameApplication.some((application) => application.id === node.metadata?.parentId));
 
   return (
-    <AppShell>
+    <AppShell context={context}>
       <div className="page-container">
         <PageHeading
           eyebrow={`Application detail · ${snapshot.mode === "fixture" ? "sample record" : "your tenant snapshot"}`}

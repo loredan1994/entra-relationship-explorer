@@ -3,6 +3,7 @@ import type { AccountInfo, AuthenticationResult } from "@azure/msal-node";
 import type { LiveEntraConfig } from "../config-core";
 
 const TENANT = "11111111-1111-4111-8111-111111111111";
+const SESSION = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const OTHER_TENANT = "22222222-2222-4222-8222-222222222222";
 
 const createSession = vi.fn();
@@ -26,7 +27,7 @@ function authResult(overrides: Partial<AuthenticationResult> = {}): Authenticati
 }
 
 beforeEach(() => {
-  vi.clearAllMocks();
+  vi.resetAllMocks();
   vi.useRealTimers();
 });
 
@@ -85,44 +86,99 @@ describe("creating a session", () => {
 });
 
 describe("reading a session", () => {
+  it.each(["invalid", "", " ", `${SESSION}\n`, `prefix-${SESSION}`, SESSION.replaceAll("-", "")])("rejects malformed cookie %j before storage", async id => {
+    expect(await getServerSession(id, config)).toBeNull();
+    expect(getSession).not.toHaveBeenCalled();
+  });
+
+  it("normalizes a valid uppercase cookie before the tenant-bound lookup", async () => {
+    getSession.mockResolvedValue({ id: SESSION, tenantId: TENANT });
+    expect(await getServerSession(SESSION.toUpperCase(), config)).toMatchObject({ id: SESSION });
+    expect(getSession).toHaveBeenCalledWith(SESSION, TENANT);
+  });
+
   it("returns nothing without a cookie value, never consulting the backend", async () => {
     expect(await getServerSession(undefined, config)).toBeNull();
     expect(getSession).not.toHaveBeenCalled();
   });
 
   it("looks the session up scoped to the configured tenant", async () => {
-    getSession.mockResolvedValue({ id: "session-1", tenantId: TENANT });
-    expect(await getServerSession("session-1", config)).toMatchObject({ id: "session-1" });
-    expect(getSession).toHaveBeenCalledWith("session-1", TENANT);
+    getSession.mockResolvedValue({ id: SESSION, tenantId: TENANT });
+    expect(await getServerSession(SESSION, config)).toMatchObject({ id: SESSION });
+    expect(getSession).toHaveBeenCalledWith(SESSION, TENANT);
   });
 
   it("passes through a backend miss", async () => {
     getSession.mockResolvedValue(null);
-    expect(await getServerSession("session-1", config)).toBeNull();
+    expect(await getServerSession(SESSION, config)).toBeNull();
   });
 });
 
 describe("access tokens", () => {
   const storedSession = (accessTokenExpiresAt: number, tenantId = TENANT) => ({
-    id: "session-1", tenantId, account, accessToken: "current-token",
+    id: SESSION, tenantId, account, accessToken: "current-token",
     accessTokenExpiresAt, tokenCache: "cache", sessionExpiresAt: Date.now() + 3_600_000,
+  });
+
+  it("rejects a session that expires before a still-valid token can be returned", async () => {
+    getSession.mockResolvedValue({ ...storedSession(Date.now() + 3_600_000), sessionExpiresAt: Date.now() });
+    expect(await getSessionAccessToken(SESSION, config)).toBeNull();
+    expect(acquireSilent).not.toHaveBeenCalled();
+  });
+
+  it("discards a refresh that finishes at app-session expiry", async () => {
+    vi.useFakeTimers().setSystemTime(new Date("2026-08-26T10:00:00.000Z"));
+    const session = { ...storedSession(Date.now()), sessionExpiresAt: Date.now() + 1_000 };
+    getSession.mockResolvedValue(session);
+    acquireSilent.mockImplementation(async () => {
+      vi.setSystemTime(session.sessionExpiresAt);
+      return { result: { accessToken: "fresh-token" }, tokenCache: "new-cache" };
+    });
+    expect(await getSessionAccessToken(SESSION, config)).toBeNull();
+    expect(updateSession).not.toHaveBeenCalled();
+    expect(session.accessToken).toBe("current-token");
+  });
+
+  it("returns no token when sign-out revoked the session during refresh", async () => {
+    getSession.mockResolvedValue(storedSession(Date.now()));
+    acquireSilent.mockResolvedValue({ result: { accessToken: "fresh-token" }, tokenCache: "new-cache" });
+    updateSession.mockRejectedValue(new Error("Session was not found in this tenant."));
+    expect(await getSessionAccessToken(SESSION, config)).toBeNull();
+    expect(updateSession).toHaveBeenCalledOnce();
+  });
+
+  it("does not hide storage failures as a successful sign-out", async () => {
+    getSession.mockResolvedValue(storedSession(Date.now()));
+    acquireSilent.mockResolvedValue({ result: { accessToken: "fresh-token" }, tokenCache: "new-cache" });
+    const failure = new Error("Synthetic database unavailable");
+    updateSession.mockRejectedValue(failure);
+    await expect(getSessionAccessToken(SESSION, config)).rejects.toBe(failure);
+  });
+
+  it("does not return a token if the session expires while its update completes", async () => {
+    vi.useFakeTimers().setSystemTime(new Date("2026-08-26T10:00:00.000Z"));
+    const session = { ...storedSession(Date.now()), sessionExpiresAt: Date.now() + 1_000 };
+    getSession.mockResolvedValue(session);
+    acquireSilent.mockResolvedValue({ result: { accessToken: "fresh-token" }, tokenCache: "new-cache" });
+    updateSession.mockImplementation(async () => { vi.setSystemTime(session.sessionExpiresAt); });
+    expect(await getSessionAccessToken(SESSION, config)).toBeNull();
   });
 
   it("returns nothing when there is no session", async () => {
     getSession.mockResolvedValue(null);
-    expect(await getSessionAccessToken("session-1", config)).toBeNull();
+    expect(await getSessionAccessToken(SESSION, config)).toBeNull();
     expect(acquireSilent).not.toHaveBeenCalled();
   });
 
   it("returns nothing for a session outside the configured tenant", async () => {
     getSession.mockResolvedValue(storedSession(Date.now() + 3_600_000, OTHER_TENANT));
-    expect(await getSessionAccessToken("session-1", config)).toBeNull();
+    expect(await getSessionAccessToken(SESSION, config)).toBeNull();
     expect(acquireSilent).not.toHaveBeenCalled();
   });
 
   it("reuses a token that still has more than five minutes of life", async () => {
     getSession.mockResolvedValue(storedSession(Date.now() + 6 * 60 * 1_000));
-    expect(await getSessionAccessToken("session-1", config)).toBe("current-token");
+    expect(await getSessionAccessToken(SESSION, config)).toBe("current-token");
     expect(acquireSilent).not.toHaveBeenCalled();
     expect(updateSession).not.toHaveBeenCalled();
   });
@@ -134,7 +190,7 @@ describe("access tokens", () => {
       getSession.mockResolvedValue(storedSession(Date.now() + 5 * 60 * 1_000));
       acquireSilent.mockResolvedValue({ result: { accessToken: "fresh-token", expiresOn: new Date(Date.now() + 3_600_000) }, tokenCache: "new-cache" });
       // The window is "more than five minutes left"; exactly five minutes is not enough.
-      expect(await getSessionAccessToken("session-1", config)).toBe("fresh-token");
+      expect(await getSessionAccessToken(SESSION, config)).toBe("fresh-token");
       expect(acquireSilent).toHaveBeenCalledOnce();
     } finally {
       vi.useRealTimers();
@@ -146,7 +202,7 @@ describe("access tokens", () => {
     vi.setSystemTime(new Date("2026-08-26T10:00:00.000Z"));
     try {
       getSession.mockResolvedValue(storedSession(Date.now() + 5 * 60 * 1_000 + 1));
-      expect(await getSessionAccessToken("session-1", config)).toBe("current-token");
+      expect(await getSessionAccessToken(SESSION, config)).toBe("current-token");
       expect(acquireSilent).not.toHaveBeenCalled();
     } finally {
       vi.useRealTimers();
@@ -156,7 +212,7 @@ describe("access tokens", () => {
   it("refreshes a token inside the five-minute window", async () => {
     getSession.mockResolvedValue(storedSession(Date.now() + 60 * 1_000));
     acquireSilent.mockResolvedValue({ result: { accessToken: "fresh-token", expiresOn: new Date(Date.now() + 3_600_000) }, tokenCache: "new-cache" });
-    expect(await getSessionAccessToken("session-1", config)).toBe("fresh-token");
+    expect(await getSessionAccessToken(SESSION, config)).toBe("fresh-token");
     expect(acquireSilent).toHaveBeenCalledWith(config, account, "cache");
     expect(updateSession).toHaveBeenCalledWith(expect.objectContaining({ accessToken: "fresh-token", tokenCache: "new-cache" }));
   });
@@ -164,15 +220,15 @@ describe("access tokens", () => {
   it("refreshes a token that has already expired", async () => {
     getSession.mockResolvedValue(storedSession(Date.now() - 1_000));
     acquireSilent.mockResolvedValue({ result: { accessToken: "fresh-token", expiresOn: new Date(Date.now() + 3_600_000) }, tokenCache: "new-cache" });
-    expect(await getSessionAccessToken("session-1", config)).toBe("fresh-token");
+    expect(await getSessionAccessToken(SESSION, config)).toBe("fresh-token");
   });
 
   it("returns nothing when a silent refresh fails or yields no token", async () => {
     getSession.mockResolvedValue(storedSession(Date.now() + 60 * 1_000));
     acquireSilent.mockResolvedValue(null);
-    expect(await getSessionAccessToken("session-1", config)).toBeNull();
+    expect(await getSessionAccessToken(SESSION, config)).toBeNull();
     acquireSilent.mockResolvedValue({ result: { accessToken: "" }, tokenCache: "c" });
-    expect(await getSessionAccessToken("session-1", config)).toBeNull();
+    expect(await getSessionAccessToken(SESSION, config)).toBeNull();
     expect(updateSession).not.toHaveBeenCalled();
   });
 
@@ -180,15 +236,24 @@ describe("access tokens", () => {
     vi.useFakeTimers().setSystemTime(new Date("2026-08-26T10:00:00.000Z"));
     getSession.mockResolvedValue(storedSession(Date.parse("2026-08-26T10:01:00.000Z")));
     acquireSilent.mockResolvedValue({ result: { accessToken: "fresh-token", expiresOn: null }, tokenCache: "new-cache" });
-    await getSessionAccessToken("session-1", config);
+    await getSessionAccessToken(SESSION, config);
     expect(updateSession).toHaveBeenCalledWith(expect.objectContaining({ accessTokenExpiresAt: Date.parse("2026-08-26T10:55:00.000Z") }));
   });
 });
 
 describe("deleting a session", () => {
+  it.each(["invalid", "", ` ${SESSION}`, `${SESSION}\n`])("lets sign-out clear malformed cookie %j without consulting storage", async id => {
+    await expect(deleteServerSession(id, config)).resolves.toBeUndefined();
+    expect(deleteSession).not.toHaveBeenCalled();
+  });
+
+  it("normalizes uppercase cookies before deleting the same opaque session", async () => {
+    await deleteServerSession(SESSION.toUpperCase(), config);
+    expect(deleteSession).toHaveBeenCalledWith(SESSION, TENANT);
+  });
   it("deletes within the configured tenant", async () => {
-    await deleteServerSession("session-1", config);
-    expect(deleteSession).toHaveBeenCalledWith("session-1", TENANT);
+    await deleteServerSession(SESSION, config);
+    expect(deleteSession).toHaveBeenCalledWith(SESSION, TENANT);
   });
 
   it("does nothing without a cookie value", async () => {

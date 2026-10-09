@@ -65,6 +65,8 @@ What-if changes exist only in browser memory and cannot call Microsoft Graph. Sc
 
 Live review writes are bound to the displayed snapshot and an opaque revision. Concurrent/stale saves fail instead of overwriting newer context. Snapshot and current/prior review reads enforce retention even when the worker is idle; periodic worker maintenance removes expired evidence and linked decisions. Workers refresh leases, recover stale work periodically, and reject stale ownership on database writes.
 
+Retention cleanup, snapshot publication and review acceptance share a tenant lock, preventing concurrent cleanup from leaving encrypted decisions without their snapshot. The worker rechecks its owning session and lease throughout collection; sign-out or absolute session expiry stops further reads and unpublished work. An already in-flight Microsoft Graph GET cannot be withdrawn. Refreshing a Microsoft token does not extend the application's session lifetime.
+
 ### Application access context
 
 Snapshots may also retain allowlisted sign-in audience, service-principal account state, assignment requirement, home-tenant ID, preferred SSO mode and verified-publisher ID/name. These are configuration evidence, not effective access or publisher safety judgments. Existing Graph read scopes cover them. Missing historical fields remain unknown. Incoming assignments/consent and observed sign-ins remain separate, including in the relationship inspector.

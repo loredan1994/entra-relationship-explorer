@@ -1,7 +1,7 @@
 import { randomUUID, timingSafeEqual } from "node:crypto";
 import type { TenantSnapshot } from "@entra-explorer/domain";
 import { canonicalReviewIds } from "./review-ids";
-import type { AccessEvent, Backend, BackendHealth, DurableAuthFlow, DurableSession, ScanCheckpoint, ScanJob, ScanJobStage, ThreatReview } from "./types";
+import type { AccessEvent, Backend, BackendHealth, DurableAuthFlow, DurableSession, ScanAccessState, ScanCheckpoint, ScanJob, ScanJobStage, ThreatReview } from "./types";
 
 function copy<T>(value: T): T {
   return structuredClone(value);
@@ -64,7 +64,7 @@ export class MemoryBackend implements Backend {
 
   async updateSession(session: DurableSession): Promise<void> {
     const existing = this.sessions.get(session.id);
-    if (!existing || existing.tenantId !== session.tenantId) throw new Error("Session was not found in this tenant.");
+    if (!existing || existing.tenantId !== session.tenantId || existing.sessionExpiresAt <= Date.now()) throw new Error("Session was not found in this tenant.");
     this.sessions.set(session.id, copy(session));
   }
 
@@ -92,6 +92,15 @@ export class MemoryBackend implements Backend {
   async getLatestJob(tenantId: string): Promise<ScanJob | null> {
     const job = [...this.jobs.values()].filter((candidate) => candidate.tenantId === tenantId).sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
     return job ? copy(job) : null;
+  }
+
+  async getScanAccessState(id: string, workerId: string, tenantId: string): Promise<ScanAccessState> {
+    const job = this.jobs.get(id);
+    if (!job || job.tenantId !== tenantId || job.workerId !== workerId) return "lease_lost";
+    if (job.status === "cancel_requested") return "cancel_requested";
+    if (job.status !== "running") return "lease_lost";
+    const session = job.sessionId ? this.sessions.get(job.sessionId) : undefined;
+    return session && session.tenantId === tenantId && session.sessionExpiresAt > Date.now() ? "running" : "session_unavailable";
   }
 
   async recoverStaleJobs(tenantId: string, staleBefore: Date): Promise<number> {
@@ -140,6 +149,8 @@ export class MemoryBackend implements Backend {
   async completeJob(id: string, workerId: string, snapshot: TenantSnapshot, retainAfter: Date): Promise<void> {
     const job = this.ownedRunningJob(id, workerId);
     if (snapshot.tenant.tenantId !== job.tenantId) throw new Error("Snapshot and job tenant boundaries do not match.");
+    const session = job.sessionId ? this.sessions.get(job.sessionId) : undefined;
+    if (!session || session.tenantId !== job.tenantId || session.sessionExpiresAt <= Date.now()) throw new Error("The scan job is not owned by this worker.");
     // Stryker disable next-line ArrayDeclaration: the retention filter below drops any seeded entry, which has no scannedAt.
     const items = this.snapshots.get(job.tenantId) ?? [];
     items.push(copy(snapshot));

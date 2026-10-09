@@ -4,6 +4,7 @@ import type { AccountInfo, AuthenticationResult } from "@azure/msal-node";
 import type { DurableSession } from "@entra-explorer/backend";
 import type { LiveEntraConfig } from "../config-core";
 import { getBackend } from "../backend";
+import { canonicalOpaqueId } from "../opaque-id";
 import { acquireSilent } from "./msal";
 
 export const SESSION_COOKIE = "entra_explorer_session";
@@ -31,23 +32,32 @@ export async function createServerSession(config: LiveEntraConfig, result: Authe
 }
 
 export async function getServerSession(id: string | undefined, config: LiveEntraConfig): Promise<ServerSession | null> {
-  if (!id) return null;
-  return (await (await getBackend(config)).getSession(id, config.tenantId)) as ServerSession | null;
+  const sessionId = canonicalOpaqueId(id);
+  if (!sessionId) return null;
+  return (await (await getBackend(config)).getSession(sessionId, config.tenantId)) as ServerSession | null;
 }
 
 export async function getSessionAccessToken(id: string | undefined, config: LiveEntraConfig): Promise<string | null> {
   const session = await getServerSession(id, config);
-  if (!session || session.tenantId !== config.tenantId) return null;
+  if (!session || session.tenantId !== config.tenantId || session.sessionExpiresAt <= Date.now()) return null;
   if (session.accessTokenExpiresAt - Date.now() > 5 * 60 * 1_000) return session.accessToken;
   const refreshed = await acquireSilent(config, session.account, session.tokenCache);
-  if (!refreshed?.result.accessToken) return null;
+  if (!refreshed?.result.accessToken || session.sessionExpiresAt <= Date.now()) return null;
   session.accessToken = refreshed.result.accessToken;
   session.accessTokenExpiresAt = refreshed.result.expiresOn?.getTime() ?? Date.now() + 55 * 60 * 1_000;
   session.tokenCache = refreshed.tokenCache;
-  await (await getBackend(config)).updateSession(session);
-  return session.accessToken;
+  try {
+    // The backend checks the stored row again: sign-out or expiry during the
+    // identity-provider request must not resurrect a session or return its token.
+    await (await getBackend(config)).updateSession(session);
+  } catch (error) {
+    if (error instanceof Error && error.message === "Session was not found in this tenant.") return null;
+    throw error;
+  }
+  return session.sessionExpiresAt > Date.now() ? session.accessToken : null;
 }
 
 export async function deleteServerSession(id: string | undefined, config: LiveEntraConfig): Promise<void> {
-  if (id) await (await getBackend(config)).deleteSession(id, config.tenantId);
+  const sessionId = canonicalOpaqueId(id);
+  if (sessionId) await (await getBackend(config)).deleteSession(sessionId, config.tenantId);
 }

@@ -1,11 +1,9 @@
-import { cookies } from "next/headers";
 import Link from "next/link";
 import { AppShell } from "@/components/app-shell";
 import { PageHeading } from "@/components/page-heading";
 import { ScanControl } from "@/components/scan-control";
-import { getServerSession, SESSION_COOKIE } from "@/server/auth/session-store";
 import { getEntraConfig } from "@/server/config";
-import { loadCurrentSnapshot } from "@/server/current-snapshot";
+import { loadSnapshotContext } from "@/server/current-snapshot";
 import { getBackend } from "@/server/backend";
 
 export const dynamic = "force-dynamic";
@@ -32,14 +30,13 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
   // arbitrary URL text into the connection feedback.
   const authMessage = authError ? (typeof authError === "string" && Object.hasOwn(authErrors, authError) ? authErrors[authError] : "Sign-in could not be completed. Start a new sign-in below.") : null;
   const config = getEntraConfig();
-  const snapshot = await loadCurrentSnapshot();
-  const cookieStore = await cookies();
-  const session = config.enabled ? await getServerSession(cookieStore.get(SESSION_COOKIE)?.value, config) : null;
-  const connected = Boolean(config.enabled && session?.tenantId === config.tenantId);
-  const latestJob = connected && session && config.enabled ? await (await getBackend(config)).getLatestJob(session.tenantId) : null;
+  const context = await loadSnapshotContext(1);
+  const { snapshot, state } = context;
+  const connected = config.enabled && (state === "no-snapshot" || (state === "connected" && snapshot.tenant.tenantId === config.tenantId));
+  const latestJob = connected && config.enabled ? await (await getBackend(config)).getLatestJob(config.tenantId) : null;
   const graphScopes = config.enabled ? config.graphScopes : ["Application.Read.All", "Directory.Read.All"];
   return (
-    <AppShell>
+    <AppShell context={context}>
       <div className="page-container settings-page">
         <PageHeading eyebrow="Product boundary" title="Settings" description="Connection, collection scope, retention, and required permissions." actions={<Link className="button button-secondary" href="/guide">Workspace guide</Link>} />
         <section className="onboarding-callout" aria-labelledby="onboarding-title">

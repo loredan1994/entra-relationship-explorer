@@ -4,7 +4,7 @@ import { Pool, type PoolClient, type QueryResultRow } from "pg";
 import { decryptJson, encryptJson, type EncryptedValue } from "./crypto";
 import { DATABASE_SCHEMA } from "./schema";
 import { canonicalReviewIds } from "./review-ids";
-import type { AccessEvent, Backend, BackendHealth, DurableAuthFlow, DurableSession, ScanCheckpoint, ScanJob, ScanJobStage, ThreatReview } from "./types";
+import type { AccessEvent, Backend, BackendHealth, DurableAuthFlow, DurableSession, ScanAccessState, ScanCheckpoint, ScanJob, ScanJobStage, ThreatReview } from "./types";
 
 interface PostgresBackendOptions { connectionString: string; encryptionKey: Uint8Array; }
 interface EncryptedRow extends QueryResultRow { id: string; tenant_id: string; expires_at?: Date; scanned_at?: Date; iv: Buffer; ciphertext: Buffer; auth_tag: Buffer; }
@@ -22,19 +22,17 @@ export class PostgresBackend implements Backend {
 
   async migrate(): Promise<void> {
     await this.transaction(async client => {
-      // Web, worker and migration processes can start together. Take this lock
-      // before touching any schema object so their DDL cannot deadlock each other.
-      await client.query("SELECT pg_advisory_xact_lock(hashtextextended('entra-explorer:migrations', 0))");
       await client.query(DATABASE_SCHEMA);
       await client.query("DELETE FROM auth_flows WHERE expires_at <= now()");
       await client.query("DELETE FROM sessions WHERE expires_at <= now()");
-    });
+    }, "exclusive");
   }
 
   async health(): Promise<BackendHealth> { await this.pool.query("SELECT 1"); return { ok: true, database: "postgres" }; }
 
   async pruneExpiredData(tenantId: string, retainAfter: Date): Promise<void> {
     await this.transaction(async client => {
+      await lockTenantSnapshots(client, tenantId);
       await client.query("DELETE FROM threat_reviews r USING snapshots s WHERE r.tenant_id=$1 AND r.snapshot_id=s.id AND s.tenant_id=$1 AND s.scanned_at<$2", [tenantId, retainAfter]);
       await client.query("DELETE FROM snapshots WHERE tenant_id=$1 AND scanned_at<$2", [tenantId, retainAfter]);
       await client.query("DELETE FROM auth_flows WHERE tenant_id=$1 AND expires_at<=now()", [tenantId]);
@@ -76,23 +74,36 @@ export class PostgresBackend implements Backend {
 
   async updateSession(session: DurableSession): Promise<void> {
     const value = encryptJson(session, this.key, sessionContext(session.id, session.tenantId));
-    const result = await this.pool.query("UPDATE sessions SET expires_at=$3,iv=$4,ciphertext=$5,auth_tag=$6,updated_at=now() WHERE id=$1 AND tenant_id=$2", [session.id, session.tenantId, new Date(session.sessionExpiresAt), value.iv, value.ciphertext, value.authTag]);
+    const result = await this.pool.query("UPDATE sessions SET expires_at=$3,iv=$4,ciphertext=$5,auth_tag=$6,updated_at=now() WHERE id=$1 AND tenant_id=$2 AND expires_at>now()", [session.id, session.tenantId, new Date(session.sessionExpiresAt), value.iv, value.ciphertext, value.authTag]);
     if (result.rowCount !== 1) throw new Error("Session was not found in this tenant.");
   }
 
-  async deleteSession(id: string, tenantId: string): Promise<void> { await this.pool.query("DELETE FROM sessions WHERE id=$1 AND tenant_id=$2", [id, tenantId]); }
+  async deleteSession(id: string, tenantId: string): Promise<void> {
+    // Deletion also updates scan_jobs through its session foreign key.
+    await this.transaction(async client => { await client.query("DELETE FROM sessions WHERE id=$1 AND tenant_id=$2", [id, tenantId]); });
+  }
 
   async enqueueScan(tenantId: string, sessionId: string): Promise<ScanJob> {
-    const id = randomUUID();
-    const result = await this.pool.query("INSERT INTO scan_jobs (id,tenant_id,session_id,status,stage,detail) SELECT $1,$2,$3,'queued','applications','Waiting to begin the read-only scan' FROM sessions WHERE id=$3 AND tenant_id=$2 AND expires_at>now() ON CONFLICT DO NOTHING RETURNING *", [id, tenantId, sessionId]);
-    const row = result.rows[0] ?? (await this.pool.query("SELECT * FROM scan_jobs WHERE tenant_id=$1 AND status IN ('queued','running','cancel_requested') AND EXISTS (SELECT 1 FROM sessions WHERE id=$2 AND tenant_id=$1 AND expires_at>now()) ORDER BY created_at DESC LIMIT 1", [tenantId, sessionId])).rows[0];
-    if (!row) throw new Error("A valid tenant session is required.");
-    await this.recordAccess(tenantId, sessionId, "enqueue", "scan_job", row.id);
-    return mapJob(row);
+    return this.transaction(async client => {
+      const id = randomUUID();
+      const result = await client.query("INSERT INTO scan_jobs (id,tenant_id,session_id,status,stage,detail) SELECT $1,$2,$3,'queued','applications','Waiting to begin the read-only scan' FROM sessions WHERE id=$3 AND tenant_id=$2 AND expires_at>clock_timestamp() ON CONFLICT DO NOTHING RETURNING *", [id, tenantId, sessionId]);
+      const created = result.rows[0];
+      const row = created ?? (await client.query("SELECT * FROM scan_jobs WHERE tenant_id=$1 AND status IN ('queued','running','cancel_requested') AND EXISTS (SELECT 1 FROM sessions WHERE id=$2 AND tenant_id=$1 AND expires_at>clock_timestamp()) ORDER BY created_at DESC LIMIT 1", [tenantId, sessionId])).rows[0];
+      if (!row) throw new Error("A valid tenant session is required.");
+      // A job becomes claimable only with its creation record. Reusing an active
+      // scan does not represent another enqueue and must not duplicate that event.
+      if (created) await client.query("INSERT INTO access_events (tenant_id,session_id,action,resource_type,resource_id) VALUES ($1,$2,$3,$4,$5)", [tenantId, sessionId, "enqueue", "scan_job", row.id]);
+      return mapJob(row);
+    });
   }
 
   async getJob(id: string, tenantId: string): Promise<ScanJob | null> { const row = (await this.pool.query("SELECT * FROM scan_jobs WHERE id=$1 AND tenant_id=$2", [id, tenantId])).rows[0]; return row ? mapJob(row) : null; }
   async getLatestJob(tenantId: string): Promise<ScanJob | null> { const row = (await this.pool.query("SELECT * FROM scan_jobs WHERE tenant_id=$1 ORDER BY created_at DESC LIMIT 1", [tenantId])).rows[0]; return row ? mapJob(row) : null; }
+
+  async getScanAccessState(id: string, workerId: string, tenantId: string): Promise<ScanAccessState> {
+    const row = (await this.pool.query<{ access_state: ScanAccessState }>("SELECT CASE WHEN j.status='cancel_requested' THEN 'cancel_requested' WHEN s.id IS NULL THEN 'session_unavailable' ELSE 'running' END AS access_state FROM scan_jobs j LEFT JOIN sessions s ON s.id=j.session_id AND s.tenant_id=j.tenant_id AND s.expires_at>now() WHERE j.id=$1 AND j.worker_id=$2 AND j.tenant_id=$3 AND j.status IN ('running','cancel_requested')", [id, workerId, tenantId])).rows[0];
+    return row?.access_state ?? "lease_lost";
+  }
 
   async recoverStaleJobs(tenantId: string, staleBefore: Date): Promise<number> {
     return this.transaction(async client => {
@@ -117,10 +128,16 @@ export class PostgresBackend implements Backend {
 
   async completeJob(id: string, workerId: string, snapshot: TenantSnapshot, retainAfter: Date): Promise<void> {
     await this.transaction(async (client) => {
+      // Maintenance can clear a job's expired session through its foreign key.
+      // Acquire its shared tenant lock before the job row to avoid inversion.
+      await lockTenantSnapshots(client, snapshot.tenant.tenantId);
       const job = (await client.query("SELECT * FROM scan_jobs WHERE id=$1 AND worker_id=$2 AND status='running' FOR UPDATE", [id, workerId])).rows[0];
       if (!job) throw new Error("The scan job is not owned by this worker.");
       if (snapshot.tenant.tenantId !== job.tenant_id) throw new Error("Snapshot and job tenant boundaries do not match.");
-      await lockTenantSnapshots(client, job.tenant_id);
+      // Check after any lock wait: now() would still refer to transaction start.
+      // Logout's foreign-key update cannot pass the held job row until commit.
+      const authorized = await client.query("SELECT 1 FROM sessions WHERE id=$1 AND tenant_id=$2 AND expires_at>clock_timestamp()", [job.session_id, job.tenant_id]);
+      if (authorized.rowCount !== 1) throw new Error("The scan job is not owned by this worker.");
       const value = encryptJson(snapshot, this.key, snapshotContext(snapshot.id, job.tenant_id, snapshot.scannedAt));
       await client.query("INSERT INTO snapshots (id,tenant_id,scanned_at,completion_status,iv,ciphertext,auth_tag) VALUES ($1,$2,$3,$4,$5,$6,$7)", [snapshot.id, job.tenant_id, snapshot.scannedAt, snapshot.completion.status, value.iv, value.ciphertext, value.authTag]);
       await client.query("UPDATE scan_jobs SET status='complete',stage='complete',collected=$3,detail=$4,snapshot_id=$5,completion=$6,finished_at=now(),updated_at=now(),worker_id=NULL,locked_at=NULL WHERE id=$1 AND worker_id=$2", [id, workerId, snapshot.nodes.length + snapshot.edges.length, `${snapshot.nodes.length} objects and ${snapshot.edges.length} relationships normalized`, snapshot.id, snapshot.completion.status]);
@@ -160,8 +177,10 @@ export class PostgresBackend implements Backend {
     const payload = encryptJson(value, this.key, checkpointContext(value.jobId, value.tenantId));
     // Hold the job row through the upsert. Recovery/cancellation cannot change
     // its owner while this statement waits for an existing checkpoint row.
-    const result = await this.pool.query("WITH owned_job AS MATERIALIZED (SELECT id,tenant_id FROM scan_jobs WHERE id=$1 AND tenant_id=$2 AND worker_id=$6 AND status='running' FOR UPDATE) INSERT INTO scan_checkpoints (job_id,tenant_id,iv,ciphertext,auth_tag,updated_at) SELECT id,tenant_id,$3,$4,$5,now() FROM owned_job ON CONFLICT (job_id) DO UPDATE SET iv=EXCLUDED.iv,ciphertext=EXCLUDED.ciphertext,auth_tag=EXCLUDED.auth_tag,updated_at=now()", [value.jobId, value.tenantId, payload.iv, payload.ciphertext, payload.authTag, workerId]);
-    if (result.rowCount !== 1) throw new Error("The scan checkpoint is not owned by this worker.");
+    await this.transaction(async client => {
+      const result = await client.query("WITH owned_job AS MATERIALIZED (SELECT id,tenant_id FROM scan_jobs WHERE id=$1 AND tenant_id=$2 AND worker_id=$6 AND status='running' FOR UPDATE) INSERT INTO scan_checkpoints (job_id,tenant_id,iv,ciphertext,auth_tag,updated_at) SELECT id,tenant_id,$3,$4,$5,now() FROM owned_job ON CONFLICT (job_id) DO UPDATE SET iv=EXCLUDED.iv,ciphertext=EXCLUDED.ciphertext,auth_tag=EXCLUDED.auth_tag,updated_at=now()", [value.jobId, value.tenantId, payload.iv, payload.ciphertext, payload.authTag, workerId]);
+      if (result.rowCount !== 1) throw new Error("The scan checkpoint is not owned by this worker.");
+    });
   }
 
   async recentSnapshots(tenantId: string, limit = 20): Promise<TenantSnapshot[]> {
@@ -219,9 +238,19 @@ export class PostgresBackend implements Backend {
 
   async close(): Promise<void> { await this.pool.end(); }
 
-  private async transaction<T>(operation: (client: PoolClient) => Promise<T>): Promise<T> {
+  private async transaction<T>(operation: (client: PoolClient) => Promise<T>, migrationLock: "shared" | "exclusive" = "shared"): Promise<T> {
     const client = await this.pool.connect();
-    try { await client.query("BEGIN"); const result = await operation(client); await client.query("COMMIT"); return result; }
+    try {
+      await client.query("BEGIN");
+      // Acquire before submitting DML/DDL, which itself takes relation locks.
+      // Runtime transactions coexist; migrations wait for them before any DDL.
+      await client.query(migrationLock === "exclusive"
+        ? "SELECT pg_advisory_xact_lock(hashtextextended('entra-explorer:migrations', 0))"
+        : "SELECT pg_advisory_xact_lock_shared(hashtextextended('entra-explorer:migrations', 0))");
+      const result = await operation(client);
+      await client.query("COMMIT");
+      return result;
+    }
     // The rethrow below is covered; v8 additionally counts the catch block's own normal
     // completion, which an unconditional throw makes unreachable, hence the ignore.
     catch (error) { await client.query("ROLLBACK"); /* c8 ignore next */ throw error; }
@@ -229,7 +258,7 @@ export class PostgresBackend implements Backend {
   }
 }
 
-/** Publishing a scan and accepting its review are serialized within one tenant. */
+/** Publishing, reviewing and pruning snapshots are serialized within one tenant. */
 async function lockTenantSnapshots(client: PoolClient, tenantId: string): Promise<void> {
   await client.query("SELECT pg_advisory_xact_lock(hashtextextended('snapshot-review:' || $1, 0))", [tenantId]);
 }

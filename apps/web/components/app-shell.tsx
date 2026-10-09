@@ -1,9 +1,11 @@
 import type { ReactNode } from "react";
-import { loadSnapshotContext } from "@/server/current-snapshot";
+import type { SnapshotContext } from "@/server/current-snapshot";
 import { AppShellClient } from "./app-shell-client";
 
-export async function AppShell({ children }: { children: ReactNode }) {
-  const { snapshot, state } = await loadSnapshotContext(1);
+export function AppShell({ children, context }: { children: ReactNode; context: Pick<SnapshotContext, "snapshot" | "state"> }) {
+  // The banner describes this page's evidence. A second read could observe a
+  // newer scan or expired session and mislabel content already authorized here.
+  const { snapshot, state } = context;
   return (
     <AppShellClient
       tenantLabel={snapshot.tenant.tenantLabel}

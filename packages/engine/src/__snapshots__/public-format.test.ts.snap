@@ -10,11 +10,13 @@ exports[`version 1 evidence format compatibility > preserves contract failures a
     "2026-10-08T12:00:00.000Z",
   ],
   "contractId": "only-production",
-  "engineVersion": "1.0.3",
+  "engineVersion": "1.0.4",
   "limits": {
     "exhausted": false,
     "maxSteps": 250000,
+    "maxWork": 10000000,
     "steps": 2,
+    "work": 136,
   },
   "missing": [],
   "queries": 1,
@@ -65,7 +67,7 @@ exports[`version 1 evidence format compatibility > preserves contract failures a
           "rule": "entra-configured/4/application-permission",
         },
       ],
-      "engineVersion": "1.0.3",
+      "engineVersion": "1.0.4",
       "evidenceClass": "configured",
       "facts": [
         {
@@ -177,11 +179,13 @@ exports[`version 1 evidence format compatibility > preserves contract failures a
       "2026-10-08T12:00:00.000Z",
     ],
     "contractId": "only-production",
-    "engineVersion": "1.0.3",
+    "engineVersion": "1.0.4",
     "limits": {
       "exhausted": false,
       "maxSteps": 250000,
+      "maxWork": 10000000,
       "steps": 2,
+      "work": 136,
     },
     "missing": [],
     "queries": 1,
@@ -232,7 +236,7 @@ exports[`version 1 evidence format compatibility > preserves contract failures a
             "rule": "entra-configured/4/application-permission",
           },
         ],
-        "engineVersion": "1.0.3",
+        "engineVersion": "1.0.4",
         "evidenceClass": "configured",
         "facts": [
           {
@@ -337,11 +341,13 @@ exports[`version 1 evidence format compatibility > preserves contract failures a
       "2026-10-08T12:00:00.000Z",
     ],
     "contractId": "only-production",
-    "engineVersion": "1.0.3",
+    "engineVersion": "1.0.4",
     "limits": {
       "exhausted": false,
       "maxSteps": 250000,
+      "maxWork": 10000000,
       "steps": 0,
+      "work": 46,
     },
     "missing": [],
     "queries": 0,
@@ -372,7 +378,7 @@ exports[`version 1 evidence format compatibility > preserves minimized policy sc
     "2026-10-08T12:00:00.000Z",
   ],
   "domainSize": 16,
-  "engineVersion": "1.0.3",
+  "engineVersion": "1.0.4",
   "limits": {
     "exhausted": false,
     "maxSteps": 10000,
@@ -426,7 +432,7 @@ exports[`version 1 evidence format compatibility > preserves planning alternativ
   "collectedAt": [
     "2026-10-08T12:00:00.000Z",
   ],
-  "engineVersion": "1.0.3",
+  "engineVersion": "1.0.4",
   "limits": {
     "exhausted": false,
     "maxSteps": 100000,
@@ -498,8 +504,8 @@ exports[`version 1 evidence format compatibility > preserves pseudonymized offli
         "object:p000004",
         "relationship:p000002",
       ],
-      "digest": "e279a894499797b6d4df2dd6e4e1f6ef2bfb1143e6fd7f6b6cfa024fb4733179",
-      "engineVersion": "1.0.3",
+      "digest": "3097815187b4b261ec00ff7d99fc73fb81f87b9013099d5b26c13ac6151f5bc1",
+      "engineVersion": "1.0.4",
       "ruleVersion": "entra-configured/4",
     },
     "proof": {
@@ -541,7 +547,7 @@ exports[`version 1 evidence format compatibility > preserves pseudonymized offli
           "rule": "entra-configured/4/application-permission",
         },
       ],
-      "engineVersion": "1.0.3",
+      "engineVersion": "1.0.4",
       "evidenceClass": "configured",
       "facts": [
         {
@@ -793,7 +799,7 @@ exports[`version 1 evidence format compatibility > preserves the public proof fi
       "rule": "entra-configured/4/active-role",
     },
   ],
-  "engineVersion": "1.0.3",
+  "engineVersion": "1.0.4",
   "evidenceClass": "configured",
   "facts": [
     {
@@ -943,7 +949,7 @@ exports[`version 1 evidence format compatibility > preserves the public proof fi
       "rule": "entra-configured/4/application-permission",
     },
   ],
-  "engineVersion": "1.0.3",
+  "engineVersion": "1.0.4",
   "evidenceClass": "configured",
   "facts": [
     {
@@ -1069,7 +1075,7 @@ exports[`version 1 evidence format compatibility > preserves the public proof fi
       "rule": "entra-configured/4/application-permission",
     },
   ],
-  "engineVersion": "1.0.3",
+  "engineVersion": "1.0.4",
   "evidenceClass": "configured",
   "facts": [
     {
@@ -1187,7 +1193,7 @@ exports[`version 1 evidence format compatibility > preserves the public proof fi
       "rule": "entra-configured/4/application-permission",
     },
   ],
-  "engineVersion": "1.0.3",
+  "engineVersion": "1.0.4",
   "evidenceClass": "configured",
   "facts": [
     {
@@ -1312,7 +1318,7 @@ exports[`version 1 evidence format compatibility > preserves the public proof fi
       "rule": "entra-configured/4/delegated-permission",
     },
   ],
-  "engineVersion": "1.0.3",
+  "engineVersion": "1.0.4",
   "evidenceClass": "configured",
   "facts": [
     {
@@ -1493,7 +1499,7 @@ exports[`version 1 evidence format compatibility > preserves the public proof fi
       "rule": "entra-configured/4/assignment",
     },
   ],
-  "engineVersion": "1.0.3",
+  "engineVersion": "1.0.4",
   "evidenceClass": "configured",
   "facts": [
     {
@@ -1685,7 +1691,7 @@ exports[`version 1 evidence format compatibility > preserves the public proof fi
       "rule": "entra-configured/4/eligible-role",
     },
   ],
-  "engineVersion": "1.0.3",
+  "engineVersion": "1.0.4",
   "evidenceClass": "configured",
   "facts": [
     {
@@ -1869,7 +1875,7 @@ exports[`version 1 evidence format compatibility > preserves the public proof fi
       "rule": "entra-configured/4/control-path",
     },
   ],
-  "engineVersion": "1.0.3",
+  "engineVersion": "1.0.4",
   "evidenceClass": "inferred",
   "facts": [
     {
@@ -2086,7 +2092,7 @@ exports[`version 1 evidence format compatibility > preserves the public proof fi
       "rule": "entra-configured/4/application-permission",
     },
   ],
-  "engineVersion": "1.0.3",
+  "engineVersion": "1.0.4",
   "evidenceClass": "configured",
   "facts": [
     {
@@ -2226,7 +2232,7 @@ exports[`version 1 evidence format compatibility > preserves the public proof fi
       "rule": "entra-configured/4/control-path",
     },
   ],
-  "engineVersion": "1.0.3",
+  "engineVersion": "1.0.4",
   "evidenceClass": "inferred",
   "facts": [
     {
@@ -2398,7 +2404,7 @@ exports[`version 1 evidence format compatibility > preserves time windows, uncer
     "2026-10-08T12:00:00.000Z",
     "2026-10-10T12:00:00.000Z",
   ],
-  "engineVersion": "1.0.3",
+  "engineVersion": "1.0.4",
   "limits": {
     "exhausted": false,
     "maxSteps": 100000,
@@ -2693,7 +2699,7 @@ exports[`version 1 evidence format compatibility > projects allowlisted facts an
       "type": "CAN_CALL_AS_APP",
     },
   ],
-  "engineVersion": "1.0.3",
+  "engineVersion": "1.0.4",
   "nodes": [
     {
       "description": "",
@@ -2907,8 +2913,8 @@ exports[`version 1 evidence format compatibility > projects allowlisted facts an
         "object:resource",
         "relationship:grant",
       ],
-      "digest": "d6e75a1cd56f95f15f162f8bd627ec3bcee8a15e58b0ea9a48259732377cf927",
-      "engineVersion": "1.0.3",
+      "digest": "f20cc1d3b39e977e7de80a38a1aee969edd9ea6376109175a87af4fd84e75298",
+      "engineVersion": "1.0.4",
       "ruleVersion": "entra-configured/4",
     },
     "proof": {
@@ -2950,7 +2956,7 @@ exports[`version 1 evidence format compatibility > projects allowlisted facts an
           "rule": "entra-configured/4/application-permission",
         },
       ],
-      "engineVersion": "1.0.3",
+      "engineVersion": "1.0.4",
       "evidenceClass": "configured",
       "facts": [
         {
@@ -3171,7 +3177,7 @@ exports[`version 1 evidence format compatibility > retains declared deployment i
   "collectedAt": [
     "2026-10-08T12:00:00.000Z",
   ],
-  "engineVersion": "1.0.3",
+  "engineVersion": "1.0.4",
   "intervals": [
     {
       "credentials": [
@@ -3277,7 +3283,7 @@ exports[`version 1 evidence format compatibility > retains distinct overlap, mis
       "witness": null,
     },
   ],
-  "engineVersion": "1.0.3",
+  "engineVersion": "1.0.4",
   "limits": {
     "exhausted": false,
     "maxSteps": 20000,
@@ -3307,7 +3313,7 @@ exports[`version 1 evidence format compatibility > retains unknown read prerequi
   "collectedAt": [
     "2026-10-08T12:00:00.000Z",
   ],
-  "engineVersion": "1.0.3",
+  "engineVersion": "1.0.4",
   "limits": {
     "exhausted": false,
     "maxSteps": 100000,

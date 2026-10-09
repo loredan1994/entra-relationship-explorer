@@ -19,15 +19,18 @@ Startup reads three values from outside the repository: the app-registration cre
 
 Container builds cache the frozen dependency install independently of source edits. Changes to a workspace manifest, lockfile, workspace configuration or pnpm patch invalidate that layer. Local package stores and nested environment files are excluded from the build context.
 
-Review decisions use a revision check and are serialized with snapshot publication within the tenant. If a newer scan completes before a decision is saved, the API returns 409 and the reviewer must reload the evidence. Review JSON is limited to 128 KiB of actual streamed bytes; oversized requests return 413. These writes affect the local database only.
+Review decisions use a revision check and are serialized with snapshot publication and retention cleanup within the tenant. If a newer scan completes before a decision is saved, the API returns 409 and the reviewer must reload the evidence. Review JSON is limited to 128 KiB of actual streamed bytes; oversized requests return 413. These writes affect the local database only.
 
 ## Stop and recover
 
+- When upgrading from a version without runtime/migration coordination, stop the old web and worker services before starting the new image. Keep PostgreSQL and its volume. Old processes do not participate in the new lock protocol, so a rolling first upgrade cannot rely on that protection. Use the same Compose project and configuration throughout the upgrade.
 - `docker compose down` stops services while preserving the named PostgreSQL volume.
 - Starting again applies migrations before web and worker become available.
-- Concurrent startup migrations acquire a database-wide transaction lock before schema changes and expired-auth cleanup. Other instances wait for the migration to commit; failures roll back and release the lock.
+- Concurrent startup migrations acquire an exclusive database-wide transaction lock before schema changes and expired-auth cleanup. Runtime transactions acquire the shared form before touching tables, so schema changes wait for active work without creating inverse table-lock cycles. Ordinary metadata reads retain their single-query path; database DDL can briefly block reads. Failures roll back and release the transaction lock.
+- A failed web database initialization closes its failed connection pool. A later request retries initialization, so a transient startup outage does not require restarting the web service after PostgreSQL recovers.
 - A stopped web service does not lose sessions or jobs. Checkpoint writes lock the owning job row so a recovered worker’s progress cannot be overwritten by its predecessor.
 - Cancellation and lost worker ownership are checked between pages and before request dispatch. Retry backoff sleeps are split into intervals of at most one second, with an ownership check after each interval; database latency can delay those checks. An already-running HTTP request retains its bounded timeout.
+- The same checks validate the owning session. Signing out or reaching its absolute expiry stops collection; sign in and start a new read-only scan. Token refresh does not extend the session lifetime.
 - Recovery commits cancellation and deletion of unpublished checkpoints together. If deletion fails, the transaction rolls back and the next recovery poll can retry; it cannot mark cleanup finished while leaving stranded ciphertext.
 - A worker interrupted during a scan leaves its job durable. On startup, jobs whose worker lease has been stale for ten minutes return to the queue.
 

@@ -42,8 +42,8 @@ export function parseEntraConfig(environment: NodeJS.ProcessEnv): EntraConfig {
     return { enabled: false, reason: "Live Microsoft Entra access is disabled. The product is using synthetic fixtures." };
   }
 
-  const tenantId = required(environment, "ENTRA_TENANT_ID");
-  const clientId = required(environment, "ENTRA_CLIENT_ID");
+  const tenantId = required(environment, "ENTRA_TENANT_ID").toLowerCase();
+  const clientId = required(environment, "ENTRA_CLIENT_ID").toLowerCase();
   const clientSecret = required(environment, "ENTRA_CLIENT_SECRET");
   const redirectUri = required(environment, "ENTRA_REDIRECT_URI");
   const { databaseUrl, dataEncryptionKey } = parseBackendConfig(environment);

@@ -5,13 +5,14 @@ import { PageHeading } from "@/components/page-heading";
 import { rankPermissions } from "@/components/permission-utils";
 import { RiskBadge } from "@/components/risk-badge";
 import { workspaceTools } from "@/components/workspace-tools";
-import { loadCurrentSnapshot } from "@/server/current-snapshot";
+import { loadSnapshotContext } from "@/server/current-snapshot";
 import { analyzeTenantSecurity } from "@/server/tenant-security";
 
 export const dynamic = "force-dynamic";
 
 export default async function OverviewPage() {
-  const snapshot = await loadCurrentSnapshot();
+  const context = await loadSnapshotContext(1);
+  const { snapshot } = context;
   const sample = snapshot.mode === "fixture";
   const apps = snapshot.nodes.filter((node) => node.kind === "application").length;
   const identities = snapshot.nodes.filter((node) => node.kind === "servicePrincipal").length;
@@ -34,7 +35,7 @@ export default async function OverviewPage() {
   const scannedLabel = new Intl.DateTimeFormat("en", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", timeZone: "UTC", timeZoneName: "short" }).format(new Date(snapshot.scannedAt));
 
   return (
-    <AppShell>
+    <AppShell context={context}>
       <div className="page-container">
         <PageHeading
           eyebrow={sample ? "Sample tenant overview" : "Your tenant, read-only"}

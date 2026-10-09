@@ -1,6 +1,7 @@
 import type { TenantSnapshot } from "@entra-explorer/domain";
 
 export type ScanJobStatus = "queued" | "running" | "complete" | "failed" | "cancel_requested" | "cancelled";
+export type ScanAccessState = "running" | "cancel_requested" | "session_unavailable" | "lease_lost";
 export type ScanJobStage = "applications" | "servicePrincipals" | "federatedIdentityCredentials" | "usersAndGroups" | "groupMemberships" | "devices" | "administrativeUnits" | "appRoleAssignments" | "delegatedPermissionGrants" | "owners" | "roles" | "conditionalAccess" | "authorizationPolicy" | "permissionGrantPolicies" | "crossTenantAccess" | "activity" | "directoryAudits" | "normalizing" | "complete";
 
 export interface DurableSession {
@@ -88,6 +89,7 @@ export interface Backend {
   enqueueScan(tenantId: string, sessionId: string): Promise<ScanJob>;
   getJob(id: string, tenantId: string): Promise<ScanJob | null>;
   getLatestJob(tenantId: string): Promise<ScanJob | null>;
+  getScanAccessState(id: string, workerId: string, tenantId: string): Promise<ScanAccessState>;
   recoverStaleJobs(tenantId: string, staleBefore: Date): Promise<number>;
   claimNextJob(workerId: string, tenantId: string): Promise<ScanJob | null>;
   updateJobProgress(id: string, workerId: string, stage: ScanJobStage, collected: number, detail: string): Promise<void>;

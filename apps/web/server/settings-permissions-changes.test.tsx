@@ -2,27 +2,21 @@ import { createElement, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, expect, it, vi } from "vitest";
 import { analyzeFindingLifecycle, cleanProjectFixture, cleanProjectPreviousFixture, type TenantSnapshot } from "@entra-explorer/domain";
-import { loadCurrentSnapshot, loadSnapshotContext, loadSnapshotHistory } from "./current-snapshot";
+import { loadSnapshotContext } from "./current-snapshot";
 import { getEntraConfig } from "./config";
-import { getServerSession } from "./auth/session-store";
 import SettingsPage from "../app/settings/page";
 import PermissionsPage from "../app/permissions/page";
 import ChangesPage from "../app/changes/page";
 
-vi.mock("./current-snapshot", () => ({ loadCurrentSnapshot: vi.fn(), loadSnapshotContext: vi.fn(), loadSnapshotHistory: vi.fn() }));
+vi.mock("./current-snapshot", () => ({ loadSnapshotContext: vi.fn() }));
 vi.mock("./config", () => ({ getEntraConfig: vi.fn() }));
-vi.mock("./auth/session-store", () => ({ getServerSession: vi.fn(), SESSION_COOKIE: "entra_explorer_session" }));
 vi.mock("./backend", () => ({ getBackend: async () => ({ getLatestJob: async () => null }) }));
-vi.mock("next/headers", () => ({ cookies: async () => ({ get: () => ({ value: "synthetic" }) }) }));
 vi.mock("../components/app-shell", () => ({ AppShell: ({ children }: { children: ReactNode }) => createElement("main", null, children) }));
 
 beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(getEntraConfig).mockReturnValue({ enabled: false, reason: "Demo mode" });
-  vi.mocked(getServerSession).mockResolvedValue(null);
-  vi.mocked(loadCurrentSnapshot).mockResolvedValue(cleanProjectFixture);
   vi.mocked(loadSnapshotContext).mockResolvedValue({ snapshot: cleanProjectFixture, state: "demo", history: [cleanProjectFixture], liveEnabled: false });
-  vi.mocked(loadSnapshotHistory).mockResolvedValue([cleanProjectFixture]);
 });
 
 it.each([
@@ -52,11 +46,15 @@ it.each(["no-snapshot", "signed-out"] as const)("offers a useful recovery link i
 
 it("does not offer a tenant export before the first completed scan", async () => {
   vi.mocked(getEntraConfig).mockReturnValue({ enabled: true, tenantId: cleanProjectFixture.tenant.tenantId, graphScopes: [] } as never);
-  vi.mocked(getServerSession).mockResolvedValue({ tenantId: cleanProjectFixture.tenant.tenantId } as never);
+  vi.mocked(loadSnapshotContext).mockResolvedValue({ snapshot: cleanProjectFixture, history: [cleanProjectFixture], state: "no-snapshot", liveEnabled: true });
   const html = renderToStaticMarkup(await SettingsPage({ searchParams: Promise.resolve({}) }));
   expect(html).not.toContain('/api/export/relationships.csv');
   expect(html).toContain("Complete a read-only scan to export tenant relationships.");
 });
+
+function setHistory(history: TenantSnapshot[]) {
+  vi.mocked(loadSnapshotContext).mockResolvedValue({ snapshot: history[0]!, history, state: "connected", liveEnabled: true });
+}
 
 function history() {
   const earlier: TenantSnapshot = { ...cleanProjectPreviousFixture, mode: "tenant", id: "oldest", scannedAt: "2026-08-24T09:00:00Z" };
@@ -69,7 +67,7 @@ function history() {
 
 it("computes the finding lifecycle through the selected later snapshot, not the newest scan", async () => {
   const snapshots = history();
-  vi.mocked(loadSnapshotHistory).mockResolvedValue(snapshots);
+  setHistory(snapshots);
   const selected = analyzeFindingLifecycle(snapshots.slice(1));
   const newest = analyzeFindingLifecycle(snapshots);
   expect(selected.counts).not.toEqual(newest.counts);
@@ -81,7 +79,7 @@ it("computes the finding lifecycle through the selected later snapshot, not the 
 });
 
 it("explains the earliest selected snapshot without claiming retained history vanished", async () => {
-  vi.mocked(loadSnapshotHistory).mockResolvedValue(history());
+  setHistory(history());
   const html = renderToStaticMarkup(await ChangesPage({ searchParams: Promise.resolve({ after: "oldest" }) }));
   expect(html).toContain("No earlier snapshot for this selection");
   expect(html).toContain("Choose a more recent later snapshot");
@@ -91,7 +89,7 @@ it("explains the earliest selected snapshot without claiming retained history va
 });
 
 it("explains a stale later-snapshot selection while retaining a usable comparison", async () => {
-  vi.mocked(loadSnapshotHistory).mockResolvedValue(history());
+  setHistory(history());
   const html = renderToStaticMarkup(await ChangesPage({ searchParams: Promise.resolve({ after: "retention-expired" }) }));
   expect(html).toContain("The selected later snapshot is unavailable. Showing the latest retained snapshot.");
   expect(html).toContain('aria-label="Snapshot change summary"');

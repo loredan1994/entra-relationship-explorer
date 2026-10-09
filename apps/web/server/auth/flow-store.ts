@@ -2,6 +2,7 @@ import "server-only";
 import { randomBytes, randomUUID } from "node:crypto";
 import type { LiveEntraConfig } from "../config-core";
 import { getBackend } from "../backend";
+import { canonicalOpaqueId } from "../opaque-id";
 
 const FLOW_MAX_AGE_MS = 10 * 60 * 1_000;
 
@@ -13,6 +14,7 @@ export async function createAuthFlow(config: LiveEntraConfig, verifier: string):
 }
 
 export async function consumeAuthFlow(config: LiveEntraConfig, flowId: string | undefined, returnedState: string | null) {
-  if (!flowId || !returnedState) return null;
-  return (await getBackend(config)).consumeAuthFlow(flowId, config.tenantId, returnedState);
+  const id = canonicalOpaqueId(flowId);
+  if (!id || !returnedState) return null;
+  return (await getBackend(config)).consumeAuthFlow(id, config.tenantId, returnedState);
 }

@@ -40,7 +40,7 @@ describe("version 1 evidence format compatibility", () => {
   cases.push(["complete absence", query, snapshot([])]);
   const conflict = snapshot(); conflict.edges.push({ ...conflict.edges[0]!, permissions: ["Disagrees"], permissionIds: ["different"] }); cases.push(["conflicting source", query, conflict]);
   it.each(cases)("preserves the public proof fields for %s", (_name, q, s) => {
-    const proof = evaluateAuthorization(compileSnapshot(s), q); expect(proof.query).toEqual(q); expect(proof.engineVersion).toBe("1.0.3"); expect(proof.ruleVersion).toBe("entra-configured/4"); expect(proof).toMatchSnapshot();
+    const proof = evaluateAuthorization(compileSnapshot(s), q); expect(proof.query).toEqual(q); expect(proof.engineVersion).toBe("1.0.4"); expect(proof.ruleVersion).toBe("entra-configured/4"); expect(proof).toMatchSnapshot();
   });
   it("preserves planning alternatives, bounds, protected paths and costs", () => {
     const model = compileSnapshot(snapshot()); const candidate = (id: string, cost: number) => ({ id, cost, removes: [id], description: `Exclude ${id}` });

@@ -1,6 +1,6 @@
 import type { CollectorCoverage, DirectoryNode, RelationshipEdge, RelationshipType } from "@entra-explorer/domain";
 
-export const ENGINE_VERSION = "1.0.3";
+export const ENGINE_VERSION = "1.0.4";
 export const RULE_VERSION = "entra-configured/4";
 export type Verdict = "supported" | "refuted" | "unknown" | "conflicting";
 export type EvidenceClass = "configured" | "observed" | "inferred";

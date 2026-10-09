@@ -4,6 +4,7 @@ import { redeemAuthorizationCode } from "@/server/auth/msal";
 import { AUTH_FLOW_COOKIE, createServerSession, SESSION_COOKIE } from "@/server/auth/session-store";
 import { getEntraConfig } from "@/server/config";
 import { noStoreJson } from "@/server/http";
+import { canonicalOpaqueId } from "@/server/opaque-id";
 
 export const dynamic = "force-dynamic";
 
@@ -12,14 +13,18 @@ export async function GET(request: NextRequest) {
   if (!config.enabled) return noStoreJson({ error: "Live Entra access is disabled." }, { status: 404 });
 
   const settingsUrl = new URL("/settings", config.redirectUri);
+  const flowId = request.cookies.get(AUTH_FLOW_COOKIE)?.value;
   const flow = await consumeAuthFlow(
     config,
-    request.cookies.get(AUTH_FLOW_COOKIE)?.value,
+    flowId,
     request.nextUrl.searchParams.get("state"),
   );
   if (!flow) {
     settingsUrl.searchParams.set("authError", "invalid_state");
-    return NextResponse.redirect(settingsUrl, { status: 302 });
+    const response = NextResponse.redirect(settingsUrl, { status: 302 });
+    // A stale callback may carry a newer sign-in's cookie. Preserve that pending
+    // flow on state mismatch; only discard a cookie that cannot identify a flow.
+    return canonicalOpaqueId(flowId) ? response : clearFlowCookie(response, config.redirectUri);
   }
 
   const providerError = request.nextUrl.searchParams.get("error");

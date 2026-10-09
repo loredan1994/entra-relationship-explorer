@@ -221,7 +221,7 @@ describe("encrypted round trips", () => {
     expect(pool.only("INSERT INTO access_events").params).toEqual([TENANT, "session-1", "update", "threat_review", "finding-1"]);
     expect(pool.sql[0]).toBe("BEGIN");
     expect(pool.sql.at(-1)).toBe("COMMIT");
-    const lock = pool.only("pg_advisory_xact_lock");
+    const lock = pool.only("snapshot-review:");
     expect(lock.params).toEqual([TENANT]);
     expect(pool.sql.indexOf(lock.sql)).toBeLessThan(pool.sql.indexOf(pool.only("INSERT INTO threat_reviews").sql));
     expect(pool.only("INSERT INTO threat_reviews").sql).toContain("id=(SELECT id FROM snapshots WHERE tenant_id=$1 ORDER BY scanned_at DESC LIMIT 1)");
@@ -387,7 +387,7 @@ describe("queueing and claiming", () => {
     pool.responder = (sql) => (sql.includes("SELECT * FROM scan_jobs WHERE tenant_id=$1 AND status IN") ? rows(jobRow({ status: "running" })) : { rows: [], rowCount: 0 });
     const job = await backend.enqueueScan(TENANT, "session-1");
     expect(job.status).toBe("running");
-    expect(pool.only("INSERT INTO scan_jobs").sql).toContain("FROM sessions WHERE id=$3 AND tenant_id=$2 AND expires_at>now()");
+    expect(pool.only("INSERT INTO scan_jobs").sql).toContain("FROM sessions WHERE id=$3 AND tenant_id=$2 AND expires_at>clock_timestamp()");
   });
 
   it("refuses to queue a scan when neither an insert nor an active job is available", async () => {
@@ -624,7 +624,7 @@ describe("statement parameters", () => {
     await backend.enqueueScan(TENANT, "session-1");
     const fallback = pool.only("SELECT * FROM scan_jobs WHERE tenant_id=$1 AND status IN");
     expect(fallback.params).toEqual([TENANT, "session-1"]);
-    expect(fallback.sql).toContain("EXISTS (SELECT 1 FROM sessions WHERE id=$2 AND tenant_id=$1 AND expires_at>now())");
+    expect(fallback.sql).toContain("EXISTS (SELECT 1 FROM sessions WHERE id=$2 AND tenant_id=$1 AND expires_at>clock_timestamp())");
   });
 
   it("scopes every job read to the tenant or the owning worker", async () => {
@@ -689,7 +689,7 @@ describe("statement parameters", () => {
     const retainAfter = new Date("2026-01-01T00:00:00.000Z");
     await backend.completeJob("job-1", "worker-1", snapshot, retainAfter);
     expect(pool.only("SELECT * FROM scan_jobs WHERE id=$1 AND worker_id=$2 AND status='running' FOR UPDATE").params).toEqual(["job-1", "worker-1"]);
-    const lock = pool.only("pg_advisory_xact_lock");
+    const lock = pool.only("snapshot-review:");
     expect(lock.params).toEqual([TENANT]);
     expect(pool.sql.indexOf(lock.sql)).toBeLessThan(pool.sql.indexOf(pool.only("INSERT INTO snapshots").sql));
     expect(pool.only("INSERT INTO snapshots").params).toEqual([SNAPSHOT_ID, TENANT, snapshot.scannedAt, snapshot.completion.status, ...ANY_PAYLOAD]);

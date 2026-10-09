@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { LiveEntraConfig } from "../config-core";
 
+const FLOW = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
 const TENANT = "11111111-1111-4111-8111-111111111111";
 
 const createAuthFlowRow = vi.fn();
@@ -52,27 +53,38 @@ describe("starting a sign-in", () => {
 });
 
 describe("completing a sign-in", () => {
+  it.each(["invalid", "", ` ${FLOW}`, `${FLOW}\n`, FLOW.replaceAll("-", "")])("rejects malformed flow cookie %j without storage access", async flow => {
+    expect(await consumeAuthFlow(config, flow, "returned-state")).toBeNull();
+    expect(consumeAuthFlowRow).not.toHaveBeenCalled();
+  });
+
+  it("normalizes an uppercase flow UUID before consumption", async () => {
+    consumeAuthFlowRow.mockResolvedValue({ id: FLOW, verifier: "v" });
+    expect(await consumeAuthFlow(config, FLOW.toUpperCase(), "returned-state")).toMatchObject({ id: FLOW });
+    expect(consumeAuthFlowRow).toHaveBeenCalledWith(FLOW, TENANT, "returned-state");
+  });
+
   it("refuses a callback with no flow cookie or no returned state", async () => {
     expect(await consumeAuthFlow(config, undefined, "state")).toBeNull();
-    expect(await consumeAuthFlow(config, "flow-1", null)).toBeNull();
+    expect(await consumeAuthFlow(config, FLOW, null)).toBeNull();
     expect(await consumeAuthFlow(config, undefined, null)).toBeNull();
     expect(consumeAuthFlowRow).not.toHaveBeenCalled();
   });
 
   it("refuses a callback whose returned state is an empty string", async () => {
-    expect(await consumeAuthFlow(config, "flow-1", "")).toBeNull();
+    expect(await consumeAuthFlow(config, FLOW, "")).toBeNull();
     expect(consumeAuthFlowRow).not.toHaveBeenCalled();
   });
 
   it("consumes the flow scoped to the configured tenant", async () => {
-    consumeAuthFlowRow.mockResolvedValue({ id: "flow-1", tenantId: TENANT, state: "s", verifier: "v", expiresAt: Date.now() });
-    const flow = await consumeAuthFlow(config, "flow-1", "returned-state");
-    expect(consumeAuthFlowRow).toHaveBeenCalledWith("flow-1", TENANT, "returned-state");
+    consumeAuthFlowRow.mockResolvedValue({ id: FLOW, tenantId: TENANT, state: "s", verifier: "v", expiresAt: Date.now() });
+    const flow = await consumeAuthFlow(config, FLOW, "returned-state");
+    expect(consumeAuthFlowRow).toHaveBeenCalledWith(FLOW, TENANT, "returned-state");
     expect(flow).toMatchObject({ verifier: "v" });
   });
 
   it("passes through a rejected or already-used flow", async () => {
     consumeAuthFlowRow.mockResolvedValue(null);
-    expect(await consumeAuthFlow(config, "flow-1", "returned-state")).toBeNull();
+    expect(await consumeAuthFlow(config, FLOW, "returned-state")).toBeNull();
   });
 });

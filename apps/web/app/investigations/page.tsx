@@ -5,7 +5,7 @@ import { AppShell } from "@/components/app-shell";
 import { PageHeading } from "@/components/page-heading";
 import { RuleLaboratory } from "@/components/rule-laboratory";
 import { ScenarioPlanner } from "@/components/scenario-planner";
-import { loadCurrentSnapshot } from "@/server/current-snapshot";
+import { loadSnapshotContext } from "@/server/current-snapshot";
 
 export const dynamic = "force-dynamic";
 const tabs = [{ id: "applications", title: "Application access" }, { id: "coverage", title: "Evidence coverage" }, { id: "ledger", title: "Permission ledger" }, { id: "credentials", title: "Credentials and federation" }, { id: "scenarios", title: "What-if planner" }, { id: "rules", title: "Rule laboratory" }];
@@ -13,13 +13,14 @@ const tabs = [{ id: "applications", title: "Application access" }, { id: "covera
 export default async function InvestigationsPage({ searchParams }: { searchParams: Promise<{ view?: string; q?: string; state?: string; identity?: string }> }) {
   const params = await searchParams;
   const view = tabs.find(t => t.id === params.view)?.id ?? "coverage";
-  const snapshot = await loadCurrentSnapshot();
+  const context = await loadSnapshotContext(1);
+  const { snapshot } = context;
   const query = (params.q ?? "").slice(0, 200).toLowerCase();
   const analysis = view === "coverage" ? analyzeTenantIntelligence(snapshot) : null;
   const ledger = view === "ledger" ? permissionLedger(snapshot).filter(r => [r.identity, r.resource, r.permission, r.status, r.principalId ?? ""].some(s => s.toLowerCase().includes(query))) : [];
   const credentialFilter = ["expired", "expires-soon", "valid", "not-yet-valid", "unknown"].includes(params.state ?? "") ? params.state : "all";
   const credentials = view === "credentials" ? credentialWorkbench(snapshot).filter(r => `${r.identity.label} ${r.identity.id}`.toLowerCase().includes(query)).filter(r => credentialFilter === "all" || (credentialFilter === "unknown" && !r.inventoryKnown) || r.credentials.some(c => c.state === credentialFilter)) : [];
-  return <AppShell><div className="page-container investigations">
+  return <AppShell context={context}><div className="page-container investigations">
     <PageHeading eyebrow="Read-only investigation" title="Investigations" description="Review application access, collection coverage, permission grants and credential lifecycles. Model possible changes locally against this snapshot." actions={<Link className="button button-secondary" href="/guide">Choose an investigation</Link>} />
     <nav className="investigation-tabs" aria-label="Investigation tools">{tabs.map(t => <Link key={t.id} href={`/investigations?view=${t.id}`} aria-current={view === t.id ? "page" : undefined}>{t.title}</Link>)}<Link href="/changes">Snapshot timeline</Link><Link href="/engine">Evidence engine</Link></nav>
     <p className="trust-note">Snapshot <code>{snapshot.id}</code> · {snapshot.scannedAt} · {snapshot.mode === "fixture" ? "Synthetic sample" : "Tenant evidence"}. Configured access and simulated paths do not establish observed use.</p>

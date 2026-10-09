@@ -3,13 +3,14 @@ import Link from "next/link";
 import { CredentialHistory } from "@/components/credential-history";
 import { AppShell } from "@/components/app-shell";
 import { PageHeading } from "@/components/page-heading";
-import { loadSnapshotHistory } from "@/server/current-snapshot";
+import { loadSnapshotContext } from "@/server/current-snapshot";
 
 export const dynamic = "force-dynamic";
 
 export default async function ChangesPage({ searchParams }: { searchParams: Promise<{ before?: string; after?: string }> }) {
   const selection = await searchParams;
-  const retained = await loadSnapshotHistory(20);
+  const context = await loadSnapshotContext(20);
+  const retained = context.history;
   const snapshots = retained[0]?.mode === "fixture" ? [retained[0], cleanProjectPreviousFixture] : retained;
   const current = snapshots.find(s => s.id === selection.after) ?? snapshots[0]!;
   const candidate = snapshots.find(s => s.id === selection.before);
@@ -18,7 +19,7 @@ export default async function ChangesPage({ searchParams }: { searchParams: Prom
   // Lifecycle must describe the selected later scan, never scans from its future.
   const lifecycle = analyzeFindingLifecycle(snapshots.slice(snapshots.indexOf(current)));
   return (
-    <AppShell>
+    <AppShell context={{ ...context, snapshot: current }}>
       <div className="page-container">
         <PageHeading eyebrow="Snapshot comparison" title="Changes" description="Compare read-only snapshots without changing the tenant." />
         <form key={`${current.id}:${previous?.id ?? "none"}`} className="investigation-search"><label>Earlier snapshot<select name="before" defaultValue={previous?.id ?? ""}><option value="">Select an earlier scan</option>{snapshots.map(s => <option key={s.id} value={s.id}>{s.scannedAt} · {s.id} · {s.completion.status}</option>)}</select></label><label>Later snapshot<select name="after" defaultValue={current.id}>{snapshots.map(s => <option key={s.id} value={s.id}>{s.scannedAt} · {s.id} · {s.completion.status}</option>)}</select></label><button className="button button-secondary" type="submit">Compare snapshots</button></form>

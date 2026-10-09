@@ -3,6 +3,7 @@ import { Pool } from "pg";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { cleanProjectFixture } from "@entra-explorer/domain";
 import { PostgresBackend } from "./postgres";
+import { blockedTransactions } from "./test-support";
 import type { ThreatReview } from "./types";
 
 const connectionString = process.env.TEST_DATABASE_URL;
@@ -13,6 +14,7 @@ if (connectionString) {
 describe.skipIf(!connectionString)("real PostgreSQL boundaries", () => {
   const tenantId = randomUUID();
   const key = randomBytes(32);
+  const applicationName = `postgres-boundaries-${tenantId}`;
   let backend: PostgresBackend;
   let sql: Pool;
   const sessionId = randomUUID();
@@ -26,7 +28,9 @@ describe.skipIf(!connectionString)("real PostgreSQL boundaries", () => {
     return snapshot;
   }
   beforeAll(async () => {
-    backend = new PostgresBackend({ connectionString: connectionString!, encryptionKey: key });
+    const backendUrl = new URL(connectionString!);
+    backendUrl.searchParams.set("application_name", applicationName);
+    backend = new PostgresBackend({ connectionString: backendUrl.toString(), encryptionKey: key });
     sql = new Pool({ connectionString });
     await backend.migrate(); await backend.migrate();
     await backend.createSession({ id: sessionId, tenantId, account: {}, accessToken: "synthetic-only", accessTokenExpiresAt: Date.now() + 3600000, sessionExpiresAt: Date.now() + 3600000, tokenCache: "synthetic" });
@@ -74,8 +78,8 @@ describe.skipIf(!connectionString)("real PostgreSQL boundaries", () => {
       await blocker.query("SELECT pg_advisory_xact_lock(hashtextextended('snapshot-review:' || $1, 0))", [tenantId]);
       const pid = (await blocker.query("SELECT pg_backend_pid() AS pid")).rows[0].pid;
       const waitForBlocked = (count: number) => vi.waitFor(async () => {
-        const result = await sql.query("SELECT count(*)::int AS count FROM pg_locks held JOIN pg_locks waiting ON held.locktype=waiting.locktype AND held.database IS NOT DISTINCT FROM waiting.database AND held.classid=waiting.classid AND held.objid=waiting.objid AND held.objsubid=waiting.objsubid WHERE held.pid=$1 AND held.locktype='advisory' AND held.granted AND NOT waiting.granted", [pid]);
-        expect(result.rows[0].count).toBe(count);
+        const result = await blockedTransactions(sql, applicationName, [pid]);
+        expect(result.rows).toHaveLength(count);
       }, { timeout: 2000, interval: 10 });
       const publish = () => { publication = backend.completeJob(job.id, "integration", current, new Date(0)); };
       const decide = () => {
@@ -170,7 +174,7 @@ describe.skipIf(!connectionString)("real PostgreSQL boundaries", () => {
       // Ownership must remain locked until the checkpoint statement finishes;
       // otherwise its stale INSERT SELECT can overwrite a recovered worker.
       await vi.waitFor(async () => {
-        const waiting = await sql.query("SELECT pid FROM pg_stat_activity WHERE $1=ANY(pg_blocking_pids(pid)) AND query LIKE '%UPDATE scan_jobs%'", [writerPid]);
+        const waiting = await blockedTransactions(sql, applicationName, [writerPid]);
         expect(waiting.rows).toHaveLength(1);
       }, { timeout: 2000, interval: 10 });
       await blocker.query("COMMIT");
