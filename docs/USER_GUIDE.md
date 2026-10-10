@@ -69,6 +69,8 @@ Review drafts allow 20 steps, 500 characters per narrative, a 160-character owne
 
 If browser storage is unavailable, your edits remain usable in the current page and the save warning explains that they are not persisted. **Retry browser save** tries again after storage recovers. Invalid saved demo records are ignored independently so valid neighboring decisions can still load. A failed live review read has **Retry review load**; it does not discard unsaved edits on another finding.
 
+Demo decisions synchronize between tabs in the same browser. Independent field edits are merged; competing changes to the same field show a conflict and retain your draft. **Reload saved decision** explicitly discards that conflicting draft and loads the saved version. Browser-local decisions remain separate from shared tenant records.
+
 Exports begin only after selecting a download action. Finding, path and CSV downloads are bound to the displayed snapshot. A newer scan requires reviewing the current evidence first; an expired session requires sign-in. Errors appear beside the export action and preserve the open review. Copy any unsaved drafts before deliberately reloading or leaving to sign in.
 
 For rule contributions, use the **Rule laboratory** with synthetic declarative cases and follow [RULE_LAB.md](RULE_LAB.md). For deployment and upgrade procedures, use [LOCAL_OPERATIONS.md](LOCAL_OPERATIONS.md) and [CHANGELOG.md](../CHANGELOG.md).
@@ -79,4 +81,8 @@ Open **Evidence engine** to reproduce an access proof, inspect time-consistent p
 
 Rotation dates and policy scenarios are supplied assumptions. Protected integrations constrain proposed plans. The engine cannot consent, execute a proposed read, or apply changes. Older snapshots and unavailable optional scopes produce unknown where appropriate. See the [engine guide and support matrix](CUSTOM_ENGINE.md) for all ten workflows, schema examples and CLI commands.
 
+Planning costs must be explicit numbers from 0 to 1,000,000. Clearing a value leaves an invalid draft; enter `0` deliberately for a proposed change with no expected operational cost. Invalid costs produce guidance instead of a plan.
+
 Access contracts and offline package import are available independently of the current access query. Package export requires a valid evaluated query and the export acknowledgment. Import/export shows pending status; selecting a newer file or changing the evaluated query or disclosure options prevents old asynchronous work from publishing a stale result or download.
+
+Imports reject duplicate JSON field names, including escaped spellings of the same name. Correct the source file instead of relying on one tenant, allowlist or proof value silently replacing another. Existing size and schema limits still apply.

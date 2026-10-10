@@ -25,6 +25,7 @@ test("a blocked browser save keeps the authored decision usable and reports that
   await page.getByRole("button", { name: "Edit a review copy" }).click();
   await page.getByLabel("Step narrative").first().fill("An intact local draft");
   await expect(page.getByLabel("Step narrative").first()).toHaveValue("An intact local draft");
+  await expect(page.locator(".record-save-state")).toContainText("not saved in this browser");
   await page.evaluate(() => window.dispatchEvent(new Event("allow-review-storage")));
   await page.getByRole("button", { name: "Retry browser save", exact: true }).click();
   await expect(page.locator(".record-save-state")).toHaveText("Decision saved in this browser.");

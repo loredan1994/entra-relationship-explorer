@@ -2,6 +2,7 @@ import type { DirectoryNode, RelationshipEdge, TenantSnapshot } from "@entra-exp
 import { evaluateAuthorization, QUERY_COLLECTORS, relevantEdges, validateQuery } from "./authorization";
 import { canonical, unique } from "./canonical";
 import { compileSnapshot, projectEdge } from "./model";
+import { parseUniqueJson } from "./json";
 import { DEFAULT_BUDGET, ENGINE_VERSION, RULE_VERSION, type AuthorizationQuery, type Budget, type EvidenceModel, type EvidenceProof } from "./types";
 
 export interface InvestigationPackage {
@@ -154,7 +155,7 @@ function exactFields(value: object, fields: string[]) {
 
 export async function verifyInvestigation(text: string): Promise<{ verified: true; proof: EvidenceProof; sharing: InvestigationPackage["sharing"]; notice: string }> {
   if (new TextEncoder().encode(text).length > MAX_BYTES) throw new Error("Investigation exceeds 5 MB.");
-  const value: unknown = JSON.parse(text);
+  const value = parseUniqueJson(text, "Investigation", 24);
   inspectJson(value);
   if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("Invalid investigation document.");
   exactFields(value, ["format", "sharing", "snapshot", "query", "budget", "proof", "manifest"]);

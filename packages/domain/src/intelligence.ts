@@ -158,7 +158,11 @@ export function controlTransition(view: RelationshipView, prior: RelationshipVie
 
 function outgoingRelationships(snapshot: TenantSnapshot): Map<string, RelationshipView[]> {
   const outgoing = new Map<string, RelationshipView[]>();
-  for (const view of relationships(snapshot)) outgoing.set(view.source.id, [...(outgoing.get(view.source.id) ?? []), view]);
+  for (const view of relationships(snapshot)) {
+    const existing = outgoing.get(view.source.id);
+    if (existing) existing.push(view);
+    else outgoing.set(view.source.id, [view]);
+  }
   return outgoing;
 }
 

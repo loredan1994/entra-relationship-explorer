@@ -17,6 +17,9 @@ export class PostgresBackend implements Backend {
     if (!options.connectionString) throw new Error("DATABASE_URL is required.");
     if (options.encryptionKey.byteLength !== 32) throw new Error("Backend encryption requires a 32-byte key.");
     this.pool = new Pool({ connectionString: options.connectionString, max: 10, idleTimeoutMillis: 30_000, connectionTimeoutMillis: 10_000 });
+    // pg removes failed idle clients before emitting this event. Handle it so a
+    // database restart cannot crash the process; never log its error/client data.
+    this.pool.on("error", () => { console.warn("An idle database connection was lost. Future requests can reconnect."); });
     this.key = options.encryptionKey;
   }
 

@@ -3,6 +3,7 @@
  * coverage reports: this file provides only test setup and `pg` substitutes.
  */
 import { randomUUID } from "node:crypto";
+import { EventEmitter } from "node:events";
 
 /** Isolate destructive expiry/DDL fixtures while preserving concurrent transactions. */
 export async function createIsolatedTestDatabase(connectionString: string, Pool: typeof import("pg").Pool) {
@@ -57,7 +58,7 @@ export class FakePoolClient {
 }
 
 /** Stands in for `pg.Pool`; every constructed instance registers itself. */
-export class FakePool {
+export class FakePool extends EventEmitter {
   static instances: FakePool[] = [];
   static reset(): void { FakePool.instances = []; }
   static get last(): FakePool { return FakePool.instances.at(-1)!; }
@@ -68,7 +69,7 @@ export class FakePool {
   ended = false;
   responder: QueryResponder = () => EMPTY;
 
-  constructor(readonly config: Record<string, unknown>) { FakePool.instances.push(this); }
+  constructor(readonly config: Record<string, unknown>) { super(); FakePool.instances.push(this); }
 
   async query(sql: string, params: unknown[] = []): Promise<QueryResult> {
     this.queries.push({ sql, params });

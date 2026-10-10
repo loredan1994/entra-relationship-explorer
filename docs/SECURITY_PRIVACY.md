@@ -77,4 +77,6 @@ The engine is a pure local TypeScript module without network, token or database 
 
 Engine contracts and packages contain data, never executable plugins. Contract imports are bounded to 100 KB. Investigation packages are bounded to 5 MB with structural-depth limits, version checks, tenant validation, dependency checking and deterministic replay. The JSON format contains no archive paths or extracted files. Export projection omits labels and unrelated metadata. Sensitive exports require acknowledgment in the UI; pseudonymization retains linkable topology and dates. Private identity mappings are offered as a separate download and never embedded in the investigation. SHA-256 checks integrity, not Microsoft origin. Imported packages remain separate from the active tenant and are never uploaded.
 
+Contract and investigation imports reject duplicate object fields, including escaped spellings of the same name, before native JSON parsing can discard conflicting values. Investigation nesting is bounded before parsing as well as during structural validation. Valid packages retain their existing format and engine version.
+
 Deployment stages, costs and protected integrations are explicitly operator-supplied assumptions. Plans never apply changes. Missing source evidence and exhausted budgets cannot establish a negative security claim.

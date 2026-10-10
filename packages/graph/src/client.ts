@@ -3,7 +3,7 @@ const GRAPH_ROOT = `${GRAPH_ORIGIN}/v1.0/`;
 
 interface GraphPage<T> {
   value: T[];
-  "@odata.nextLink"?: string;
+  "@odata.nextLink"?: unknown;
 }
 
 export interface ReadOnlyGraphClientOptions {
@@ -90,12 +90,16 @@ export class ReadOnlyGraphClient {
     while (nextUrl) {
       if (++pages > this.maxPages) throw new GraphRequestError(0, "page_limit", endpoint);
       const page: GraphPage<T> = await this.getPage<T>(nextUrl, checkActive);
-      if (!Array.isArray(page.value)) throw new GraphRequestError(0, "invalid_collection", endpoint);
+      if (!Array.isArray(page?.value)) throw new GraphRequestError(0, "invalid_collection", endpoint);
       if (items.length + page.value.length > this.maxItems) throw new GraphRequestError(0, "item_limit", endpoint);
+      const nextLink = page["@odata.nextLink"];
+      // Only an absent continuation establishes that the collection ended. Treating
+      // a malformed falsey value as the last page would incorrectly certify coverage.
+      if (nextLink !== undefined && (typeof nextLink !== "string" || !nextLink.trim())) throw new GraphRequestError(0, "invalid_next_link", endpoint);
+      nextUrl = nextLink === undefined ? undefined : this.resolveGraphUrl(nextLink);
       // Collections can exceed the runtime's function-argument limit; never spread a page into push.
       for (const item of page.value) items.push(item);
       onPage?.(items.length);
-      nextUrl = page["@odata.nextLink"] ? this.resolveGraphUrl(page["@odata.nextLink"]) : undefined;
     }
 
     return items;
@@ -115,7 +119,7 @@ export class ReadOnlyGraphClient {
     for (let attempt = 0; attempt <= this.maxRetries; attempt++) {
       await checkActive?.();
       const readGuard = new ReadGuardOptions(checkActive);
-      let response: Response;
+      let response: Response | undefined;
       try {
         response = await this.sdkClient.api(safeUrl).middlewareOptions([readGuard]).responseType(ResponseType.RAW).get() as Response;
         await readGuard.verify();
@@ -127,6 +131,7 @@ export class ReadOnlyGraphClient {
           return value;
         }
       } catch (error) {
+        await releaseResponse(response);
         // The SDK wraps middleware errors. Preserve the caller's original stop reason.
         if (readGuard.interruption) throw readGuard.interruption.reason;
         await checkActive?.();
@@ -137,6 +142,7 @@ export class ReadOnlyGraphClient {
       }
 
       if ([408, 429, 500, 502, 503, 504].includes(response.status) && attempt < this.maxRetries) {
+        await releaseResponse(response);
         await this.waitBeforeRetry(safeUrl, response.status, attempt, response.headers, checkActive);
         continue;
       }
@@ -170,6 +176,13 @@ export class ReadOnlyGraphClient {
     }
     return url.toString();
   }
+}
+
+/** Release an abandoned fetch body before backoff or an ownership interruption. */
+async function releaseResponse(response: Response | undefined): Promise<void> {
+  // A failed/consumed body can reject cancellation; cleanup must not hide the
+  // original error or turn an explicit cancellation into another Graph attempt.
+  try { await response?.body?.cancel(); } catch { /* Already closed or unavailable. */ }
 }
 
 /**

@@ -1,6 +1,7 @@
 import { evaluateAuthorization, pathMissing, QUERY_COLLECTORS } from "./authorization";
 import { bound, canonical, compare, unique } from "./canonical";
 import { assertTenant, context } from "./model";
+import { parseUniqueJson } from "./json";
 import type { AuthorizationQuery, EvidenceModel, EvidenceProof, WorkflowResult } from "./types";
 
 export type AccessContract =
@@ -14,7 +15,7 @@ export interface ContractResult extends WorkflowResult {
 
 export function parseContract(text: string): AccessContract {
   if (new TextEncoder().encode(text).length > 100_000) throw new Error("Contract exceeds 100 KB.");
-  const value: unknown = JSON.parse(text);
+  const value = parseUniqueJson(text, "Contract");
   if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("Contract must be an object.");
   const c = value as Record<string, unknown>;
   const fields: Record<string, string[]> = { "only-principals": ["resourceId", "permissionId", "allowedPrincipalIds"], "no-control-path": ["sourceIds", "resourceIds"], "require-grant": ["principalId", "resourceId", "permissionId"] };

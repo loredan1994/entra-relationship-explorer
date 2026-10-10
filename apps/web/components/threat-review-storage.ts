@@ -3,6 +3,23 @@ import { THREAT_REVIEW_LIMITS } from "../lib/threat-review-limits";
 export type Disposition = "open" | "mitigating" | "accepted" | "resolved";
 export interface FlowDraftStep { id: string; title: string; evidenceEdgeId: string | null; }
 export interface ReviewRecord { disposition: Disposition; owner: string; expiresAt: string; assumption: string; flowDraft: FlowDraftStep[]; }
+export const EMPTY_REVIEW: ReviewRecord = { disposition: "open", owner: "", expiresAt: "", assumption: "", flowDraft: [] };
+export interface BrowserReviewDraft { original: ReviewRecord; changes: Partial<ReviewRecord>; }
+
+/** Apply only authored fields. Concurrent changes to the same field require an explicit decision. */
+export function mergeBrowserReviewDrafts(saved: Record<string, ReviewRecord>, drafts: Record<string, BrowserReviewDraft>): { records: Record<string, ReviewRecord>; conflicts: string[] } {
+  const records = { ...saved }, conflicts: string[] = [];
+  for (const [id, draft] of Object.entries(drafts)) {
+    const current = saved[id] ?? EMPTY_REVIEW;
+    const changed = Object.keys(draft.changes) as Array<keyof ReviewRecord>;
+    if (changed.some(field => JSON.stringify(current[field]) !== JSON.stringify(draft.original[field]) && JSON.stringify(current[field]) !== JSON.stringify(draft.changes[field]))) {
+      conflicts.push(id);
+      continue;
+    }
+    records[id] = { ...current, ...draft.changes };
+  }
+  return { records, conflicts };
+}
 
 function object(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value);

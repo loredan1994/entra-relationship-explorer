@@ -13,6 +13,7 @@ Breaking changes are always called out under **Changed** with a migration note.
 
 ### Added
 
+- Reproducible ownership fan-out benchmark (`pnpm intelligence:benchmark`) and a deterministic work-count regression for large relationship indexes.
 - Original tenant-bound evidence engine with reproducible proofs, typed access evaluation, temporal path reconstruction, weighted change planning, policy counterexamples, federation overlap analysis, credential continuity simulation, evidence-gap planning, access contracts, and portable offline replay.
 - Evidence engine UI with ten workflows, visible support limits, sensitive export acknowledgment, and a standalone offline CLI.
 - Independent exhaustive planning oracles, semantic decision tables, package-tamper tests, desktop/mobile engine workflows, and reproducible generated benchmarks.
@@ -62,6 +63,11 @@ Breaking changes are always called out under **Changed** with a migration note.
 
 ### Fixed
 
+- Preserve browser-local review decisions across tabs, merge independent field edits, and require explicit recovery when the same field changes concurrently. Blank planning costs remain invalid until an explicit value is supplied.
+- Reject duplicate JSON fields in investigation and access-contract imports, including escaped aliases, before parsing can discard conflicting tenant, allowlist or proof values.
+- Handle idle PostgreSQL connection failures without crashing the web or worker process; discard the failed connection and reconnect on a later request without logging connection details.
+- Reject malformed Graph continuation markers instead of certifying incomplete collections as complete, and release abandoned response bodies before retry backoff or ownership interruption.
+- Build threat-analysis adjacency lists in linear work while preserving relationship order, source evidence and existing traversal limits.
 - Use one authorized snapshot context for page content and its header, including historical comparisons. Missing or filtered application bookmarks offer recovery instead of silently showing another identity.
 - Prevent delayed What-if imports from overwriting newer imports, resets, manual edits or selected candidates; clear obsolete import feedback when the plan changes.
 - Reject malformed authentication cookies and scan identifiers before database lookup, normalize UUID case consistently with encrypted storage, and allow sign-out to clear a damaged cookie. Retry database initialization after transient startup failure.

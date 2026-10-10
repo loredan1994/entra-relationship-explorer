@@ -5,20 +5,25 @@ import { download, JsonDetails, ResultSummary } from "./common";
 
 export function ChangePlanner({ model, proof, names }: { model: EvidenceModel; proof: EvidenceProof; names: Map<string, string> }) {
   const ids = unique(proof.paths.flat());
-  const [costs, setCosts] = useState<Record<string, number>>({}), [protectedIds, setProtected] = useState<string[]>([]);
+  const [costs, setCosts] = useState<Record<string, string>>({}), [protectedIds, setProtected] = useState<string[]>([]);
   const [result, setResult] = useState<ReturnType<typeof solveChanges> | null>(null), [error, setError] = useState("");
   const protectionChoices = model.edges.filter(e => e.type === "CAN_CALL_AS_APP" && e.evidence.configured);
   function run() {
     try {
+      const candidates = ids.map(id => {
+        const draft = costs[id] ?? "1";
+        if (!draft.trim() || !Number.isFinite(Number(draft)) || Number(draft) < 0 || Number(draft) > 1_000_000) throw new Error("Enter a cost from 0 to 1,000,000 for every candidate. Use an explicit 0 only when no operational cost is expected.");
+        return { id, cost: Number(draft), removes: [id], description: "Proposed relationship exclusion" };
+      });
       setResult(solveChanges({ context: model, paths: proof.paths.map((dependencies, i) => ({ id: `path-${i + 1}`, dependencies })),
-        candidates: ids.map(id => ({ id, cost: costs[id] ?? 1, removes: [id], description: "Proposed relationship exclusion" })),
+        candidates,
         protectedIntegrations: protectedIds.map(id => ({ id, alternatives: [{ id, dependencies: [id] }] })),
         evidenceComplete: proof.verdict !== "unknown" && proof.verdict !== "conflicting" && !proof.missing.length, maxSteps: 25_000 }));
       setError("");
     } catch (e) { setError(e instanceof Error ? e.message : "Plan could not be evaluated."); }
   }
   return <><p>Find low-cost sets of proposed relationship exclusions that break all {proof.paths.length} recorded paths. Costs are your operational estimates. Nothing is applied to Entra.</p>
-    <h3>Candidate changes and declared cost</h3><div className="engine-costs">{ids.map(id => { const e = model.edges.find(e => e.id === id)!; return <label key={id}><span>{names.get(e.sourceId)} → {names.get(e.targetId)} · {e.type}<br /><code>{id}</code></span><input aria-label={`Cost for ${id}`} type="number" min="0" max="1000000" value={costs[id] ?? 1} onChange={event => { setCosts(c => ({ ...c, [id]: Number(event.target.value) })); setResult(null); }} /></label>; })}</div>
+    <h3>Candidate changes and declared cost</h3><div className="engine-costs">{ids.map(id => { const e = model.edges.find(e => e.id === id)!; return <label key={id}><span>{names.get(e.sourceId)} → {names.get(e.targetId)} · {e.type}<br /><code>{id}</code></span><input aria-label={`Cost for ${id}`} type="number" min="0" max="1000000" value={costs[id] ?? "1"} onChange={event => { setCosts(c => ({ ...c, [id]: event.target.value })); setResult(null); setError(""); }} /></label>; })}</div>
     <details><summary>Protect required application integrations</summary><p>A protected recorded grant cannot be excluded. Advanced protected alternatives are supported by the engine’s declarative planning interface.</p><div className="scenario-choices">{protectionChoices.map(e => <label key={e.id}><input type="checkbox" checked={protectedIds.includes(e.id)} onChange={event => { setProtected(values => event.target.checked ? [...values, e.id] : values.filter(id => id !== e.id)); setResult(null); }} /><span>{names.get(e.sourceId)} → {names.get(e.targetId)} · {e.permissions.join(", ")}<br /><code>{e.id}</code></span></label>)}</div></details>
     <button className="button button-primary" onClick={run} type="button" disabled={!proof.paths.length}>Compare proposed changes</button>{!proof.paths.length ? <p>Evaluate a query with a recorded path first.</p> : null}{error ? <p role="alert">{error}</p> : null}
     {result ? <><ResultSummary result={result}><p>Search: <strong>{result.status}</strong> · lower bound {result.lowerBound} · best cost {result.upperBound ?? "No feasible plan found"}. Bounds concern supplied paths only.</p><p>Analysis work: {result.limits.work.toLocaleString()} / {result.limits.maxWork.toLocaleString()} units. {result.status === "bounded" ? "A limit was reached. Reduce the candidate set or use a larger offline budget; no result here establishes that a plan is impossible." : "All supplied planning work completed."}</p></ResultSummary>{result.plans.map((p, i) => <article className="engine-result" key={i}><h3>Plan {i + 1} · cost {p.cost}</h3><ul>{p.changes.map(id => <li key={id}>Propose excluding <code>{id}</code></li>)}</ul><p>{p.brokenPaths.length} modeled paths broken · {p.residualPaths.length} residual paths · {p.preservedIntegrations.length} protected integrations preserved.</p></article>)}<button className="button button-secondary" type="button" onClick={() => download(result, "entra-local-change-plans.json")}>Export sensitive review plans</button><JsonDetails value={result} /></> : null}

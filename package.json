@@ -27,6 +27,7 @@
     "test:persistence": "node scripts/persistence-tests.mjs",
     "engine": "pnpm --filter @entra-explorer/web exec node --import tsx ../../scripts/engine.mts",
     "engine:benchmark": "pnpm --filter @entra-explorer/web exec node --import tsx ../../scripts/engine-benchmark.mts",
+    "intelligence:benchmark": "pnpm --filter @entra-explorer/web exec node --import tsx ../../scripts/intelligence-benchmark.mts",
     "test:engine-cli": "pnpm --filter @entra-explorer/web exec node --import tsx ../../scripts/check-engine-cli.mts"
   },
   "devDependencies": {
