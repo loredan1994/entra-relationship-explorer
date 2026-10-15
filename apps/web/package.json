@@ -22,7 +22,7 @@
     "cytoscape": "3.34.3",
     "next": "16.3.8",
     "react": "19.2.8",
-    "react-dom": "19.2.8",
+    "react-dom": "19.3.0",
     "server-only": "0.0.1",
     "tsx": "4.23.15",
     "@entra-explorer/engine": "workspace:*"
@@ -34,7 +34,7 @@
     "@stryker-mutator/vitest-runner": "^10.0.0",
     "@types/node": "24.19.1",
     "@types/react": "19.2.18",
-    "@types/react-dom": "19.2.5",
+    "@types/react-dom": "19.3.0",
     "@vitest/coverage-v8": "5.0.3",
     "typescript": "5.9.2",
     "vitest": "5.0.3"
